@@ -1,0 +1,14 @@
+.idea
+*.iws
+*.class
+*.log
+dist/*
+target/
+.history
+.cache
+.lib/
+*.iml
+out
+gen
+/.attach_pid*
+.bsp
