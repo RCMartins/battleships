@@ -1,7 +1,7 @@
 package pt.rmartins.battleships.frontend.views.game
 
 import io.udash.HasModelPropertyCreator
-import pt.rmartins.battleships.shared.model.game.{Coordinate, GameState, Rotation, Ship}
+import pt.rmartins.battleships.shared.model.game.{Coordinate, GameState, Ship}
 
 case class GameModel(
     myGameState: Option[GameState],

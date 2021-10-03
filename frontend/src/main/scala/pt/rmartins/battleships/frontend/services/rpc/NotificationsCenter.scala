@@ -2,7 +2,7 @@ package pt.rmartins.battleships.frontend.services.rpc
 
 import io.udash.utils.{CallbacksHandler, Registration}
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
-import pt.rmartins.battleships.shared.model.game.{Coordinate, GameState}
+import pt.rmartins.battleships.shared.model.game.{Coordinate, GameMode, GameState}
 
 /** Provides notifications about new messages and connections status. */
 class NotificationsCenter {
@@ -12,8 +12,12 @@ class NotificationsCenter {
     new CallbacksHandler[ChatMessage]
   private[rpc] val connectionsListeners: CallbacksHandler[Int] =
     new CallbacksHandler[Int]
-  private[rpc] val gameViewListeners: CallbacksHandler[GameState] =
+  private[rpc] val quitGameListeners: CallbacksHandler[Unit] =
+    new CallbacksHandler[Unit]
+  private[rpc] val gameStateListeners: CallbacksHandler[GameState] =
     new CallbacksHandler[GameState]
+  private[rpc] val gameModeListeners: CallbacksHandler[GameMode] =
+    new CallbacksHandler[GameMode]
   private[rpc] val receiveHitsListeners: CallbacksHandler[Seq[Coordinate]] =
     new CallbacksHandler[Seq[Coordinate]]
 
@@ -30,10 +34,20 @@ class NotificationsCenter {
   ): Registration =
     connectionsListeners.register(callback)
 
-  def onGameView(
-      callback: gameViewListeners.CallbackType
+  def onQuitGame(
+      callback: quitGameListeners.CallbackType
   ): Registration =
-    gameViewListeners.register(callback)
+    quitGameListeners.register(callback)
+
+  def onGameState(
+      callback: gameStateListeners.CallbackType
+  ): Registration =
+    gameStateListeners.register(callback)
+
+  def onGameMode(
+      callback: gameModeListeners.CallbackType
+  ): Registration =
+    gameModeListeners.register(callback)
 
   def onReceiveHits(
       callback: receiveHitsListeners.CallbackType

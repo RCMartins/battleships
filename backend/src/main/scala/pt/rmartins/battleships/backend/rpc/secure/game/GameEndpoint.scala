@@ -4,7 +4,7 @@ import io.udash.auth._
 import pt.rmartins.battleships.backend.services.{ChatService, GameService, RpcClientsService}
 import pt.rmartins.battleships.shared.model.auth.{Permission, UserContext}
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
-import pt.rmartins.battleships.shared.model.game.{Coordinate, GameId, GameState, ShipInGame}
+import pt.rmartins.battleships.shared.model.game.{Attack, Coordinate, GameId, GameState, ShipInGame}
 import pt.rmartins.battleships.shared.rpc.server.game.GameRPC
 import pt.rmartins.battleships.shared.rpc.server.secure.chat.ChatRPC
 
@@ -18,8 +18,11 @@ class GameEndpoint(implicit
 ) extends GameRPC
     with AuthRequires {
 
-  override def startGameWith(otherPlayer: String): Future[Unit] =
-    gameService.startGame(ctx.name, otherPlayer)
+  override def startGameWith(otherPlayerUsername: String): Future[Unit] =
+    gameService.startGame(ctx.name, otherPlayerUsername)
+
+  override def quitCurrentGame(gameId: GameId): Future[Unit] =
+    gameService.quitCurrentGame(gameId, ctx.name)
 
   override def confirmShips(
       gameId: GameId,
@@ -27,7 +30,10 @@ class GameEndpoint(implicit
   ): Future[Unit] =
     gameService.confirmShips(gameId, ctx.name, shipPositions)
 
-  override def sendTurnPlay(hits: Seq[Coordinate]): Future[Boolean] =
-    ???
+  override def cancelShipsPlacement(gameId: GameId): Future[Unit] =
+    gameService.cancelShipsPlacement(gameId, ctx.name)
+
+  def sendTurnAttacks(gameId: GameId, halfTurns: Int, turnAttacks: List[Attack]): Future[Unit] =
+    gameService.sendTurnAttacks(gameId, ctx.name, halfTurns, turnAttacks)
 
 }

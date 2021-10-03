@@ -4,7 +4,7 @@ import com.avsystem.commons.serialization.HasGenCodec
 
 case class ShipInGame(ship: Ship, position: Coordinate) {
 
-  def shipActualPieces: List[Coordinate] = ship.pieces.map(_ + position)
+  lazy val shipActualPieces: List[Coordinate] = ship.pieces.map(_ + position)
 
 }
 

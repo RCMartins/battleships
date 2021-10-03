@@ -3,7 +3,7 @@ package pt.rmartins.battleships.backend.services
 import io.udash.rpc.{ClientId, ClientRPCTarget, DefaultClientRPC}
 import pt.rmartins.battleships.shared.model.auth.UserContext
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
-import pt.rmartins.battleships.shared.model.game.GameState
+import pt.rmartins.battleships.shared.model.game.{GameMode, GameState}
 import pt.rmartins.battleships.shared.rpc.client.MainClientRPC
 
 import java.util.Date
@@ -68,6 +68,20 @@ class RpcClientsService(sendToClientFactory: ClientRPCTarget => MainClientRPC) {
     authClients.get(clientId) match {
       case Some(_) =>
         sendToClient(clientId).game().gameStateUpdate(gameState)
+      case _ =>
+    }
+
+  def sendGameMode(clientId: ClientId, gameMode: GameMode): Unit =
+    authClients.get(clientId) match {
+      case Some(_) =>
+        sendToClient(clientId).game().gameModeUpdate(gameMode)
+      case _ =>
+    }
+
+  def sendQuitGame(clientId: ClientId): Unit =
+    authClients.get(clientId) match {
+      case Some(_) =>
+        sendToClient(clientId).game().sendQuitGame()
       case _ =>
     }
 

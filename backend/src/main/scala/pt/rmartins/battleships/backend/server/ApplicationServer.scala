@@ -36,7 +36,9 @@ class ApplicationServer(val port: Int, resourceBase: String, domainServices: Dom
 
     // notify ClientsService about new or closed connections
     config.onNewConnection { case id => domainServices.rpcClientsService.registerConnection(id) }
-    config.onClosedConnection { case id => domainServices.rpcClientsService.unregisterConnection(id) }
+    config.onClosedConnection { case id =>
+      domainServices.rpcClientsService.unregisterConnection(id)
+    }
 
     val framework = new DefaultAtmosphereFramework(
       config,
@@ -64,7 +66,7 @@ class ApplicationServer(val port: Int, resourceBase: String, domainServices: Dom
     rewrite.setRewritePathInfo(false)
 
     val spaRewrite = new RewriteRegexRule
-    spaRewrite.setRegex("^/(?!assets|scripts|styles|atm)(.*/?)*$")
+    spaRewrite.setRegex("^/(?!assets|scripts|styles|atm|icons)(.*/?)*$")
     spaRewrite.setReplacement("/")
     rewrite.addRule(spaRewrite)
     rewrite.setHandler(context)

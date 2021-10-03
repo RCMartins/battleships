@@ -12,6 +12,8 @@ case class Coordinate(x: Int, y: Int) {
 
   def *(mult: Int): Coordinate = Coordinate(x * mult, y * mult)
 
+  def *(mult: Double): Coordinate = Coordinate((x * mult).toInt, (y * mult).toInt)
+
   def /(mult: Int): Coordinate = Coordinate(x / mult, y / mult)
 
   def <(other: Coordinate): Boolean = x < other.x && y < other.y

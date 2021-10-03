@@ -48,6 +48,24 @@ object Ship extends HasGenCodec[Ship] {
   val PatrolBoat4: Ship = List((0, 0), (0, 1), (0, 2), (0, 3)).pipe(toShip)
   val Carrier: Ship = List((0, 0), (1, 0), (2, 0), (1, 1), (1, 2)).pipe(toShip)
 
+  val allShips: Map[Int, Ship] =
+    List(
+      Submarine,
+      PatrolBoat2,
+      PatrolBoat3,
+      PatrolBoat4,
+      Carrier
+    ).map(ship => ship.shipId -> ship).toMap
+
+  val allShipsNames: Map[Int, String] =
+    Map(
+      Submarine -> "Submarine",
+      PatrolBoat2 -> "PatrolBoat2",
+      PatrolBoat3 -> "PatrolBoat3",
+      PatrolBoat4 -> "PatrolBoat4",
+      Carrier -> "Carrier"
+    ).map { case (ship, name) => ship.shipId -> name }
+
   private[Ship] lazy val cacheRotations: mutable.Map[(Int, Int), Ship] =
     mutable.Map.empty[(Int, Int), Ship] ++
       List[Ship](
@@ -63,7 +81,7 @@ object Ship extends HasGenCodec[Ship] {
       val maxNegX = ship.pieces.minBy(_.x).x
       val maxNegY = ship.pieces.minBy(_.y).y
       val coor = -Coordinate(maxNegX, maxNegY)
-      ship.mapPieces(_ + coor).tap(ship => println((coor, ship.pieces)))
+      ship.mapPieces(_ + coor)
     }
 
     val shipRotation0 = cacheRotations((shipId, Rotation0.rIndex))

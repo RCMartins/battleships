@@ -1,17 +1,21 @@
 package pt.rmartins.battleships.shared.rpc.server.game
 
 import io.udash.rpc.DefaultServerRpcCompanion
-import pt.rmartins.battleships.shared.model.game.{Coordinate, GameId, GameState, ShipInGame}
+import pt.rmartins.battleships.shared.model.game.{Attack, Coordinate, GameId, GameState, ShipInGame}
 
 import scala.concurrent.Future
 
 trait GameRPC {
 
-  def startGameWith(otherPlayer: String): Future[Unit]
+  def startGameWith(otherPlayerUsername: String): Future[Unit]
+
+  def quitCurrentGame(gameId: GameId): Future[Unit]
 
   def confirmShips(gameId: GameId, shipPositions: List[ShipInGame]): Future[Unit]
 
-  def sendTurnPlay(hits: Seq[Coordinate]): Future[Boolean]
+  def cancelShipsPlacement(gameId: GameId): Future[Unit]
+
+  def sendTurnAttacks(gameId: GameId, halfTurns: Int, turnAttacks: List[Attack]): Future[Unit]
 
 }
 
