@@ -218,11 +218,12 @@ class GamePresenter(
   def mouseLeave(): Unit =
     gameModel.subProp(_.mousePosition).set(None)
 
-  def mouseClick(boardView: BoardView): Unit = {
-    (gameModel.get, gameStateProperty.get) match {
+  def mouseClick(boardView: BoardView, button: Int): Unit = {
+    (gameModel.get, gameStateProperty.get, button) match {
       case (
             GameModel(Some(_), selectedShipOpt, _, _, _),
-            Some(gameState @ GameState(_, _, me, _, PreGameMode(_, _)))
+            Some(gameState @ GameState(_, _, me, _, PreGameMode(_, _))),
+            0
           ) =>
         boardView.shipToPlaceHover.get.map(_.ship) match {
           case Some(ship) =>
@@ -241,14 +242,25 @@ class GamePresenter(
         }
       case (
             GameModel(Some(_), _, turnAttacks, turnAttacksSent, selectedBoardMarkOpt),
-            Some(gameState @ GameState(gameId, _, me, _, InGameMode(_, _, _) | GameOverMode(_, _)))
+            Some(gameState @ GameState(gameId, _, me, _, InGameMode(_, _, _) | GameOverMode(_, _))),
+            0 | 2
           ) =>
         (
           boardView.enemyBoardMouseCoordinate.get,
           boardView.boardMarkHover.get,
-          selectedBoardMarkOpt
+          selectedBoardMarkOpt,
+          button
         ) match {
-          case (Some(enemyBoardCoor), None, Some(selectedBoardMark)) =>
+          case (Some(enemyBoardCoor), _, _, 2) =>
+            val (_, currentBoardMark) = me.enemyBoardMarks(enemyBoardCoor.x)(enemyBoardCoor.y)
+
+            if (!currentBoardMark.isPermanent && currentBoardMark != BoardMark.Empty) {
+              gameStateProperty.set(
+                Some(gameState.copy(me = me.updateBoardMark(enemyBoardCoor, BoardMark.Empty)))
+              )
+              gameRpc.sendBoardMarks(gameId, List((enemyBoardCoor, BoardMark.Empty)))
+            }
+          case (Some(enemyBoardCoor), None, Some(selectedBoardMark), 0) =>
             val (_, currentBoardMark) = me.enemyBoardMarks(enemyBoardCoor.x)(enemyBoardCoor.y)
 
             if (!currentBoardMark.isPermanent) {
@@ -263,7 +275,7 @@ class GamePresenter(
               )
               gameRpc.sendBoardMarks(gameId, List((enemyBoardCoor, updatedBoardMark)))
             }
-          case (Some(enemyBoardCoor), None, None)
+          case (Some(enemyBoardCoor), None, None, 0)
               if gameState.gameMode.isInGame &&
                 !turnAttacksSent && isValidCoordinateTarget(enemyBoardCoor) =>
             def setFirstMissile(turnAttacks: List[Attack]): List[Attack] =
@@ -288,10 +300,10 @@ class GamePresenter(
                 setFirstMissile(turnAttacks)
 
             gameModel.subProp(_.turnAttacks).set(turnAttackUpdated)
-          case (None, Some(boardMarkClicked), selectedBoardMarkOpt)
+          case (None, Some(boardMarkClicked), selectedBoardMarkOpt, 0)
               if !selectedBoardMarkOpt.contains(boardMarkClicked) =>
             gameModel.subProp(_.selectedBoardMarkOpt).set(Some(boardMarkClicked))
-          case (None, None, Some(_)) =>
+          case (None, None, Some(_), 0) =>
             gameModel.subProp(_.selectedBoardMarkOpt).set(None)
           case _ =>
         }

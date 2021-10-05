@@ -89,14 +89,17 @@ class GameView(
     presenter.mouseLeave()
   }
 
-  myBoardCanvas.onmousedown = (_: MouseEvent) => {
-    presenter.mouseClick(boardView)
-    false
+  myBoardCanvas.onmousedown = (mouseEvent: MouseEvent) => {
+    presenter.mouseClick(boardView, mouseEvent.button)
+  }
   }
 
   myBoardCanvas.onmousewheel = (wheelEvent: WheelEvent) => {
     presenter.mouseWheel(wheelEvent.deltaY.toInt / 100)
-    false
+  }
+
+  myBoardCanvas.oncontextmenu = (event: MouseEvent) => {
+    event.preventDefault()
   }
 
   private val mainStartButton = UdashButton(

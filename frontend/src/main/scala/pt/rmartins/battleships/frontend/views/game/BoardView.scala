@@ -594,11 +594,7 @@ class BoardView(
     renderingCtx.textBaseline = "bottom"
     renderingCtx.textAlign = "left"
     renderingCtx.lineWidth = 1.0
-    renderingCtx.strokeText(
-      boardTitle,
-      boardPosition.x,
-      boardPosition.y - 2
-    )
+    renderingCtx.strokeText(boardTitle, boardPosition.x, boardPosition.y - 2)
   }
 
   def drawEnemyBoard(
@@ -614,8 +610,6 @@ class BoardView(
 
     val boardMarksWithCoor: Seq[(Coordinate, Option[Int], BoardMark)] =
       me.enemyBoardMarksWithCoor
-
-    val lastTurnNumber = me.turnPlayHistory.headOption.map(_.turnNumber)
 
     boardMarksWithCoor.foreach { case (coor, turnNumberOpt, mark) =>
       val canvasColor: CanvasColor =
@@ -641,15 +635,18 @@ class BoardView(
       }
     }
 
-    boardMarksWithCoor.foreach { case (coor, turnNumberOpt, _) =>
-      if (turnNumberOpt == lastTurnNumber)
-        drawBoardSquare(
-          renderingCtx,
-          boardPosition,
-          coor,
-          squareSize,
-          CanvasColor.White(CanvasBorder.RedBold())
-        )
+    me.turnPlayHistory.headOption.map(_.turnNumber).foreach { lastTurnNumber =>
+      boardMarksWithCoor.foreach {
+        case (coor, Some(turnNumber), _) if turnNumber == lastTurnNumber =>
+          drawBoardSquare(
+            renderingCtx,
+            boardPosition,
+            coor,
+            squareSize,
+            CanvasColor.White(CanvasBorder.RedBold())
+          )
+        case _ =>
+      }
     }
 
     enemyBoardMouseCoordinate.get.foreach { enemyBoardCoor =>
