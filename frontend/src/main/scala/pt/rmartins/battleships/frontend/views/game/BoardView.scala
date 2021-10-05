@@ -6,7 +6,8 @@ import org.scalajs.dom.html.Canvas
 import org.scalajs.dom.raw.HTMLImageElement
 import org.scalajs.dom.{CanvasRenderingContext2D, html}
 import pt.rmartins.battleships.frontend.views.game.BoardView.ToPlaceShip
-import pt.rmartins.battleships.shared.model.game.GameMode.{InGameMode, PreGameMode}
+import pt.rmartins.battleships.frontend.views.game.PropertiesUtils.combine
+import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game._
 
 class BoardView(
@@ -16,48 +17,67 @@ class BoardView(
     myBoardCanvas: Canvas
 ) {
 
-  private val DefaultSquareSize: ReadableProperty[Int] =
-    screenModel.subProp(_.canvasSize).transform(size => if (size.x < 1000) 20 else 30)
-  private val PlaceShipsSize: ReadableProperty[Int] =
-    screenModel.subProp(_.canvasSize).transform(size => if (size.x < 1000) 12 else 15)
-  private val MyBoardInGameSize: ReadableProperty[Int] =
-    screenModel.subProp(_.canvasSize).transform(size => if (size.x < 1000) 14 else 20)
+  // TODO * 10 hardcoded everywhere... instead of a real (Max Board Width/Height) / boardSize
 
-  private val AbsInitial: Coordinate = Coordinate(1, 1)
-  private val MyBoardPosPreGame: Coordinate = Coordinate(20, 20)
+  val AbsMargin: Coordinate = Coordinate(1, 1)
+
+  private val SquareSizeBig: ReadableProperty[Int] =
+    screenModel.subProp(_.canvasSize).transform(size => if (size.x < 680) 20 else 30)
+  private val SquareSizeMedium: ReadableProperty[Int] =
+    screenModel.subProp(_.canvasSize).transform(size => if (size.x < 680) 15 else 20)
+  private val SquareSizeSmall: ReadableProperty[Int] =
+    screenModel.subProp(_.canvasSize).transform(size => if (size.x < 680) 12 else 15)
+
+  private val BothShipSizes: ReadableProperty[(Int, Int)] = // TODO find better name
+    combine(SquareSizeBig, SquareSizeSmall)
+
+  private val EnemyBoardSqSize = SquareSizeBig
+  private val EnemyBoardMargin = SquareSizeMedium
+
+  private val MyBoardPosPreGame: ReadableProperty[Coordinate] =
+    SquareSizeMedium.transform(size => AbsMargin + Coordinate(size, size))
   private val MyBoardPosInGame: ReadableProperty[Coordinate] =
-    screenModel.subProp(_.canvasSize).combine(MyBoardInGameSize) {
+    screenModel.subProp(_.canvasSize).combine(SquareSizeMedium) {
       case (canvasSize, myBoardInGameSize) =>
-        Coordinate(canvasSize.x - myBoardInGameSize * 11, myBoardInGameSize)
+        AbsMargin + Coordinate(canvasSize.x - myBoardInGameSize * 11, myBoardInGameSize)
     }
-  private val EnemyBoardPos: Coordinate = Coordinate(20, 20)
+  private val MyBoardPosGameOver: ReadableProperty[Coordinate] =
+    combine(screenModel.subProp(_.canvasSize), SquareSizeBig, SquareSizeMedium)
+      .transform { case (canvasSize, myBoardGameOverSize, marginSize) =>
+        Coordinate(canvasSize.x - myBoardGameOverSize * 10 - marginSize, marginSize)
+      }
+  private val EnemyBoardPos: ReadableProperty[Coordinate] =
+    EnemyBoardMargin.transform(size => AbsMargin + Coordinate(size, size))
 
-  private val PlaceShipBoardMargin = Coordinate(20, 20)
+  private val BoardMarksSelectorPos: ReadableProperty[Coordinate] =
+    combine(EnemyBoardPos, EnemyBoardSqSize).transform { case (enemyBoardPos, enemyBoardSize) =>
+      enemyBoardPos + Coordinate(0, enemyBoardSize * 10 + enemyBoardSize)
+    }
+  private val BoardMarksSelectorSize = SquareSizeBig
+  private val BoardMarksSelectorMargin = SquareSizeBig.transform(_ / 2)
+  private val BoardMarksSelectorCombined: ReadableProperty[(Coordinate, Int, Int)] =
+    combine(BoardMarksSelectorPos, BoardMarksSelectorSize, BoardMarksSelectorMargin)
 
-  class Image(src: String) {
-    private var ready: Boolean = false
+  private val BoardMarksSelectorOrder: List[BoardMark] =
+    List(BoardMark.Empty, BoardMark.ManualShip, BoardMark.ManualWater)
+
+  private val PlaceShipBoardMargin = Coordinate.square(20)
+
+  private class Image(src: String) {
+//    private var ready: Boolean = false
 
     val element: html.Image = dom.document.createElement("img").asInstanceOf[HTMLImageElement]
-    element.onload = (e: dom.Event) => ready = true
+//    element.onload = (e: dom.Event) => ready = true
     element.src = src
 
-    def isReady: Boolean = ready
+//    def isReady: Boolean = ready
   }
-
-//  private val crosshair: Image =
-//    new Image("icons/crosshair1.png")
 
   private val attackSimple: Image =
     new Image("icons/missile-simple.png")
-//    new Image("icons/crosshairs.ai")
-
-  val bothShipSizes: ReadableProperty[(Int, Int)] =
-    DefaultSquareSize.combine(PlaceShipsSize) { case (defaultSquareSize, placeShipsSize) =>
-      (defaultSquareSize, placeShipsSize)
-    }
 
   val getAllShipsCoordinates: ReadableProperty[List[ToPlaceShip]] =
-    gameModel.subProp(_.myGameState).combine(bothShipSizes) {
+    gamePresenter.gameStateProperty.combine(BothShipSizes) {
       case (
             Some(GameState(_, me, _, PreGameMode(shipsToPlace, _, _))),
             (defaultSquareSize, placeShipsSize)
@@ -123,12 +143,19 @@ class BoardView(
     }
 
   val myBoardMouseCoordinate: ReadableProperty[Option[Coordinate]] =
-    gameModel.combine(DefaultSquareSize) {
+    combine(
+      gameModel.subProp(_.mousePosition),
+      gamePresenter.gameStateProperty,
+      SquareSizeBig,
+      MyBoardPosPreGame
+    ).transform {
       case (
-            GameModel(Some(GameState(_, me, _, PreGameMode(_, _, _))), Some(mousePosition), _),
-            defaultSquareSize
+            Some(mousePosition),
+            Some(GameState(_, me, _, PreGameMode(_, _, _))),
+            defaultSquareSize,
+            myBoardPosPreGame
           ) =>
-        val relativeBoardCoor = mousePosition - AbsInitial - MyBoardPosPreGame
+        val relativeBoardCoor = mousePosition - myBoardPosPreGame
         Some(relativeBoardCoor)
           .filter(coor =>
             coor >= -PlaceShipBoardMargin &&
@@ -141,12 +168,19 @@ class BoardView(
     }
 
   val enemyBoardMouseCoordinate: ReadableProperty[Option[Coordinate]] =
-    gameModel.combine(DefaultSquareSize) {
+    combine(
+      gameModel.subProp(_.mousePosition),
+      gamePresenter.gameStateProperty,
+      EnemyBoardPos,
+      EnemyBoardSqSize
+    ).transform {
       case (
-            GameModel(Some(GameState(_, _, enemy, InGameMode(_, _, _))), Some(mousePosition), _),
+            Some(mousePosition),
+            Some(GameState(_, _, enemy, InGameMode(_, _, _))),
+            enemyBoardPos,
             defaultSquareSize
           ) =>
-        val relativeBoardCoor = mousePosition - AbsInitial - EnemyBoardPos
+        val relativeBoardCoor = mousePosition - enemyBoardPos
         Some(relativeBoardCoor)
           .filter(coor =>
             coor >= -PlaceShipBoardMargin &&
@@ -158,38 +192,82 @@ class BoardView(
         None
     }
 
+  private val BoardMarksSelectorAllPositions: ReadableProperty[List[(BoardMark, Coordinate)]] =
+    combine(
+      gamePresenter.inGameModeProperty,
+      BoardMarksSelectorCombined
+    ).transform {
+      case (
+            Some(InGameMode(_, _, _)),
+            (boardMarksSelectorPos, boardMarksSelectorSize, boardMarksSelectorMargin)
+          ) =>
+        BoardMarksSelectorOrder.zipWithIndex
+          .map { case (boardMark, index) =>
+            (
+              boardMark,
+              boardMarksSelectorPos +
+                Coordinate(index * (boardMarksSelectorSize + boardMarksSelectorMargin), 0)
+            )
+          }
+      case _ =>
+        Nil
+    }
+
+  val boardMarkHover: ReadableProperty[Option[BoardMark]] =
+    combine(
+      gameModel.subProp(_.mousePosition),
+      gamePresenter.inGameModeProperty,
+      BoardMarksSelectorAllPositions,
+      BoardMarksSelectorSize
+    ).transform {
+      case (
+            Some(mousePosition),
+            Some(InGameMode(_, _, _)),
+            boardMarksSelectorAllPositions,
+            boardMarksSelectorSize
+          ) =>
+        boardMarksSelectorAllPositions
+          .find { case (_, position) =>
+            mousePosition >= position &&
+              mousePosition <= position + Coordinate.square(boardMarksSelectorSize)
+          }
+          .map(_._1)
+      case _ =>
+        None
+    }
+
   def getShipInCoor(
       shipsToPlaceCoor: List[ToPlaceShip],
       mousePosition: Coordinate
   ): Option[ToPlaceShip] = {
-    val relativeBoardCoor = mousePosition - AbsInitial - MyBoardPosPreGame
+    val relativeBoardCoor = mousePosition - MyBoardPosPreGame.get
     shipsToPlaceCoor
       .find { case ToPlaceShip(_, pieces, _, alreadyPlaced) =>
         !alreadyPlaced && pieces.exists(sqCoor =>
-          relativeBoardCoor >= sqCoor * PlaceShipsSize.get &&
-            relativeBoardCoor <= (sqCoor + Coordinate(1, 1)) * PlaceShipsSize.get
+          relativeBoardCoor >= sqCoor * SquareSizeSmall.get &&
+            relativeBoardCoor <= (sqCoor + Coordinate(1, 1)) * SquareSizeSmall.get
         )
       }
   }
 
   def drawShipSquareCoor(
-      myBoardCtx: CanvasRenderingContext2D,
+      renderingCtx: CanvasRenderingContext2D,
       boardPosition: Coordinate,
       coor: Coordinate,
       size: Int,
       alpha: Double = 1.0
   ): Unit =
-    drawShipSquareAbsCoor(myBoardCtx, boardPosition + coor * size, size, alpha = alpha)
+    drawShipSquareAbsCoor(renderingCtx, boardPosition + coor * size, size, alpha = alpha)
 
   def drawDarkerShipSquareCoor(
-      myBoardCtx: CanvasRenderingContext2D,
+      renderingCtx: CanvasRenderingContext2D,
       boardPosition: Coordinate,
       coor: Coordinate,
       size: Int,
       alpha: Double = 1.0
   ): Unit =
     drawShipSquareAbsCoor(
-      myBoardCtx,
+      renderingCtx,
       boardPosition + coor * size,
       size,
       shipColor = "140, 74, 19",
@@ -197,14 +275,14 @@ class BoardView(
     )
 
   def drawShipRedSquareCoor(
-      myBoardCtx: CanvasRenderingContext2D,
+      renderingCtx: CanvasRenderingContext2D,
       boardPosition: Coordinate,
       coor: Coordinate,
       size: Int,
       alpha: Double = 1.0
   ): Unit =
     drawShipSquareAbsCoor(
-      myBoardCtx,
+      renderingCtx,
       boardPosition + coor * size,
       size,
       shipColor = "255, 0, 0",
@@ -212,128 +290,188 @@ class BoardView(
     )
 
   def drawShipSquareAbsCoor(
-      myBoardCtx: CanvasRenderingContext2D,
+      renderingCtx: CanvasRenderingContext2D,
       coor: Coordinate,
       size: Int,
       shipColor: String = "160, 94, 39",
       alpha: Double = 1.0
   ): Unit = {
-    myBoardCtx.fillStyle = s"rgb($shipColor, $alpha)"
-    myBoardCtx.strokeStyle = s"rgb(0, 0, 0, $alpha)"
-    myBoardCtx.lineWidth = 1.0
-    myBoardCtx.fillRect(AbsInitial.x + coor.x, AbsInitial.y + coor.y, size, size)
-    myBoardCtx.beginPath()
-    myBoardCtx.rect(AbsInitial.x + coor.x, AbsInitial.y + coor.y, size, size)
-    myBoardCtx.stroke()
+    renderingCtx.fillStyle = s"rgb($shipColor, $alpha)"
+    renderingCtx.strokeStyle = s"rgb(0, 0, 0, $alpha)"
+    renderingCtx.lineWidth = 1.0
+    renderingCtx.fillRect(coor.x, coor.y, size, size)
+    renderingCtx.beginPath()
+    renderingCtx.rect(coor.x, coor.y, size, size)
+    renderingCtx.stroke()
   }
 
   def drawSelectedShipSquareCoor(
-      myBoardCtx: CanvasRenderingContext2D,
+      renderingCtx: CanvasRenderingContext2D,
       boardPosition: Coordinate,
       coor: Coordinate,
       size: Int,
       alpha: Double = 1.0
   ): Unit = {
-    val relCoor = AbsInitial + boardPosition + coor * size
-    myBoardCtx.fillStyle = s"rgb(255, 0, 0, $alpha)"
-    myBoardCtx.strokeStyle = s"rgb(0, 0, 0, $alpha)"
-    myBoardCtx.lineWidth = 3.0
-    myBoardCtx.fillRect(relCoor.x, relCoor.y, size, size)
-    myBoardCtx.beginPath()
-    myBoardCtx.rect(relCoor.x, relCoor.y, size, size)
-    myBoardCtx.stroke()
+    val relCoor = boardPosition + coor * size
+    renderingCtx.fillStyle = s"rgb(255, 0, 0, $alpha)"
+    renderingCtx.strokeStyle = s"rgb(0, 0, 0, $alpha)"
+    renderingCtx.lineWidth = 3.0
+    renderingCtx.fillRect(relCoor.x, relCoor.y, size, size)
+    renderingCtx.beginPath()
+    renderingCtx.rect(relCoor.x, relCoor.y, size, size)
+    renderingCtx.stroke()
+  }
+
+  def drawEmptyCoor(
+      renderingCtx: CanvasRenderingContext2D,
+      boardPosition: Coordinate,
+      coor: Coordinate,
+      size: Int,
+      alpha: Double = 1.0
+  ): Unit = {
+    val relCoor = boardPosition + coor * size
+    renderingCtx.fillStyle = s"rgb(255, 255, 255, $alpha)"
+    renderingCtx.strokeStyle = s"rgb(0, 0, 0, $alpha)"
+    renderingCtx.lineWidth = 1.0
+    renderingCtx.fillRect(relCoor.x, relCoor.y, size, size)
+    renderingCtx.beginPath()
+    renderingCtx.rect(relCoor.x, relCoor.y, size, size)
+    renderingCtx.stroke()
   }
 
   def drawWaterCoor(
-      myBoardCtx: CanvasRenderingContext2D,
+      renderingCtx: CanvasRenderingContext2D,
       boardPosition: Coordinate,
       coor: Coordinate,
-      size: Int
+      size: Int,
+      alpha: Double = 1.0
   ): Unit = {
-    val relCoor = AbsInitial + boardPosition + coor * size
-    myBoardCtx.fillStyle = s"rgb(0, 206, 209)"
-    myBoardCtx.strokeStyle = s"rgb(0, 0, 0)"
-    myBoardCtx.lineWidth = 1.0
-    myBoardCtx.fillRect(relCoor.x, relCoor.y, size, size)
-    myBoardCtx.beginPath()
-    myBoardCtx.rect(relCoor.x, relCoor.y, size, size)
-    myBoardCtx.stroke()
+    val relCoor = boardPosition + coor * size
+    renderingCtx.fillStyle = s"rgb(0, 206, 209, $alpha)"
+    renderingCtx.strokeStyle = s"rgb(0, 0, 0, $alpha)"
+    renderingCtx.lineWidth = 1.0
+    renderingCtx.fillRect(relCoor.x, relCoor.y, size, size)
+    renderingCtx.beginPath()
+    renderingCtx.rect(relCoor.x, relCoor.y, size, size)
+    renderingCtx.stroke()
   }
 
   def drawDarkerWaterCoor(
-      myBoardCtx: CanvasRenderingContext2D,
+      renderingCtx: CanvasRenderingContext2D,
       boardPosition: Coordinate,
       coor: Coordinate,
       size: Int
   ): Unit = {
-    val relCoor = AbsInitial + boardPosition + coor * size
-    myBoardCtx.fillStyle = s"rgb(0, 166, 169)"
-    myBoardCtx.strokeStyle = s"rgb(0, 0, 0)"
-    myBoardCtx.lineWidth = 1.0
-    myBoardCtx.fillRect(relCoor.x, relCoor.y, size, size)
-    myBoardCtx.beginPath()
-    myBoardCtx.rect(relCoor.x, relCoor.y, size, size)
-    myBoardCtx.stroke()
+    val relCoor = boardPosition + coor * size
+    renderingCtx.fillStyle = s"rgb(0, 166, 169)"
+    renderingCtx.strokeStyle = s"rgb(0, 0, 0)"
+    renderingCtx.lineWidth = 1.0
+    renderingCtx.fillRect(relCoor.x, relCoor.y, size, size)
+    renderingCtx.beginPath()
+    renderingCtx.rect(relCoor.x, relCoor.y, size, size)
+    renderingCtx.stroke()
   }
 
   def drawTurnNumberCoor(
-      myBoardCtx: CanvasRenderingContext2D,
+      renderingCtx: CanvasRenderingContext2D,
       boardPosition: Coordinate,
       coor: Coordinate,
       size: Int,
       turnNumber: Int,
       textSize: Int
   ): Unit = {
-    val relCoor = AbsInitial + boardPosition + coor * size + Coordinate(size / 2, size / 2 + 2)
-    myBoardCtx.strokeStyle = s"rgb(0, 0, 0)"
-    myBoardCtx.font = s"${textSize}px serif"
-    myBoardCtx.textBaseline = "middle"
-    myBoardCtx.textAlign = "center"
-    myBoardCtx.lineWidth = 2.0
-    myBoardCtx.strokeText(turnNumber.toString, relCoor.x, relCoor.y)
+    val relCoor = boardPosition + coor * size + Coordinate(size / 2, size / 2 + 2)
+    renderingCtx.strokeStyle = s"rgb(0, 0, 0)"
+    renderingCtx.font = s"${textSize}px serif"
+    renderingCtx.textBaseline = "middle"
+    renderingCtx.textAlign = "center"
+    renderingCtx.lineWidth = 2.0
+    renderingCtx.strokeText(turnNumber.toString, relCoor.x, relCoor.y)
   }
 
-  def paint(gameModel: GameModel): Unit = {
-    val GameModel(gameState, mousePositionOpt, selectedShipOpt) = gameModel
+  def drawSquareRedBorder(
+      renderingCtx: CanvasRenderingContext2D,
+      boardPosition: Coordinate,
+      coor: Coordinate,
+      size: Int,
+      alpha: Double = 1.0
+  ): Unit = {
+    val relCoor = boardPosition + coor * size
+    renderingCtx.strokeStyle = s"rgb(255, 0, 0, $alpha)"
+    renderingCtx.lineWidth = 3.0
+    renderingCtx.beginPath()
+    renderingCtx.rect(relCoor.x, relCoor.y, size, size)
+    renderingCtx.stroke()
+  }
 
-    val myBoardCtx = myBoardCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+  def paint(): Unit = {
+    val GameModel(mousePositionOpt, selectedShipOpt, turnAttacks, _, selectedBoardMarkOpt) =
+      gameModel.get
 
-    myBoardCtx.clearRect(0, 0, myBoardCanvas.width, myBoardCanvas.height)
+    val renderingCtx = myBoardCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
 
-    gameState match {
+    renderingCtx.clearRect(0, 0, myBoardCanvas.width, myBoardCanvas.height)
+
+    gamePresenter.gameStateProperty.get match {
       case Some(GameState(_, me, enemy, gameMode)) =>
         gameMode match {
-          case GameMode.PreGameMode(_, _, _) =>
+          case PreGameMode(_, _, _) =>
             drawMyBoard(
-              myBoardCtx,
+              renderingCtx,
               me,
               enemy,
               mousePositionOpt,
               selectedShipOpt,
-              MyBoardPosPreGame,
-              DefaultSquareSize.get,
+              MyBoardPosPreGame.get,
+              SquareSizeBig.get,
               fillEmptySquares = false
             )
-          case GameMode.InGameMode(isFirstPlayer, halfTurns, turnAttacks) =>
+          case InGameMode(_, _, _) =>
             drawMyBoard(
-              myBoardCtx,
+              renderingCtx,
               me,
               enemy,
               None,
               None,
               MyBoardPosInGame.get,
-              MyBoardInGameSize.get,
+              SquareSizeMedium.get,
               fillEmptySquares = true
             )
 
             drawEnemyBoard(
-              myBoardCtx,
+              renderingCtx,
               me,
               enemy,
-              mousePositionOpt,
               turnAttacks,
-              EnemyBoardPos,
-              DefaultSquareSize.get
+              EnemyBoardPos.get,
+              EnemyBoardSqSize.get,
+              selectedBoardMarkOpt
+            )
+
+            drawBoardMarksSelector(
+              renderingCtx,
+              selectedBoardMarkOpt
+            )
+          case GameOverMode(_, _) =>
+            drawMyBoard(
+              renderingCtx,
+              me,
+              enemy,
+              None,
+              None,
+              MyBoardPosGameOver.get,
+              SquareSizeBig.get,
+              fillEmptySquares = true
+            )
+
+            drawEnemyBoard(
+              renderingCtx,
+              me,
+              enemy,
+              Nil,
+              EnemyBoardPos.get,
+              EnemyBoardSqSize.get,
+              selectedBoardMarkOpt
             )
         }
       case None =>
@@ -341,7 +479,7 @@ class BoardView(
   }
 
   def drawMyBoard(
-      myBoardCtx: CanvasRenderingContext2D,
+      renderingCtx: CanvasRenderingContext2D,
       me: Player,
       enemy: SimplePlayer,
       mousePositionOpt: Option[Coordinate],
@@ -352,29 +490,29 @@ class BoardView(
   ): Unit = {
     val boardSize = me.myBoard.boardSize
 
-    drawBoardLimits(myBoardCtx, boardSize, boardPosition, squareSize)
+    drawBoardLimits(renderingCtx, "My board", boardSize, boardPosition, squareSize)
 
     val hoverShipOpt: Option[ToPlaceShip] =
       mousePositionOpt.flatMap(getShipInCoor(getAllShipsCoordinates.get, _))
 
-    val preSquareSize = PlaceShipsSize.get
+    val preSquareSize = SquareSizeSmall.get
     getAllShipsCoordinates.get.foreach { case ToPlaceShip(ship, pieces, _, alreadyPlaced) =>
       if (alreadyPlaced)
         pieces.foreach(
-          drawShipSquareCoor(myBoardCtx, boardPosition, _, size = preSquareSize, alpha = 0.4)
+          drawShipSquareCoor(renderingCtx, boardPosition, _, size = preSquareSize, alpha = 0.4)
         )
       else
         (selectedShipOpt, hoverShipOpt) match {
           case (Some(selectedShip), _) if selectedShip.shipId == ship.shipId =>
             pieces.foreach(
-              drawSelectedShipSquareCoor(myBoardCtx, boardPosition, _, size = preSquareSize)
+              drawSelectedShipSquareCoor(renderingCtx, boardPosition, _, size = preSquareSize)
             )
           case (_, Some(ToPlaceShip(hoverShip, _, _, _))) if hoverShip.shipId == ship.shipId =>
             pieces.foreach(
-              drawSelectedShipSquareCoor(myBoardCtx, boardPosition, _, size = preSquareSize)
+              drawSelectedShipSquareCoor(renderingCtx, boardPosition, _, size = preSquareSize)
             )
           case _ =>
-            pieces.foreach(drawShipSquareCoor(myBoardCtx, boardPosition, _, size = preSquareSize))
+            pieces.foreach(drawShipSquareCoor(renderingCtx, boardPosition, _, size = preSquareSize))
         }
     }
 
@@ -385,7 +523,7 @@ class BoardView(
           .map(_ + position)
           .foreach { case Coordinate(x, y) =>
             for (dx <- -1 to 1; dy <- -1 to 1)
-              Some(Coordinate(x + dx, y + dy)).filter(_.isInside(boardSize)).foreach {
+              Some(Coordinate(x + dx, y + dy)).filter(_.isInsideBoard(boardSize)).foreach {
                 case Coordinate(cx, cy) => water(cx)(cy) = true
               }
           }
@@ -393,18 +531,18 @@ class BoardView(
 
     for (x <- 0 until boardSize.x; y <- 0 until boardSize.y)
       if (water(x)(y))
-        drawWaterCoor(myBoardCtx, boardPosition, Coordinate(x, y), size = squareSize)
+        drawWaterCoor(renderingCtx, boardPosition, Coordinate(x, y), size = squareSize)
 
     me.myBoard.ships.foreach { case ShipInGame(ship, position) =>
       ship.pieces
         .map(_ + position)
-        .foreach(drawShipSquareCoor(myBoardCtx, boardPosition, _, size = squareSize))
+        .foreach(drawShipSquareCoor(renderingCtx, boardPosition, _, size = squareSize))
     }
 
     enemy.turnPlayHistory.foreach { case TurnPlay(turnNumber, turnAttacks, _) =>
       turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
         drawTurnNumberCoor(
-          myBoardCtx,
+          renderingCtx,
           boardPosition,
           coor,
           size = squareSize,
@@ -428,7 +566,7 @@ class BoardView(
                 else
                   0.75
               drawShipRedSquareCoor(
-                myBoardCtx,
+                renderingCtx,
                 boardPosition,
                 _,
                 size = squareSize,
@@ -442,87 +580,182 @@ class BoardView(
 
             ship.pieces
               .map(_ * squareSize + mousePosition - center)
-              .foreach(drawShipSquareAbsCoor(myBoardCtx, _, size = squareSize, alpha = 0.5))
+              .foreach(drawShipSquareAbsCoor(renderingCtx, _, size = squareSize, alpha = 0.5))
         }
       case _ =>
     }
   }
 
   def drawBoardLimits(
-      myBoardCtx: CanvasRenderingContext2D,
+      renderingCtx: CanvasRenderingContext2D,
+      boardTitle: String,
       boardSize: Coordinate,
       boardPosition: Coordinate,
       squareSize: Int
   ): Unit = {
-    myBoardCtx.strokeStyle = s"rgb(0, 0, 0)"
+    renderingCtx.strokeStyle = s"rgb(0, 0, 0)"
+    renderingCtx.lineWidth = 1.0
 
     for (x <- 0 to boardSize.x) {
-      myBoardCtx.beginPath()
-      myBoardCtx.moveTo(
-        AbsInitial.x + boardPosition.x + x * squareSize,
-        AbsInitial.y + boardPosition.y
+      renderingCtx.beginPath()
+      renderingCtx.moveTo(boardPosition.x + x * squareSize, boardPosition.y)
+      renderingCtx.lineTo(
+        boardPosition.x + x * squareSize,
+        boardPosition.y + boardSize.y * squareSize
       )
-      myBoardCtx.lineTo(
-        AbsInitial.x + boardPosition.x + x * squareSize,
-        AbsInitial.y + boardPosition.y + boardSize.y * squareSize
-      )
-      myBoardCtx.stroke()
+      renderingCtx.stroke()
     }
     for (y <- 0 to boardSize.y) {
-      myBoardCtx.beginPath()
-      myBoardCtx.moveTo(
-        AbsInitial.x + boardPosition.x,
-        AbsInitial.y + boardPosition.y + y * squareSize
+      renderingCtx.beginPath()
+      renderingCtx.moveTo(boardPosition.x, boardPosition.y + y * squareSize)
+      renderingCtx.lineTo(
+        boardPosition.x + boardSize.x * squareSize,
+        boardPosition.y + y * squareSize
       )
-      myBoardCtx.lineTo(
-        AbsInitial.x + boardPosition.x + boardSize.x * squareSize,
-        AbsInitial.y + boardPosition.y + y * squareSize
-      )
-      myBoardCtx.stroke()
+      renderingCtx.stroke()
     }
+
+    val fontSize = Math.max(11, squareSize / 2)
+    renderingCtx.strokeStyle = s"rgb(0, 0, 0)"
+    renderingCtx.font = s"${fontSize}px serif"
+    renderingCtx.textBaseline = "bottom"
+    renderingCtx.textAlign = "left"
+    renderingCtx.lineWidth = 1.0
+    renderingCtx.strokeText(
+      boardTitle,
+      boardPosition.x,
+      boardPosition.y - 2
+    )
   }
 
   def drawEnemyBoard(
-      myBoardCtx: CanvasRenderingContext2D,
+      renderingCtx: CanvasRenderingContext2D,
       me: Player,
       enemy: SimplePlayer,
-      mousePositionOpt: Option[Coordinate],
       turnAttacks: List[Attack],
       boardPosition: Coordinate,
-      squareSize: Int
+      squareSize: Int,
+      selectedBoardMarkOpt: Option[BoardMark]
   ): Unit = {
-    drawBoardLimits(myBoardCtx, enemy.boardSize, boardPosition, squareSize)
+    drawBoardLimits(renderingCtx, "Enemy board", enemy.boardSize, boardPosition, squareSize)
 
     def drawCrosshair(coordinate: Coordinate, alpha: Double): Unit = {
-      myBoardCtx.strokeStyle = s"rgb(255, 0, 0, $alpha)"
-      myBoardCtx.lineWidth = 2.0
+      renderingCtx.strokeStyle = s"rgb(255, 0, 0, $alpha)"
+      renderingCtx.lineWidth = 2.0
 
-      myBoardCtx.beginPath()
-      myBoardCtx.moveTo(
-        AbsInitial.x + boardPosition.x + coordinate.x * squareSize,
-        AbsInitial.y + boardPosition.y + coordinate.y * squareSize
+      renderingCtx.beginPath()
+      renderingCtx.moveTo(
+        boardPosition.x + coordinate.x * squareSize,
+        boardPosition.y + coordinate.y * squareSize
       )
-      myBoardCtx.lineTo(
-        AbsInitial.x + boardPosition.x + (coordinate.x + 1) * squareSize,
-        AbsInitial.y + boardPosition.y + (coordinate.y + 1) * squareSize
+      renderingCtx.lineTo(
+        boardPosition.x + (coordinate.x + 1) * squareSize,
+        boardPosition.y + (coordinate.y + 1) * squareSize
       )
-      myBoardCtx.stroke()
+      renderingCtx.stroke()
 
-      myBoardCtx.beginPath()
-      myBoardCtx.moveTo(
-        AbsInitial.x + boardPosition.x + (coordinate.x + 1) * squareSize,
-        AbsInitial.y + boardPosition.y + coordinate.y * squareSize
+      renderingCtx.beginPath()
+      renderingCtx.moveTo(
+        boardPosition.x + (coordinate.x + 1) * squareSize,
+        boardPosition.y + coordinate.y * squareSize
       )
-      myBoardCtx.lineTo(
-        AbsInitial.x + boardPosition.x + coordinate.x * squareSize,
-        AbsInitial.y + boardPosition.y + (coordinate.y + 1) * squareSize
+      renderingCtx.lineTo(
+        boardPosition.x + coordinate.x * squareSize,
+        boardPosition.y + (coordinate.y + 1) * squareSize
       )
-      myBoardCtx.stroke()
+      renderingCtx.stroke()
+    }
+
+    turnAttacks.zipWithIndex.foreach {
+      case (Attack(AttackType.Simple, coorOpt), index) =>
+        if (coorOpt.nonEmpty)
+          renderingCtx.globalAlpha = 0.25
+        else
+          renderingCtx.globalAlpha = 1.0
+
+        renderingCtx.drawImage(
+          attackSimple.element,
+          0,
+          0,
+          500,
+          500,
+          boardPosition.x + enemy.boardSize.x * squareSize + squareSize * 0.5,
+          boardPosition.y + index * (squareSize * 2.25),
+          squareSize * 2,
+          squareSize * 2
+        )
+
+        renderingCtx.globalAlpha = 1.0
+      case _ =>
+    }
+
+    val boardMarksWithCoor: Seq[(Coordinate, Option[Int], BoardMark)] =
+      me.enemyBoardMarksWithCoor
+
+    boardMarksWithCoor.foreach { case (coor, turnNumberOpt, mark) =>
+      mark match {
+        case BoardMark.Empty =>
+        case BoardMark.Miss =>
+          drawDarkerWaterCoor(renderingCtx, boardPosition, coor, size = squareSize)
+        case BoardMark.ShipHit =>
+          drawDarkerShipSquareCoor(renderingCtx, boardPosition, coor, size = squareSize)
+        case BoardMark.ManualWater =>
+          drawWaterCoor(renderingCtx, boardPosition, coor, size = squareSize)
+        case BoardMark.ManualShip =>
+          drawShipSquareCoor(renderingCtx, boardPosition, coor, size = squareSize)
+        case BoardMark.ManualQuestionShip  =>
+        case BoardMark.ManualQuestionWater =>
+      }
+      turnNumberOpt.foreach { turnNumber =>
+        drawTurnNumberCoor(
+          renderingCtx,
+          boardPosition,
+          coor,
+          size = squareSize,
+          turnNumber,
+          textSize = (SquareSizeBig.get * 0.6).toInt
+        )
+      }
     }
 
     enemyBoardMouseCoordinate.get.foreach { enemyBoardCoor =>
-      if (turnAttacks.exists(!_.isPlaced) && gamePresenter.isValidCoordinateTarget(enemyBoardCoor))
-        drawCrosshair(enemyBoardCoor, alpha = 0.5)
+      selectedBoardMarkOpt match {
+        case Some(boardMark) if !boardMarksWithCoor.exists { case (coor, _, currentBoardMark) =>
+              coor == enemyBoardCoor && currentBoardMark.isPermanent
+            } =>
+          boardMark match {
+            case BoardMark.Empty =>
+              drawEmptyCoor(
+                renderingCtx,
+                boardPosition,
+                enemyBoardCoor,
+                squareSize,
+                alpha = 0.5
+              )
+            case BoardMark.ManualWater =>
+              drawWaterCoor(
+                renderingCtx,
+                boardPosition,
+                enemyBoardCoor,
+                squareSize,
+                alpha = 0.5
+              )
+            case BoardMark.ManualShip =>
+              drawShipSquareCoor(
+                renderingCtx,
+                boardPosition,
+                enemyBoardCoor,
+                squareSize,
+                alpha = 0.5
+              )
+            case _ =>
+          }
+        case None
+            if turnAttacks.exists(!_.isPlaced) &&
+              gamePresenter.isValidCoordinateTarget(enemyBoardCoor) =>
+          drawCrosshair(enemyBoardCoor, alpha = 0.5)
+        case _ =>
+      }
     }
 
     turnAttacks.foreach {
@@ -530,133 +763,31 @@ class BoardView(
         drawCrosshair(coordinate, alpha = 1.0)
       case _ =>
     }
+  }
 
-    turnAttacks.zipWithIndex.foreach {
-      case (Attack(AttackType.Simple, coorOpt), index) =>
-        if (coorOpt.nonEmpty)
-          myBoardCtx.globalAlpha = 0.25
-        else
-          myBoardCtx.globalAlpha = 1.0
+  def drawBoardMarksSelector(
+      renderingCtx: CanvasRenderingContext2D,
+      selectedBoardMarkOpt: Option[BoardMark]
+  ): Unit = {
+    val boardMarksPos = BoardMarksSelectorPos.get
+    val boardMarksSize = BoardMarksSelectorSize.get
+    val boardMarksMargin = BoardMarksSelectorMargin.get
 
-        myBoardCtx.drawImage(
-          attackSimple.element,
-          0,
-          0,
-          500,
-          500,
-          AbsInitial.x + boardPosition.x + enemy.boardSize.x * squareSize + squareSize,
-          AbsInitial.y + boardPosition.y + index * (squareSize * 2.25),
-          squareSize * 2,
-          squareSize * 2
-        )
+    val selected = selectedBoardMarkOpt.orElse(boardMarkHover.get)
 
-        myBoardCtx.globalAlpha = 1.0
-      case _ =>
-    }
-
-    me.enemyBoardMarksWithCoor.foreach { case (coor, turnNumberOpt, mark) =>
-      mark match {
+    BoardMarksSelectorAllPositions.get.foreach { case (boardMark, position) =>
+      boardMark match {
         case BoardMark.Empty =>
-        case BoardMark.Miss =>
-          drawDarkerWaterCoor(myBoardCtx, boardPosition, coor, size = squareSize)
-        case BoardMark.ShipHit =>
-          drawDarkerShipSquareCoor(myBoardCtx, boardPosition, coor, size = squareSize)
+          drawEmptyCoor(renderingCtx, position, Coordinate.origin, boardMarksSize)
         case BoardMark.ManualWater =>
-          drawWaterCoor(myBoardCtx, boardPosition, coor, size = squareSize)
+          drawWaterCoor(renderingCtx, position, Coordinate.origin, boardMarksSize)
         case BoardMark.ManualShip =>
-          drawShipSquareCoor(myBoardCtx, boardPosition, coor, size = squareSize)
-        case BoardMark.ManualQuestionShip  =>
-        case BoardMark.ManualQuestionWater =>
+          drawShipSquareCoor(renderingCtx, position, Coordinate.origin, boardMarksSize)
+        case _ =>
       }
-      turnNumberOpt.foreach { turnNumber =>
-        drawTurnNumberCoor(
-          myBoardCtx,
-          boardPosition,
-          coor,
-          size = squareSize,
-          turnNumber,
-          textSize = (DefaultSquareSize.get * 0.6).toInt
-        )
-      }
+      if (selected.contains(boardMark))
+        drawSquareRedBorder(renderingCtx, position, Coordinate.origin, boardMarksSize)
     }
-
-//    val hoverShipOpt: Option[ToPlaceShip] =
-//      mousePositionOpt.flatMap(getShipInCoor(getAllShipsCoordinates.get, _))
-//
-//    getAllShipsCoordinates.get.foreach { case ToPlaceShip(ship, pieces, _, alreadyPlaced) =>
-//      if (alreadyPlaced)
-//        pieces.foreach(
-//          drawShipSquareCoor(myBoardCtx, boardPosition, _, size = preSquareSize, alpha = 0.4)
-//        )
-//      else
-//        (selectedShipOpt, hoverShipOpt) match {
-//          case (Some(selectedShip), _) if selectedShip.shipId == ship.shipId =>
-//            pieces.foreach(
-//              drawSelectedShipSquareCoor(myBoardCtx, boardPosition, _, size = preSquareSize)
-//            )
-//          case (_, Some(ToPlaceShip(hoverShip, _, _, _))) if hoverShip.shipId == ship.shipId =>
-//            pieces.foreach(
-//              drawSelectedShipSquareCoor(myBoardCtx, boardPosition, _, size = preSquareSize)
-//            )
-//          case _ =>
-//            pieces.foreach(drawShipSquareCoor(myBoardCtx, boardPosition, _, size = preSquareSize))
-//        }
-//    }
-//
-//    val water: Array[Array[Boolean]] = Array.fill(boardSize.x, boardSize.y)(false)
-//    me.myBoard.ships.foreach { case ShipInGame(ship, position) =>
-//      ship.pieces
-//        .map(_ + position)
-//        .foreach { case Coordinate(x, y) =>
-//          for (dx <- -1 to 1; dy <- -1 to 1)
-//            Some(Coordinate(x + dx, y + dy)).filter(_.isInside(boardSize)).foreach {
-//              case Coordinate(cx, cy) => water(cx)(cy) = true
-//            }
-//        }
-//    }
-//
-//    for (x <- 0 until boardSize.x; y <- 0 until boardSize.y)
-//      if (water(x)(y))
-//        drawWaterCoor(myBoardCtx, boardPosition, Coordinate(x, y), size = squareSize)
-//
-//    me.myBoard.ships.foreach { case ShipInGame(ship, position) =>
-//      ship.pieces
-//        .map(_ + position)
-//        .foreach(drawShipSquareCoor(myBoardCtx, boardPosition, _, size = squareSize))
-//    }
-//
-//    (mousePositionOpt, selectedShipOpt) match {
-//      case (Some(mousePosition), Some(ship)) =>
-//        myBoardMouseCoordinate.get match {
-//          case Some(boardCoor) =>
-//            val roundedBoardCoor =
-//              boardCoor.roundTo(boardSize - ship.size + Coordinate(1, 1))
-//
-//            val drawCoordinate: Coordinate => Unit = {
-//              val alpha: Double =
-//                if (gamePresenter.canPlace(me.myBoard, ship, roundedBoardCoor))
-//                  0.9
-//                else
-//                  0.75
-//              drawShipRedSquareCoor(
-//                myBoardCtx,
-//                boardPosition,
-//                _,
-//                size = squareSize,
-//                alpha = alpha
-//              )
-//            }
-//
-//            ship.pieces.map(_ + roundedBoardCoor).foreach(drawCoordinate)
-//          case _ =>
-//            val center = ship.size * (squareSize / 2)
-//
-//            ship.pieces
-//              .map(_ * squareSize + mousePosition - center)
-//              .foreach(drawShipSquareAbsCoor(myBoardCtx, _, size = squareSize, alpha = 0.5))
-//        }
-//      case _ =>
-//    }
   }
 
 }
@@ -665,6 +796,6 @@ object BoardView {
 
   case class ToPlaceShip(ship: Ship, pieces: List[Coordinate], index: Int, alreadyPlaced: Boolean)
 
-  val CanvasSize: Coordinate = Coordinate(1000, 340)
+  val CanvasSize: Coordinate = Coordinate(1000, 400)
 
 }

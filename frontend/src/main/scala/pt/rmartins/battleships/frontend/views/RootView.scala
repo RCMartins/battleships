@@ -43,7 +43,7 @@ class RootView(translationsService: TranslationsService) extends ContainerView w
       GlobalStyles.floatRight,
       Translations.langs.map(v => langChangeButton(Lang(v)))
     ),
-    h1("battleships", BootstrapStyles.Spacing.margin()),
+    h1("battleships"), //, BootstrapStyles.Spacing.margin()),
     childViewContainer
   )
 }

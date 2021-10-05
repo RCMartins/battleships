@@ -39,5 +39,7 @@ object Translations {
     val gameTurn = key1[Int]("game.header.game_turn")
     val yourTurn = key("game.header.your_turn")
     val enemyTurn = key("game.header.enemy_turn")
+    val youWon = key("game.header.youWon")
+    val enemyWon = key("game.header.enemyWon")
   }
 }

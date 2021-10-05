@@ -8,6 +8,8 @@ sealed trait GameMode {
 
   def isInGame: Boolean = false
 
+  def isEndGame: Boolean = false
+
 }
 
 object GameMode extends HasGenCodec[GameMode] {
@@ -17,15 +19,23 @@ object GameMode extends HasGenCodec[GameMode] {
       mePlacedShips: Boolean,
       enemyPlacedShips: Boolean
   ) extends GameMode {
+
     override def isPreGame: Boolean = true
+
   }
 
-  case class InGameMode(isFirstPlayer: Boolean, halfTurns: Int, turnAttacks: List[Attack])
+  case class InGameMode(isFirstPlayer: Boolean, halfTurns: Int, turnAttackTypes: List[AttackType])
       extends GameMode {
 
     override def isInGame: Boolean = true
 
     def isMyTurn: Boolean = if (isFirstPlayer) halfTurns % 2 == 1 else halfTurns % 2 == 0
+
+  }
+
+  case class GameOverMode(halfTurns: Int, youWon: Boolean) extends GameMode {
+
+    override def isEndGame: Boolean = true
 
   }
 

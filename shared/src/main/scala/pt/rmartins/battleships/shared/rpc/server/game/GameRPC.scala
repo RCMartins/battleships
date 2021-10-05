@@ -1,7 +1,7 @@
 package pt.rmartins.battleships.shared.rpc.server.game
 
 import io.udash.rpc.DefaultServerRpcCompanion
-import pt.rmartins.battleships.shared.model.game.{Attack, Coordinate, GameId, GameState, ShipInGame}
+import pt.rmartins.battleships.shared.model.game._
 
 import scala.concurrent.Future
 
@@ -16,6 +16,8 @@ trait GameRPC {
   def cancelShipsPlacement(gameId: GameId): Future[Unit]
 
   def sendTurnAttacks(gameId: GameId, halfTurns: Int, turnAttacks: List[Attack]): Future[Unit]
+
+  def sendBoardMarks(gameId: GameId, updatedBoardMarks: List[(Coordinate, BoardMark)]): Future[Unit]
 
 }
 

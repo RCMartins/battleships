@@ -11,18 +11,21 @@ import io.udash.bootstrap.utils.UdashIcons.FontAwesome
 import io.udash.component.ComponentId
 import io.udash.css._
 import io.udash.i18n._
+import org.scalajs.dom
 import org.scalajs.dom.html.{Canvas, Div}
 import org.scalajs.dom.{MouseEvent, UIEvent, WheelEvent, window}
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.shared.css.ChatStyles
 import pt.rmartins.battleships.shared.i18n.Translations
-import pt.rmartins.battleships.shared.model.game.GameMode.{InGameMode, PreGameMode}
+import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game._
+import scalatags.JsDom.all._
 
 import scala.util.chaining.scalaUtilChainingOps
 
 class GameView(
     gameModel: ModelProperty[GameModel],
+    gameStateModel: ModelProperty[GameStateModel],
     chatModel: ModelProperty[ChatModel],
     screenModel: ModelProperty[ScreenModel],
     presenter: GamePresenter,
@@ -30,7 +33,6 @@ class GameView(
 ) extends View
     with CssView {
 
-  import scalatags.JsDom.all._
   import translationsService._
 
   private val MainGameCanvasId = "mainGameCanvas"
@@ -40,6 +42,11 @@ class GameView(
       id := MainGameCanvasId
     ).render
 
+  screenModel.get.canvasSize.pipe { canvasSize =>
+    myBoardCanvas.setAttribute("width", canvasSize.x.toString)
+    myBoardCanvas.setAttribute("height", canvasSize.y.toString)
+  }
+
   private val canvasDiv: Div =
     div(id := "canvas-div", myBoardCanvas).render
 
@@ -47,30 +54,31 @@ class GameView(
     presenter.onCanvasResize(canvasDiv)
   }
 
-  screenModel.listen { case ScreenModel(canvasSize, _) =>
-    myBoardCanvas.setAttribute("width", canvasSize.x.toString)
-    myBoardCanvas.setAttribute("height", canvasSize.y.toString)
-    boardView.paint(gameModel.get)
+  window.setTimeout(
+    () => presenter.onCanvasResize(canvasDiv),
+    1
+  )
+
+  private val boardView =
+    new BoardView(gameModel, screenModel, presenter, myBoardCanvas)
+
+  private def reloadBoardView(): Unit = {
+    val canvasSize = screenModel.get.canvasSize
+    if (myBoardCanvas.clientWidth != canvasSize.x || myBoardCanvas.clientHeight != canvasSize.y) {
+      myBoardCanvas.setAttribute("width", canvasSize.x.toString)
+      myBoardCanvas.setAttribute("height", canvasSize.y.toString)
+    }
+    boardView.paint()
   }
 
-  screenModel.get.canvasSize.pipe { canvasSize =>
-    myBoardCanvas.setAttribute("width", canvasSize.x.toString)
-    myBoardCanvas.setAttribute("height", canvasSize.y.toString)
-  }
-
-  private val boardView = new BoardView(gameModel, screenModel, presenter, myBoardCanvas)
-
-  private def gameCanvas(nested: Binding.NestedInterceptor) =
-    div(
-      nested(produce(gameModel) { gameModel =>
-        boardView.paint(gameModel)
-        canvasDiv
-      })
-    )
+  screenModel.subProp(_.canvasSize).listen(_ => reloadBoardView())
+  gameStateModel.listen(_ => reloadBoardView())
+  gameModel.listen(_ => reloadBoardView())
 
   myBoardCanvas.onmousemove = (mouseEvent: MouseEvent) => {
     val rect = myBoardCanvas.getBoundingClientRect()
     presenter.mouseMove(
+      boardView,
       mouseEvent.clientX.toInt - rect.left.toInt,
       mouseEvent.clientY.toInt - rect.top.toInt
     )
@@ -90,10 +98,6 @@ class GameView(
     false
   }
 
-//  myBoardCanvas.onkeydown = (keyboardEvent: KeyboardEvent) => {
-//    presenter.keyDown(keyboardEvent.key)
-//  }
-
   private val mainStartButton = UdashButton(
     buttonStyle = Color.Primary.toProperty,
     block = true.toProperty,
@@ -104,14 +108,14 @@ class GameView(
     buttonStyle = Color.Primary.toProperty,
     block = true.toProperty,
     componentId = ComponentId("confirm-button"),
-    disabled = gameModel.subProp(_.myGameState).transform(!_.exists(_.me.shipsLeftToPlace.isEmpty))
+    disabled = presenter.gameStateProperty.transform(!_.exists(_.me.shipsLeftToPlace.isEmpty))
   )(_ => Seq(span("Confirm")))
 
   private val undoButton = UdashButton(
     buttonStyle = Color.Secondary.toProperty,
     block = true.toProperty,
     componentId = ComponentId("undo-button"),
-    disabled = gameModel.subProp(_.myGameState).transform(!_.exists(_.me.myBoard.ships.nonEmpty))
+    disabled = presenter.gameStateProperty.transform(!_.exists(_.me.myBoard.ships.nonEmpty))
   )(_ =>
     Seq(
       span("Undo"),
@@ -123,33 +127,44 @@ class GameView(
     buttonStyle = Color.Danger.toProperty,
     block = true.toProperty,
     componentId = ComponentId("reset-button"),
-    disabled = gameModel.subProp(_.myGameState).transform(!_.exists(_.me.myBoard.ships.nonEmpty))
+    disabled = presenter.gameStateProperty.transform(!_.exists(_.me.myBoard.ships.nonEmpty))
   )(_ => Seq(span("Reset")))
 
   private val randomPlacementButton = UdashButton(
     buttonStyle = Color.Secondary.toProperty,
     block = true.toProperty,
     componentId = ComponentId("random-button"),
-    disabled = gameModel.subProp(_.myGameState).transform(!_.exists(_.me.shipsLeftToPlace.nonEmpty))
+    disabled = presenter.gameStateProperty.transform(!_.exists(_.me.shipsLeftToPlace.nonEmpty))
   )(_ => Seq(span("Random")))
 
-  private val launchAttackButton = UdashButton(
-    buttonStyle = Color.Primary.toProperty,
-    block = true.toProperty,
-    componentId = ComponentId("launch-attack-button"),
-    disabled = presenter.inGameModeOpt.transform(
-      !_.exists(inGameMode => inGameMode.isMyTurn && inGameMode.turnAttacks.forall(_.isPlaced))
+  private val launchAttackButton = {
+    val launchAttackIsDisabledProperty =
+      presenter.inGameModeProperty.combine(gameModel.subProp(_.turnAttacks)) {
+        case (inGameMode, turnAttacks) =>
+          !inGameMode.exists(inGameMode => inGameMode.isMyTurn && turnAttacks.forall(_.isPlaced))
+      }
+
+    UdashButton(
+      buttonStyle = Color.Primary.toProperty,
+      block = true.toProperty,
+      componentId = ComponentId("launch-attack-button"),
+      disabled = launchAttackIsDisabledProperty
+    )(nested =>
+      Seq(nested(produce(presenter.isMyTurnProperty) {
+        case true  => span("Launch Attack!").render
+        case false => span("Wait for your turn").render
+      }))
     )
-  )(_ => Seq(span("Launch Attack!")))
+  }
 
   private val mainGameForm = UdashForm(
     componentId = ComponentId("main-game-from")
   )(factory =>
     factory.disabled(presenter.hasWriteAccess.toProperty.transform(!_))(nested =>
-      nested(produce(gameModel.subProp(_.myGameState)) {
+      nested(produce(presenter.gameModeProperty) {
         case None =>
           UdashInputGroup()(UdashInputGroup.appendButton(mainStartButton)).render
-        case Some(GameState(_, _, _, PreGameMode(_, _, _))) =>
+        case Some(PreGameMode(_, _, _)) =>
           UdashInputGroup()(
             Seq(
               UdashInputGroup.appendButton(confirmShipsButton),
@@ -158,7 +173,13 @@ class GameView(
               UdashInputGroup.appendButton(randomPlacementButton)
             )
           ).render
-        case Some(GameState(_, _, _, InGameMode(_, _, _))) =>
+        case Some(InGameMode(_, _, _)) =>
+          UdashInputGroup()(
+            Seq(
+              UdashInputGroup.appendButton(launchAttackButton)
+            )
+          ).render
+        case Some(GameOverMode(_, _)) =>
           UdashInputGroup()(
             Seq(
               UdashInputGroup.appendButton(launchAttackButton)
@@ -195,26 +216,30 @@ class GameView(
   }
 
   private val chatTabButton: UdashButton =
-    UdashButton(
-      //            buttonStyle = Color.Primary.toProperty
-    )(nested =>
-      Seq[Modifier](
-        `class` := "nav-link btn-outline-primary",
+    UdashButton()(_ =>
+      Seq(
+        `class` := "nav-link btn-outline-primary" +
+          (if (presenter.selectedTabProperty.get == "chat") " active" else ""),
         data("bs-toggle") := "tab",
         data("bs-target") := "#chat",
-        //              aria.controls := "Chat",
-        //              aria.selected := true,
-        //              attr("aria-current") := "page",
-        "Chat"
+        span("Chat")
       )
     )
 
   private val myMovesTabButton: UdashButton =
     UdashButton(
-      //              buttonStyle = Color.Primary.toProperty
+      disabled = presenter.inPreGameMode
     )(_ =>
       Seq[Modifier](
-        `class` := "nav-link btn-outline-primary",
+        `class` := "nav-link btn-outline-primary" +
+          (if (presenter.selectedTabProperty.get == "my-moves") " active" else ""),
+//        (`class` := "nav-link btn-outline-primary active")
+//          .attrIf(presenter.selectedTabProperty.transform(_ == "my-moves")),
+//        (`class` := "nav-link btn-outline-primary")
+//          .attrIf(presenter.selectedTabProperty.transform(_ != "my-moves")),
+//        `class` := "nav-link btn-outline-primary",
+//        (`class` :+= "active")
+//          .attrIf(presenter.selectedTabProperty.transform(_ == "my-moves")),
         data("bs-toggle") := "tab",
         data("bs-target") := "#my-moves",
         "My Moves"
@@ -223,10 +248,15 @@ class GameView(
 
   private val enemyMovesTabButton: UdashButton =
     UdashButton(
-      //              buttonStyle = Color.Primary.toProperty
+      disabled = presenter.inPreGameMode
     )(_ =>
       Seq[Modifier](
-        `class` := "nav-link btn-outline-primary",
+        `class` := "nav-link btn-outline-primary" +
+          (if (presenter.selectedTabProperty.get == "enemy-moves") " active" else ""),
+//        (`class` := "nav-link btn-outline-primary active")
+//          .attrIf(presenter.selectedTabProperty.transform(_ == "enemy-moves")),
+//        (`class` := "nav-link btn-outline-primary")
+//          .attrIf(presenter.selectedTabProperty.transform(_ != "enemy-moves")),
         data("bs-toggle") := "tab",
         data("bs-target") := "#enemy-moves",
         "Enemy Moves"
@@ -245,7 +275,7 @@ class GameView(
     presenter.setSelectedTab("enemy-moves")
   }
 
-  private def messagesTab(nested: Binding.NestedInterceptor): Binding = {
+  private def messagesTab(nested: Binding.NestedInterceptor) = {
     val navTabs =
       ul(
         `class` := "nav nav-tabs",
@@ -255,136 +285,101 @@ class GameView(
           role := "presentation",
           chatTabButton
         ),
-        showIf(presenter.inGameMode)(
-          li(
-            `class` := "nav-item",
-            role := "presentation",
-            myMovesTabButton
-          ).render
+        li(
+          `class` := "nav-item",
+          role := "presentation",
+          myMovesTabButton
         ),
-        showIf(presenter.inGameMode)(
-          li(
-            `class` := "nav-item",
-            role := "presentation",
-            enemyMovesTabButton
-          ).render
+        li(
+          `class` := "nav-item",
+          role := "presentation",
+          enemyMovesTabButton
         )
       )
 
-    nested(produceWithNested(gameModel.subProp(_.myGameState)) {
-      case (None, nested2) =>
-        Seq(
-          navTabs,
-          div(
-            `class` := "tab-content",
-            messagesTabItem(nested2)
-          )
-        ).render
-      case (Some(_), nested2) =>
-        Seq(
-          navTabs,
-          div(
-            `class` := "tab-content",
-            messagesTabItem(nested2),
-            myMovesTabItem(nested2),
-            enemyMovesTabItem(nested2)
-          )
-        ).render
-    })
+    Seq(
+      navTabs,
+      div(
+        `class` := "tab-content",
+        messagesTabItem(nested),
+        myMovesTabItem(nested),
+        enemyMovesTabItem(nested)
+      )
+    ).render
   }
 
-  private def messagesTabItem(nested: Binding.NestedInterceptor) =
-    div(
-      `class` := "tab-pane fade" + (if (screenModel.get.selectedTab == "chat") " show active"
-                                    else ""),
-      id := "chat",
-      role := "tabpanel",
-      ChatStyles.messagesWindow,
-      nested(repeat(chatModel.subSeq(_.msgs)) { msgProperty =>
-        val msg = msgProperty.get
-        div(
-          ChatStyles.msgContainer,
-          strong(msg.author, ": "),
-          span(msg.text),
-          span(ChatStyles.msgDate, msg.created.toString)
-        ).render
-      })
-    )
-
-  private def myMovesTabItem(nested: Binding.NestedInterceptor) =
-    div(
-      `class` := "tab-pane fade" + (if (screenModel.get.selectedTab == "my-moves") " show active"
-                                    else ""),
-      id := "my-moves",
-      role := "tabpanel",
-      ChatStyles.messagesWindow,
-      nested(
-        repeat(
-          gameModel
-            .subProp(_.myGameState)
-            .transformToSeq(_.map(_.me.turnPlayHistory).getOrElse(Seq.empty))
-        ) { turnPlayProperty =>
-          val TurnPlay(turnNumber, _, hitHints) = turnPlayProperty.get
+  private def messagesTabItem(nested: Binding.NestedInterceptor): Binding =
+    nested(produceWithNested(presenter.selectedTabProperty) { case (selectedTab, nested2) =>
+      div(
+        `class` := "tab-pane fade" + (if (selectedTab == "chat") " show active" else ""),
+        id := "chat",
+        role := "tabpanel",
+        ChatStyles.messagesWindow,
+        nested2(repeat(chatModel.subSeq(_.msgs)) { msgProperty =>
+          val msg = msgProperty.get
           div(
             ChatStyles.msgContainer,
-            strong(turnNumber, ": "),
-            span(
-              hitHints
-                .map {
-                  case HitHint.Water =>
-                    "Water"
-                  case HitHint.ShipHit(shipId, destroyed) =>
-                    val shipName = Ship.allShipsNames(shipId)
-                    if (destroyed) shipName + " destroyed!" else shipName
-                }
-                .mkString(", ")
-            )
+            strong(msg.author, ": "),
+            span(msg.text),
+            span(ChatStyles.msgDate, msg.created.toString)
           ).render
-        }
-      )
-    )
+        })
+      ).render
+    })
 
-  private def enemyMovesTabItem(nested: Binding.NestedInterceptor) =
+  private def turnPlaysToHtml(turnPlay: TurnPlay): Seq[dom.Element] =
     div(
-      `class` := "tab-pane fade" + (if (screenModel.get.selectedTab == "enemy-moves") " show active"
-                                    else ""),
-      id := "enemy-moves",
-      role := "tabpanel",
-      ChatStyles.messagesWindow,
-      nested(
-        repeat(
-          gameModel
-            .subProp(_.myGameState)
-            .transformToSeq(_.map(_.enemy.turnPlayHistory).getOrElse(Seq.empty))
-        ) { turnPlayProperty =>
-          val TurnPlay(turnNumber, _, hitHints) = turnPlayProperty.get
-          div(
-            ChatStyles.msgContainer,
-            strong(turnNumber, ": "),
-            span(
-              hitHints
-                .map {
-                  case HitHint.Water =>
-                    "Water"
-                  case HitHint.ShipHit(shipId, destroyed) =>
-                    val shipName = Ship.allShipsNames(shipId)
-                    if (destroyed) shipName + " destroyed!" else shipName
-                }
-                .mkString(", ")
-            )
-          ).render
-        }
+      ChatStyles.msgContainer,
+      strong(turnPlay.turnNumber, ": "),
+      span(
+        turnPlay.hitHints
+          .map {
+            case HitHint.Water =>
+              "Water"
+            case HitHint.ShipHit(shipId, destroyed) =>
+              val shipName = Ship.allShipsNames(shipId)
+              if (destroyed) shipName + " destroyed!" else shipName
+          }
+          .mkString(", ")
       )
-    )
+    ).render
 
-  // Standard Udash TextInput (we don't need Bootstrap Forms input wrapping)
+  private def myMovesTabItem(nested: Binding.NestedInterceptor): Binding =
+    nested(produceWithNested(presenter.selectedTabProperty) { case (selectedTab, nested2) =>
+      div(
+        `class` := "tab-pane fade" + (if (selectedTab == "my-moves") " show active" else ""),
+        id := "my-moves",
+        role := "tabpanel",
+        ChatStyles.messagesWindow,
+        nested2(
+          repeat(
+            presenter.gameStateProperty
+              .transformToSeq(_.map(_.me.turnPlayHistory).getOrElse(Seq.empty))
+          )(turnPlayProperty => turnPlaysToHtml(turnPlayProperty.get))
+        )
+      ).render
+    })
+
+  private def enemyMovesTabItem(nested: Binding.NestedInterceptor): Binding =
+    nested(produceWithNested(presenter.selectedTabProperty) { case (selectedTab, nested2) =>
+      div(
+        `class` := "tab-pane fade" + (if (selectedTab == "enemy-moves") " show active" else ""),
+        id := "enemy-moves",
+        role := "tabpanel",
+        ChatStyles.messagesWindow,
+        nested2(
+          repeat(
+            presenter.gameStateProperty
+              .transformToSeq(_.map(_.enemy.turnPlayHistory).getOrElse(Seq.empty))
+          )(turnPlayProperty => turnPlaysToHtml(turnPlayProperty.get))
+        )
+      ).render
+    })
+
   private val msgInput = TextInput(chatModel.subProp(_.msgInput))(
-    translatedAttrDynamic(Translations.Chat.inputPlaceholder, "placeholder")(
-      _.apply()
-    )
+    translatedAttrDynamic(Translations.Chat.inputPlaceholder, "placeholder")(_.apply())
   )
 
-  // Button from Udash Bootstrap wrapper
   private val submitButton = UdashButton(
     buttonStyle = Color.Primary.toProperty,
     block = true.toProperty,
@@ -431,14 +426,16 @@ class GameView(
                 else
                   span("").render,
                 br,
-                nested(produce(gameModel.subProp(_.myGameState)) {
-                  case Some(GameState(_, _, _, GameMode.PreGameMode(_, _, _))) =>
+                nested(produce(presenter.gameModeProperty) {
+                  case Some(PreGameMode(_, _, _)) =>
                     val placeShipsBinding =
                       translatedDynamic(Translations.Game.placeShips)(_.apply())
                     span(color := "#FF0000", b(placeShipsBinding)).render
-                  case Some(GameState(_, _, _, GameMode.InGameMode(isFirstPlayer, halfTurns, _))) =>
+                  case Some(InGameMode(isFirstPlayer, halfTurns, _)) =>
                     val isMyTurn =
                       halfTurns % 2 == (if (isFirstPlayer) 1 else 0)
+                    val currentTurn: Int =
+                      (halfTurns + 1) / 2
 
                     val turnStrBinding: Binding =
                       translatedDynamic(
@@ -448,7 +445,30 @@ class GameView(
                           Translations.Game.enemyTurn
                       )(_.apply())
 
-                    span(color := "#FF0000", b(turnStrBinding)).render
+                    span(
+                      span("Turn "),
+                      span(currentTurn),
+                      span(": "),
+                      span(color := "#FF0000", b(turnStrBinding))
+                    ).render
+                  case Some(GameOverMode(halfTurns, youWon)) =>
+                    val currentTurn: Int =
+                      (halfTurns + 1) / 2
+
+                    val turnStrBinding: Binding =
+                      translatedDynamic(
+                        if (youWon)
+                          Translations.Game.youWon
+                        else
+                          Translations.Game.enemyWon
+                      )(_.apply())
+
+                    span(
+                      span("Turn "),
+                      span(currentTurn),
+                      span(": "),
+                      span(color := "#FF0000", b(turnStrBinding))
+                    ).render
                   case _ =>
                     span("").render
                 })
@@ -457,7 +477,7 @@ class GameView(
                 `class` := "col container",
                 div(
                   `class` := "row justify-content-end",
-                  showIf(gameModel.subProp(_.myGameState).transform(_.nonEmpty))(
+                  showIf(presenter.gameStateProperty.transform(_.nonEmpty))(
                     span(quitGameButton).render
                   )
                 )
@@ -465,18 +485,13 @@ class GameView(
             ).render
           })
         ),
-        factory.body(nested =>
-          Seq(
+        factory.body(_ =>
+          Seq[Modifier](
             `class` := "p-0",
-            gameCanvas(nested)
+            canvasDiv
           )
         ),
         factory.footer(nested => nested(mainGameForm)),
-//        factory.header(nested =>
-//          nested(produce(chatModel.subProp(_.connectionsCount)) { connectionsCount =>
-//            span(s"Chat: $connectionsCount").render
-//          })
-//        ),
         factory.body(messagesTab),
         factory.footer(nested => nested(msgForm))
       )

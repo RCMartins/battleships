@@ -1,12 +1,10 @@
 package pt.rmartins.battleships.backend.rpc.secure.game
 
 import io.udash.auth._
-import pt.rmartins.battleships.backend.services.{ChatService, GameService, RpcClientsService}
-import pt.rmartins.battleships.shared.model.auth.{Permission, UserContext}
-import pt.rmartins.battleships.shared.model.chat.ChatMessage
-import pt.rmartins.battleships.shared.model.game.{Attack, Coordinate, GameId, GameState, ShipInGame}
+import pt.rmartins.battleships.backend.services.{GameService, RpcClientsService}
+import pt.rmartins.battleships.shared.model.auth.UserContext
+import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.rpc.server.game.GameRPC
-import pt.rmartins.battleships.shared.rpc.server.secure.chat.ChatRPC
 
 import scala.concurrent.Future
 
@@ -35,5 +33,11 @@ class GameEndpoint(implicit
 
   def sendTurnAttacks(gameId: GameId, halfTurns: Int, turnAttacks: List[Attack]): Future[Unit] =
     gameService.sendTurnAttacks(gameId, ctx.name, halfTurns, turnAttacks)
+
+  def sendBoardMarks(
+      gameId: GameId,
+      updatedBoardMarksList: List[(Coordinate, BoardMark)]
+  ): Future[Unit] =
+    gameService.sendBoardMarks(gameId, ctx.name, updatedBoardMarksList)
 
 }

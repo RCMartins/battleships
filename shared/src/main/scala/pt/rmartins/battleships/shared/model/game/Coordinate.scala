@@ -24,7 +24,7 @@ case class Coordinate(x: Int, y: Int) {
 
   def >=(other: Coordinate): Boolean = x >= other.x && y >= other.y
 
-  def isInside(maxCoor: Coordinate): Boolean = x >= 0 && y >= 0 && this < maxCoor
+  def isInsideBoard(maxCoor: Coordinate): Boolean = x >= 0 && y >= 0 && this < maxCoor
 
   def roundTo(maxSize: Coordinate): Coordinate =
     Coordinate(Math.max(0, Math.min(maxSize.x - 1, x)), Math.max(0, Math.min(maxSize.y - 1, y)))
@@ -35,4 +35,10 @@ case class Coordinate(x: Int, y: Int) {
 
 }
 
-object Coordinate extends HasGenCodec[Coordinate]
+object Coordinate extends HasGenCodec[Coordinate] {
+
+  val origin: Coordinate = Coordinate(0, 0)
+
+  def square(size: Int): Coordinate = Coordinate(size, size)
+
+}
