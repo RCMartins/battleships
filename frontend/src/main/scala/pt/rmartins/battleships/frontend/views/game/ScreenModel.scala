@@ -15,6 +15,6 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
   val enemyMovesTab: String = "enemy-moves"
 
   val default: ScreenModel =
-    ScreenModel(BoardView.CanvasSize, chatTab)
+    ScreenModel(BoardView.CanvasSize, myMovesTab)
 
 }

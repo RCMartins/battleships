@@ -626,7 +626,8 @@ class BoardView(
       renderingCtx.stroke()
     }
 
-    val fontSize = Math.max(11, squareSize / 2)
+    val fontSize = Math.max(15, squareSize / 2)
+    renderingCtx.fillStyle = s"rgb(0, 0, 0)"
     renderingCtx.strokeStyle = s"rgb(0, 0, 0)"
     renderingCtx.font = s"${fontSize}px serif"
     renderingCtx.textBaseline = "bottom"

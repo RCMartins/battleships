@@ -329,27 +329,29 @@ class GameView(
 
   private def messagesTab(nested: Binding.NestedInterceptor) = {
     val navTabs =
-      ul(
-        `class` := "nav nav-tabs",
-        `role` := "tablist",
-        li(
-          `class` := "nav-item",
-          role := "presentation",
-          nested(chatTabButton)
-        ),
-        li(
-          `class` := "nav-item",
-          role := "presentation",
-          nested(myMovesTabButton)
-        ),
-        li(
-          `class` := "nav-item",
-          role := "presentation",
-          nested(enemyMovesTabButton)
-        )
-      )
+      nested(produce(screenModel.subProp(_.selectedTab)) { _ =>
+        ul(
+          `class` := "nav nav-tabs",
+          `role` := "tablist",
+          li(
+            `class` := "nav-item",
+            role := "presentation",
+            nested(chatTabButton)
+          ),
+          li(
+            `class` := "nav-item",
+            role := "presentation",
+            nested(myMovesTabButton)
+          ),
+          li(
+            `class` := "nav-item",
+            role := "presentation",
+            nested(enemyMovesTabButton)
+          )
+        ).render
+      })
 
-    Seq(
+    Seq[Modifier](
       navTabs,
       div(
         `class` := "tab-content",
@@ -357,7 +359,7 @@ class GameView(
         myMovesTabItem(nested),
         enemyMovesTabItem(nested)
       )
-    ).render
+    )
   }
 
   private def messagesTabItem(nested: Binding.NestedInterceptor): Binding =
