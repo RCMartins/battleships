@@ -80,7 +80,7 @@ class GameView(
     val rect = myBoardCanvas.getBoundingClientRect()
     presenter.mouseMove(
       boardView,
-      mouseEvent.clientX.toInt - rect.left.toInt,
+      mouseEvent.clientX.toInt - rect.left.toInt, // TODO subtract AbsMargin?
       mouseEvent.clientY.toInt - rect.top.toInt
     )
   }
@@ -90,8 +90,12 @@ class GameView(
   }
 
   myBoardCanvas.onmousedown = (mouseEvent: MouseEvent) => {
-    presenter.mouseClick(boardView, mouseEvent.button)
+    presenter.mouseDown(boardView, mouseEvent.button)
+    false // Prevent the mouse down from exiting the canvas
   }
+
+  myBoardCanvas.onmouseup = (_: MouseEvent) => {
+    presenter.mouseUp()
   }
 
   myBoardCanvas.onmousewheel = (wheelEvent: WheelEvent) => {

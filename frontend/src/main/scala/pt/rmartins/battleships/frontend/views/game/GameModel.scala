@@ -5,6 +5,7 @@ import pt.rmartins.battleships.shared.model.game.{Attack, BoardMark, Coordinate,
 
 case class GameModel(
     mousePosition: Option[Coordinate],
+    mouseDown: Option[Int],
     selectedShip: Option[Ship],
     turnAttacks: List[Attack],
     turnAttacksSent: Boolean,
@@ -14,6 +15,6 @@ case class GameModel(
 object GameModel extends HasModelPropertyCreator[GameModel] {
 
   val default: GameModel =
-    GameModel(None, None, Nil, turnAttacksSent = false, None)
+    GameModel(None, None, None, Nil, turnAttacksSent = false, None)
 
 }

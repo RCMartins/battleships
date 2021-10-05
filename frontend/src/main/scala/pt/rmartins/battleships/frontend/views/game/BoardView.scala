@@ -347,7 +347,7 @@ class BoardView(
     }
 
   def paint(): Unit = {
-    val GameModel(mousePositionOpt, selectedShipOpt, turnAttacks, _, selectedBoardMarkOpt) =
+    val GameModel(mousePositionOpt, _, selectedShipOpt, turnAttacks, _, selectedBoardMarkOpt) =
       gameModel.get
 
     val renderingCtx = myBoardCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
