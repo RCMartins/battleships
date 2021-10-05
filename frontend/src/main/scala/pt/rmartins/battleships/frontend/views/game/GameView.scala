@@ -12,13 +12,14 @@ import io.udash.component.ComponentId
 import io.udash.css._
 import io.udash.i18n._
 import org.scalajs.dom
-import org.scalajs.dom.html.{Canvas, Div}
-import org.scalajs.dom.{MouseEvent, UIEvent, WheelEvent, window}
+import org.scalajs.dom.html.{Canvas, Div, Span}
+import org.scalajs.dom.{MouseEvent, Node, UIEvent, WheelEvent, window}
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.shared.css.ChatStyles
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game._
+import scalatags.JsDom
 import scalatags.JsDom.all._
 
 import scala.util.chaining.scalaUtilChainingOps
@@ -387,15 +388,20 @@ class GameView(
       ChatStyles.msgContainer,
       strong(turnPlay.turnNumber, ": "),
       span(
-        turnPlay.hitHints
-          .map {
-            case HitHint.Water =>
-              "Water"
-            case HitHint.ShipHit(shipId, destroyed) =>
-              val shipName = Ship.allShipsNames(shipId)
-              if (destroyed) shipName + " destroyed!" else shipName
-          }
-          .mkString(", ")
+        Utils.addSeparator(
+          turnPlay.hitHints
+            .map {
+              case HitHint.Water =>
+                span(color := "blue", "Water")
+              case HitHint.ShipHit(shipId, destroyed) =>
+                val shipName = Ship.allShipsNames(shipId)
+                if (destroyed)
+                  span(color := "red", b(shipName + " destroyed!"))
+                else
+                  span(shipName)
+            },
+          span(", ")
+        )
       )
     ).render
 

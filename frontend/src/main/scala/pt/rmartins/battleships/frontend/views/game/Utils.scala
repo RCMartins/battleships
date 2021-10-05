@@ -2,7 +2,7 @@ package pt.rmartins.battleships.frontend.views.game
 
 import io.udash.ReadableProperty
 
-object PropertiesUtils {
+object Utils {
 
   def combine[A, B](
       propertyA: ReadableProperty[A],
@@ -26,5 +26,14 @@ object PropertiesUtils {
   ): ReadableProperty[(A, B, C, D)] =
     combine(propertyA, propertyB, propertyC)
       .combine(propertyD) { case ((a, b, c), d) => (a, b, c, d) }
+
+  def addSeparator[A](list: List[A], separator: A): List[A] = {
+    list match {
+      case value1 :: value2 :: next =>
+        value1 :: separator :: addSeparator(value2 :: next, separator)
+      case list =>
+        list
+    }
+  }
 
 }

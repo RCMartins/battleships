@@ -6,7 +6,7 @@ import org.scalajs.dom.html.Canvas
 import org.scalajs.dom.raw.HTMLImageElement
 import org.scalajs.dom.{CanvasRenderingContext2D, html}
 import pt.rmartins.battleships.frontend.views.game.BoardView.ToPlaceShip
-import pt.rmartins.battleships.frontend.views.game.PropertiesUtils.combine
+import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game._
 
