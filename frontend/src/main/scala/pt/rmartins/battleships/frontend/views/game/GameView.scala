@@ -102,14 +102,14 @@ class GameView(
     buttonStyle = Color.Primary.toProperty,
     block = true.toProperty,
     componentId = ComponentId("start-game-button")
-  )(_ => Seq(span("Start Game!"), tpe := "submit"))
+  )(_ => Seq[Modifier](span("Start Game!"), tpe := "submit"))
 
   private val confirmShipsButton = UdashButton(
     buttonStyle = Color.Primary.toProperty,
     block = true.toProperty,
     componentId = ComponentId("confirm-button"),
     disabled = presenter.gameStateProperty.transform(!_.exists(_.me.shipsLeftToPlace.isEmpty))
-  )(_ => Seq(span("Confirm")))
+  )(_ => Seq[Modifier](span("Confirm")))
 
   private val undoButton = UdashButton(
     buttonStyle = Color.Secondary.toProperty,
@@ -117,10 +117,9 @@ class GameView(
     componentId = ComponentId("undo-button"),
     disabled = presenter.gameStateProperty.transform(!_.exists(_.me.myBoard.ships.nonEmpty))
   )(_ =>
-    Seq(
-      span("Undo"),
-      `class` := "bi bi-arrow-counterclockwise"
-    )
+    Seq[Modifier](
+      span("Undo")
+    ) //, `class` := "bi bi-arrow-counterclockwise")
   )
 
   private val resetButton = UdashButton(
@@ -128,14 +127,14 @@ class GameView(
     block = true.toProperty,
     componentId = ComponentId("reset-button"),
     disabled = presenter.gameStateProperty.transform(!_.exists(_.me.myBoard.ships.nonEmpty))
-  )(_ => Seq(span("Reset")))
+  )(_ => Seq[Modifier](span("Reset")))
 
   private val randomPlacementButton = UdashButton(
     buttonStyle = Color.Secondary.toProperty,
     block = true.toProperty,
     componentId = ComponentId("random-button"),
     disabled = presenter.gameStateProperty.transform(!_.exists(_.me.shipsLeftToPlace.nonEmpty))
-  )(_ => Seq(span("Random")))
+  )(_ => Seq[Modifier](span("Random")))
 
   private val launchAttackButton = {
     val launchAttackIsDisabledProperty =
@@ -157,34 +156,83 @@ class GameView(
     )
   }
 
+  private val restartButton = {
+    UdashButton(
+      buttonStyle = Color.Primary.toProperty,
+      block = true.toProperty,
+      componentId = ComponentId("restart-button")
+    )(nested => Seq(nested(translatedDynamic(Translations.Game.restartButton)(_.apply()))))
+  }
+
   private val mainGameForm = UdashForm(
     componentId = ComponentId("main-game-from")
   )(factory =>
     factory.disabled(presenter.hasWriteAccess.toProperty.transform(!_))(nested =>
       nested(produce(presenter.gameModeProperty) {
         case None =>
-          UdashInputGroup()(UdashInputGroup.appendButton(mainStartButton)).render
-        case Some(PreGameMode(_, _, _)) =>
-          UdashInputGroup()(
-            Seq(
-              UdashInputGroup.appendButton(confirmShipsButton),
-              UdashInputGroup.appendButton(undoButton),
-              UdashInputGroup.appendButton(resetButton),
-              UdashInputGroup.appendButton(randomPlacementButton)
-            )
+          div(
+            `class` := "row",
+            div(`class` := "mx-2"),
+            div(`class` := "mx-1", mainStartButton)
+          ).render
+        case Some(PreGameMode(_, false, _)) =>
+          div(
+            `class` := "row",
+            div(`class` := "mx-2"),
+            div(`class` := "mx-1", confirmShipsButton),
+            div(`class` := "mx-1", undoButton),
+            div(`class` := "mx-1", resetButton),
+            div(`class` := "mx-1", randomPlacementButton)
+          ).render
+        case Some(PreGameMode(_, true, _)) =>
+          div(
+            `class` := "row",
+            div(`class` := "mx-2"),
+            div(`class` := "mx-1", undoButton),
+            div(`class` := "mx-1", resetButton)
           ).render
         case Some(InGameMode(_, _, _)) =>
-          UdashInputGroup()(
-            Seq(
-              UdashInputGroup.appendButton(launchAttackButton)
-            )
+          div(
+            `class` := "row",
+            div(`class` := "mx-2"),
+            div(`class` := "mx-1", launchAttackButton)
           ).render
         case Some(GameOverMode(_, _)) =>
-          UdashInputGroup()(
-            Seq(
-              UdashInputGroup.appendButton(launchAttackButton)
-            )
+          div(
+            `class` := "row",
+            div(`class` := "mx-2"),
+            div(`class` := "mx-1", restartButton)
           ).render
+//        case None =>
+//          UdashInputGroup()(UdashInputGroup.appendButton(mainStartButton)).render
+//        case Some(PreGameMode(_, false, _)) =>
+//          UdashInputGroup()(
+//            Seq(
+//              UdashInputGroup.appendButton(confirmShipsButton),
+//              UdashInputGroup.appendButton(undoButton),
+//              UdashInputGroup.appendButton(resetButton),
+//              UdashInputGroup.appendButton(randomPlacementButton)
+//            )
+//          ).render
+//        case Some(PreGameMode(_, true, _)) =>
+//          UdashInputGroup()(
+//            Seq(
+//              UdashInputGroup.appendButton(undoButton),
+//              UdashInputGroup.appendButton(resetButton)
+//            )
+//          ).render
+//        case Some(InGameMode(_, _, _)) =>
+//          UdashInputGroup()(
+//            Seq(
+//              UdashInputGroup.appendButton(launchAttackButton)
+//            )
+//          ).render
+//        case Some(GameOverMode(_, _)) =>
+//          UdashInputGroup()(
+//            Seq(
+//              UdashInputGroup.appendButton(restartButton)
+//            )
+//          ).render
         case _ =>
           span.render
       })
@@ -215,13 +263,17 @@ class GameView(
     presenter.launchAttack()
   }
 
+  restartButton.listen { _ =>
+    presenter.restartGame()
+  }
+
   private val chatTabButton: UdashButton =
     UdashButton()(_ =>
       Seq(
         `class` := "nav-link btn-outline-primary" +
-          (if (presenter.selectedTabProperty.get == "chat") " active" else ""),
+          (if (presenter.selectedTabProperty.get == ScreenModel.chatTab) " active" else ""),
         data("bs-toggle") := "tab",
-        data("bs-target") := "#chat",
+        data("bs-target") := "#" + ScreenModel.chatTab,
         span("Chat")
       )
     )
@@ -232,16 +284,16 @@ class GameView(
     )(_ =>
       Seq[Modifier](
         `class` := "nav-link btn-outline-primary" +
-          (if (presenter.selectedTabProperty.get == "my-moves") " active" else ""),
+          (if (presenter.selectedTabProperty.get == ScreenModel.myMovesTab) " active" else ""),
 //        (`class` := "nav-link btn-outline-primary active")
-//          .attrIf(presenter.selectedTabProperty.transform(_ == "my-moves")),
+//          .attrIf(presenter.selectedTabProperty.transform(_ == ScreenModel.myMovesTab)),
 //        (`class` := "nav-link btn-outline-primary")
-//          .attrIf(presenter.selectedTabProperty.transform(_ != "my-moves")),
+//          .attrIf(presenter.selectedTabProperty.transform(_ != ScreenModel.myMovesTab)),
 //        `class` := "nav-link btn-outline-primary",
 //        (`class` :+= "active")
-//          .attrIf(presenter.selectedTabProperty.transform(_ == "my-moves")),
+//          .attrIf(presenter.selectedTabProperty.transform(_ == ScreenModel.myMovesTab)),
         data("bs-toggle") := "tab",
-        data("bs-target") := "#my-moves",
+        data("bs-target") := "#" + ScreenModel.myMovesTab,
         "My Moves"
       )
     )
@@ -252,27 +304,27 @@ class GameView(
     )(_ =>
       Seq[Modifier](
         `class` := "nav-link btn-outline-primary" +
-          (if (presenter.selectedTabProperty.get == "enemy-moves") " active" else ""),
+          (if (presenter.selectedTabProperty.get == ScreenModel.enemyMovesTab) " active" else ""),
 //        (`class` := "nav-link btn-outline-primary active")
-//          .attrIf(presenter.selectedTabProperty.transform(_ == "enemy-moves")),
+//          .attrIf(presenter.selectedTabProperty.transform(_ == ScreenModel.enemyMovesTab)),
 //        (`class` := "nav-link btn-outline-primary")
-//          .attrIf(presenter.selectedTabProperty.transform(_ != "enemy-moves")),
+//          .attrIf(presenter.selectedTabProperty.transform(_ != ScreenModel.enemyMovesTab)),
         data("bs-toggle") := "tab",
-        data("bs-target") := "#enemy-moves",
+        data("bs-target") := "#" + ScreenModel.enemyMovesTab,
         "Enemy Moves"
       )
     )
 
   chatTabButton.listen { _ =>
-    presenter.setSelectedTab("chat")
+    presenter.setSelectedTab(ScreenModel.chatTab)
   }
 
   myMovesTabButton.listen { _ =>
-    presenter.setSelectedTab("my-moves")
+    presenter.setSelectedTab(ScreenModel.myMovesTab)
   }
 
   enemyMovesTabButton.listen { _ =>
-    presenter.setSelectedTab("enemy-moves")
+    presenter.setSelectedTab(ScreenModel.enemyMovesTab)
   }
 
   private def messagesTab(nested: Binding.NestedInterceptor) = {
@@ -283,17 +335,17 @@ class GameView(
         li(
           `class` := "nav-item",
           role := "presentation",
-          chatTabButton
+          nested(chatTabButton)
         ),
         li(
           `class` := "nav-item",
           role := "presentation",
-          myMovesTabButton
+          nested(myMovesTabButton)
         ),
         li(
           `class` := "nav-item",
           role := "presentation",
-          enemyMovesTabButton
+          nested(enemyMovesTabButton)
         )
       )
 
@@ -311,8 +363,9 @@ class GameView(
   private def messagesTabItem(nested: Binding.NestedInterceptor): Binding =
     nested(produceWithNested(presenter.selectedTabProperty) { case (selectedTab, nested2) =>
       div(
-        `class` := "tab-pane fade" + (if (selectedTab == "chat") " show active" else ""),
-        id := "chat",
+        `class` := "tab-pane fade" + (if (selectedTab == ScreenModel.chatTab) " show active"
+                                      else ""),
+        id := ScreenModel.chatTab,
         role := "tabpanel",
         ChatStyles.messagesWindow,
         nested2(repeat(chatModel.subSeq(_.msgs)) { msgProperty =>
@@ -347,8 +400,9 @@ class GameView(
   private def myMovesTabItem(nested: Binding.NestedInterceptor): Binding =
     nested(produceWithNested(presenter.selectedTabProperty) { case (selectedTab, nested2) =>
       div(
-        `class` := "tab-pane fade" + (if (selectedTab == "my-moves") " show active" else ""),
-        id := "my-moves",
+        `class` := "tab-pane fade" + (if (selectedTab == ScreenModel.myMovesTab) " show active"
+                                      else ""),
+        id := ScreenModel.myMovesTab,
         role := "tabpanel",
         ChatStyles.messagesWindow,
         nested2(
@@ -363,8 +417,9 @@ class GameView(
   private def enemyMovesTabItem(nested: Binding.NestedInterceptor): Binding =
     nested(produceWithNested(presenter.selectedTabProperty) { case (selectedTab, nested2) =>
       div(
-        `class` := "tab-pane fade" + (if (selectedTab == "enemy-moves") " show active" else ""),
-        id := "enemy-moves",
+        `class` := "tab-pane fade" + (if (selectedTab == ScreenModel.enemyMovesTab) " show active"
+                                      else ""),
+        id := ScreenModel.enemyMovesTab,
         role := "tabpanel",
         ChatStyles.messagesWindow,
         nested2(
@@ -420,16 +475,23 @@ class GameView(
             div(
               `class` := "row justify-content-between",
               div(
-                `class` := "col",
+                `class` := "col-8",
                 if (username.nonEmpty)
                   span(s"Logged in as ", b(username)).render
                 else
                   span("").render,
                 br,
                 nested(produce(presenter.gameModeProperty) {
-                  case Some(PreGameMode(_, _, _)) =>
+                  case Some(PreGameMode(_, iPlacedShips, enemyPlacedShips)) =>
                     val placeShipsBinding =
-                      translatedDynamic(Translations.Game.placeShips)(_.apply())
+                      translatedDynamic(
+                        if (iPlacedShips)
+                          Translations.Game.placeShipsWaitEnemy
+                        else if (enemyPlacedShips)
+                          Translations.Game.placeShipsEnemyReady
+                        else
+                          Translations.Game.placeShips
+                      )(_.apply())
                     span(color := "#FF0000", b(placeShipsBinding)).render
                   case Some(InGameMode(isFirstPlayer, halfTurns, _)) =>
                     val isMyTurn =
@@ -474,7 +536,7 @@ class GameView(
                 })
               ),
               div(
-                `class` := "col container",
+                `class` := "col-4 container",
                 div(
                   `class` := "row justify-content-end",
                   showIf(presenter.gameStateProperty.transform(_.nonEmpty))(

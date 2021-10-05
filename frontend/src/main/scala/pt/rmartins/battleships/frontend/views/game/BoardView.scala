@@ -176,7 +176,7 @@ class BoardView(
     ).transform {
       case (
             Some(mousePosition),
-            Some(GameState(_, _, enemy, InGameMode(_, _, _))),
+            Some(GameState(_, _, enemy, InGameMode(_, _, _) | GameOverMode(_, _))),
             enemyBoardPos,
             defaultSquareSize
           ) =>
@@ -194,21 +194,20 @@ class BoardView(
 
   private val BoardMarksSelectorAllPositions: ReadableProperty[List[(BoardMark, Coordinate)]] =
     combine(
-      gamePresenter.inGameModeProperty,
+      gamePresenter.gameModeProperty,
       BoardMarksSelectorCombined
     ).transform {
       case (
-            Some(InGameMode(_, _, _)),
+            Some(InGameMode(_, _, _) | GameOverMode(_, _)),
             (boardMarksSelectorPos, boardMarksSelectorSize, boardMarksSelectorMargin)
           ) =>
-        BoardMarksSelectorOrder.zipWithIndex
-          .map { case (boardMark, index) =>
-            (
-              boardMark,
-              boardMarksSelectorPos +
-                Coordinate(index * (boardMarksSelectorSize + boardMarksSelectorMargin), 0)
-            )
-          }
+        BoardMarksSelectorOrder.zipWithIndex.map { case (boardMark, index) =>
+          (
+            boardMark,
+            boardMarksSelectorPos +
+              Coordinate(index * (boardMarksSelectorSize + boardMarksSelectorMargin), 0)
+          )
+        }
       case _ =>
         Nil
     }
@@ -216,13 +215,13 @@ class BoardView(
   val boardMarkHover: ReadableProperty[Option[BoardMark]] =
     combine(
       gameModel.subProp(_.mousePosition),
-      gamePresenter.inGameModeProperty,
+      gamePresenter.gameModeProperty,
       BoardMarksSelectorAllPositions,
       BoardMarksSelectorSize
     ).transform {
       case (
             Some(mousePosition),
-            Some(InGameMode(_, _, _)),
+            Some(InGameMode(_, _, _) | GameOverMode(_, _)),
             boardMarksSelectorAllPositions,
             boardMarksSelectorSize
           ) =>
@@ -473,6 +472,11 @@ class BoardView(
               EnemyBoardSqSize.get,
               selectedBoardMarkOpt
             )
+
+            drawBoardMarksSelector(
+              renderingCtx,
+              selectedBoardMarkOpt
+            )
         }
       case None =>
     }
@@ -559,19 +563,26 @@ class BoardView(
             val roundedBoardCoor =
               boardCoor.roundTo(boardSize - ship.size + Coordinate(1, 1))
 
-            val drawCoordinate: Coordinate => Unit = {
-              val alpha: Double =
-                if (gamePresenter.canPlace(me.myBoard, ship, roundedBoardCoor))
-                  0.9
-                else
-                  0.75
-              drawShipRedSquareCoor(
-                renderingCtx,
-                boardPosition,
-                _,
-                size = squareSize,
-                alpha = alpha
-              )
+            def drawCoordinate(coor: Coordinate): Unit = {
+              val canPlace = gamePresenter.canPlace(me.myBoard, ship, roundedBoardCoor)
+              val alpha: Double = if (canPlace) 0.9 else 0.75
+
+              if (canPlace)
+                drawShipSquareCoor(
+                  renderingCtx,
+                  boardPosition,
+                  coor,
+                  size = squareSize,
+                  alpha = alpha
+                )
+              else
+                drawShipRedSquareCoor(
+                  renderingCtx,
+                  boardPosition,
+                  coor,
+                  size = squareSize,
+                  alpha = alpha
+                )
             }
 
             ship.pieces.map(_ + roundedBoardCoor).foreach(drawCoordinate)
@@ -769,9 +780,7 @@ class BoardView(
       renderingCtx: CanvasRenderingContext2D,
       selectedBoardMarkOpt: Option[BoardMark]
   ): Unit = {
-    val boardMarksPos = BoardMarksSelectorPos.get
     val boardMarksSize = BoardMarksSelectorSize.get
-    val boardMarksMargin = BoardMarksSelectorMargin.get
 
     val selected = selectedBoardMarkOpt.orElse(boardMarkHover.get)
 

@@ -15,11 +15,10 @@ class GameViewFactory(
   import scala.concurrent.ExecutionContext.Implicits.global
 
   override def create(): (View, Presenter[RoutingInGameState.type]) = {
-    val gameModel =
-      ModelProperty[GameModel](GameModel(None, None, Nil, turnAttacksSent = false, None))
+    val gameModel = ModelProperty[GameModel](GameModel.default)
     val gameStateModel = ModelProperty[GameStateModel](GameStateModel(None))
-    val chatModel = ModelProperty[ChatModel](ChatModel("", Seq.empty, "", 0))
-    val screenModel = ModelProperty[ScreenModel](ScreenModel(BoardView.CanvasSize, "chat"))
+    val chatModel = ModelProperty[ChatModel](ChatModel.default)
+    val screenModel = ModelProperty[ScreenModel](ScreenModel.default)
 
     val rpc = userService.secureRpc()
     if (rpc.isEmpty) throw SharedExceptions.UnauthorizedException()

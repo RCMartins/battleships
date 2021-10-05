@@ -22,6 +22,9 @@ class GameEndpoint(implicit
   override def quitCurrentGame(gameId: GameId): Future[Unit] =
     gameService.quitCurrentGame(gameId, ctx.name)
 
+  override def restartGame(gameId: GameId): Future[Unit] =
+    gameService.restartGame(gameId)
+
   override def confirmShips(
       gameId: GameId,
       shipPositions: List[ShipInGame]

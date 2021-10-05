@@ -16,7 +16,7 @@ object GameMode extends HasGenCodec[GameMode] {
 
   case class PreGameMode(
       shipsToPlace: List[Ship],
-      mePlacedShips: Boolean,
+      iPlacedShips: Boolean,
       enemyPlacedShips: Boolean
   ) extends GameMode {
 

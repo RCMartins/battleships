@@ -11,4 +11,9 @@ case class GameModel(
     selectedBoardMarkOpt: Option[BoardMark]
 )
 
-object GameModel extends HasModelPropertyCreator[GameModel]
+object GameModel extends HasModelPropertyCreator[GameModel] {
+
+  val default: GameModel =
+    GameModel(None, None, Nil, turnAttacksSent = false, None)
+
+}

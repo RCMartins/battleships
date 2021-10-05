@@ -11,6 +11,8 @@ trait GameRPC {
 
   def quitCurrentGame(gameId: GameId): Future[Unit]
 
+  def restartGame(gameId: GameId): Future[Unit]
+
   def confirmShips(gameId: GameId, shipPositions: List[ShipInGame]): Future[Unit]
 
   def cancelShipsPlacement(gameId: GameId): Future[Unit]

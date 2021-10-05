@@ -8,4 +8,13 @@ case class ScreenModel(
     selectedTab: String
 )
 
-object ScreenModel extends HasModelPropertyCreator[ScreenModel]
+object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
+
+  val chatTab: String = "chat"
+  val myMovesTab: String = "my-moves"
+  val enemyMovesTab: String = "enemy-moves"
+
+  val default: ScreenModel =
+    ScreenModel(BoardView.CanvasSize, chatTab)
+
+}

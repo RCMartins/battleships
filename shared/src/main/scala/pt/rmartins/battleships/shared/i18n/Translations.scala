@@ -36,10 +36,14 @@ object Translations {
 
   object Game {
     val placeShips = key("game.header.place_ships")
+    val placeShipsWaitEnemy = key("game.header.place_ships_wait_enemy")
+    val placeShipsEnemyReady = key("game.header.place_ships_enemy_ready")
     val gameTurn = key1[Int]("game.header.game_turn")
     val yourTurn = key("game.header.your_turn")
     val enemyTurn = key("game.header.enemy_turn")
-    val youWon = key("game.header.youWon")
-    val enemyWon = key("game.header.enemyWon")
+    val youWon = key("game.header.you_won")
+    val enemyWon = key("game.header.enemy_won")
+
+    val restartButton = key("game.buttons.restart")
   }
 }

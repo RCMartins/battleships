@@ -10,4 +10,9 @@ case class ChatModel(
     connectionsCount: Int
 )
 
-object ChatModel extends HasModelPropertyCreator[ChatModel]
+object ChatModel extends HasModelPropertyCreator[ChatModel] {
+
+  val default: ChatModel =
+    ChatModel("", Seq.empty, "", 0)
+
+}

@@ -12,6 +12,7 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Random
+import scala.util.chaining.scalaUtilChainingOps
 
 class GameService(rpcClientsService: RpcClientsService) {
 
@@ -255,6 +256,21 @@ class GameService(rpcClientsService: RpcClientsService) {
       }
     }
 
+  def restartGame(gameId: GameId): Future[Unit] =
+    Future {
+      activeGames.get(gameId).tap {
+        case None =>
+          rpcClientsService.sendMessage(s"Error finding game!")
+        case Some(game) =>
+          removeServerGame(game)
+          updateBothQuitGame(game)
+      }
+    }.map {
+      case Some(oldGame) =>
+        startGame(oldGame.player1.username, oldGame.player2.username)
+      case None =>
+    }
+
   def confirmShips(
       gameId: GameId,
       playerUsername: String,
@@ -377,9 +393,11 @@ class GameService(rpcClientsService: RpcClientsService) {
           val gameOver = updatedPlayer.enemyBoard.shipsLeft == 0
           val updatedGame: Game = game.updatePlayer(updatedPlayer)
           val updatedGame2: Game =
-            if (gameOver)
+            if (gameOver) {
+              rpcClientsService.sendMessage(s"Game Over! Player ${updatedPlayer.username} won!")
+
               updatedGame.modify(_.playerWhoWonOpt).setTo(Some(updatedPlayer.username))
-            else
+            } else
               updatedGame.modify(_.halfTurnsOpt).using(_.map(_ + 1))
 
           updateServerState(updatedGame2)
