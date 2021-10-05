@@ -27,6 +27,16 @@ object Utils {
     combine(propertyA, propertyB, propertyC)
       .combine(propertyD) { case ((a, b, c), d) => (a, b, c, d) }
 
+  def combine[A, B, C, D, E](
+      propertyA: ReadableProperty[A],
+      propertyB: ReadableProperty[B],
+      propertyC: ReadableProperty[C],
+      propertyD: ReadableProperty[D],
+      propertyE: ReadableProperty[E]
+  ): ReadableProperty[(A, B, C, D, E)] =
+    combine(propertyA, propertyB, propertyC, propertyD)
+      .combine(propertyE) { case ((a, b, c, d), e) => (a, b, c, d, e) }
+
   def addSeparator[A](list: List[A], separator: A): List[A] = {
     list match {
       case value1 :: value2 :: next =>

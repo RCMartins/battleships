@@ -47,14 +47,23 @@ class GamePresenter(
       case _                                => None
     }
 
+  val rulesProperty: ReadableProperty[Option[Rules]] =
+    gameStateProperty.transform(_.map(_.rules))
+
   val inPreGameMode: ReadableProperty[Boolean] =
     inGameModeProperty.transform(_.exists(_.isPreGame))
 
   val isMyTurnProperty: ReadableProperty[Boolean] =
     inGameModeProperty.transform(_.exists(_.isMyTurn))
 
+  val meProperty: ReadableProperty[Option[Player]] =
+    gameStateProperty.transform(_.map(_.me))
+
   val selectedTabProperty: ReadableProperty[String] =
     screenModel.subProp(_.selectedTab)
+
+  val mousePositionProperty: ReadableProperty[Option[Coordinate]] =
+    gameModel.subProp(_.mousePosition)
 
   private val msgCallback = notificationsCenter.onNewMsg { case msg =>
     chatModel.subSeq(_.msgs).append(msg)
@@ -95,11 +104,11 @@ class GamePresenter(
 
   def updateGameMode(fromGameMode: Option[GameMode], to: Option[GameState]): Unit = {
     (fromGameMode, to) match {
-      case (None, Some(GameState(_, me, _, PreGameMode(_, _, _)))) =>
+      case (None, Some(GameState(_, _, me, _, PreGameMode(_, _)))) =>
         me.shipsLeftToPlace.headOption.foreach { headShip =>
           gameModel.subProp(_.selectedShip).set(Some(headShip))
         }
-      case (None | Some(PreGameMode(_, _, _)), Some(GameState(_, me, _, InGameMode(_, _, _)))) =>
+      case (None | Some(PreGameMode(_, _)), Some(GameState(_, _, _, _, InGameMode(_, _, _)))) =>
         screenModel.subProp(_.selectedTab).set(ScreenModel.myMovesTab)
       case _ =>
     }
@@ -183,7 +192,7 @@ class GamePresenter(
 
   def restartGame(): Unit = {
     gameStateProperty.get match {
-      case Some(GameState(gameId, _, _, _)) =>
+      case Some(GameState(gameId, _, _, _, _)) =>
         gameRpc.restartGame(gameId)
       case _ =>
     }
@@ -191,7 +200,7 @@ class GamePresenter(
 
   def quitCurrentGame(): Unit =
     gameStateProperty.get match {
-      case Some(GameState(gameId, _, _, _)) =>
+      case Some(GameState(gameId, _, _, _, _)) =>
         gameRpc.quitCurrentGame(gameId)
       case _ =>
     }
@@ -212,11 +221,11 @@ class GamePresenter(
   def mouseClick(boardView: BoardView): Unit = {
     (gameModel.get, gameStateProperty.get) match {
       case (
-            GameModel(Some(mousePosition), selectedShipOpt, _, _, _),
-            Some(gameState @ GameState(_, me, _, PreGameMode(_, _, _)))
+            GameModel(Some(_), selectedShipOpt, _, _, _),
+            Some(gameState @ GameState(_, _, me, _, PreGameMode(_, _)))
           ) =>
-        boardView.getShipInCoor(boardView.getAllShipsCoordinates.get, mousePosition) match {
-          case Some(ToPlaceShip(ship, _, _, _)) =>
+        boardView.shipToPlaceHover.get.map(_.ship) match {
+          case Some(ship) =>
             gameModel.subProp(_.selectedShip).set(Some(ship))
           case None =>
             (selectedShipOpt, boardView.myBoardMouseCoordinate.get) match {
@@ -232,7 +241,7 @@ class GamePresenter(
         }
       case (
             GameModel(Some(_), _, turnAttacks, turnAttacksSent, selectedBoardMarkOpt),
-            Some(gameState @ GameState(gameId, me, _, InGameMode(_, _, _) | GameOverMode(_, _)))
+            Some(gameState @ GameState(gameId, _, me, _, InGameMode(_, _, _) | GameOverMode(_, _)))
           ) =>
         (
           boardView.enemyBoardMouseCoordinate.get,
@@ -340,7 +349,7 @@ class GamePresenter(
 
   private def rotateSelectedShip(directionDelta: Int): Unit =
     (gameModel.get.selectedShip, gameModeProperty.get) match {
-      case (Some(ship), Some(PreGameMode(_, _, _))) =>
+      case (Some(ship), Some(PreGameMode(_, _))) =>
         gameModel
           .subProp(_.selectedShip)
           .set(Some(ship.rotateBy(directionDelta)))
@@ -359,21 +368,21 @@ class GamePresenter(
 
   def cancelShipsPlacement(): Unit =
     gameStateProperty.get match {
-      case Some(GameState(gameId, _, _, PreGameMode(_, true, _))) =>
+      case Some(GameState(gameId, _, _, _, PreGameMode(true, _))) =>
         gameRpc.cancelShipsPlacement(gameId)
       case _ =>
     }
 
   def confirmShipPlacement(): Unit =
     gameStateProperty.get match {
-      case Some(GameState(gameId, me, _, _)) =>
+      case Some(GameState(gameId, _, me, _, _)) =>
         gameRpc.confirmShips(gameId, me.myBoard.ships)
       case _ =>
     }
 
   def undoLastPlacedShip(): Unit =
     gameStateProperty.get match {
-      case Some(gameState @ GameState(_, me, _, _)) =>
+      case Some(gameState @ GameState(_, _, me, _, _)) =>
         val undoShip: Option[Ship] =
           me.myBoard.ships match {
             case Nil =>
@@ -406,11 +415,11 @@ class GamePresenter(
 
   def resetPlacedShips(): Unit =
     gameStateProperty.get match {
-      case Some(gameState @ GameState(_, me, _, PreGameMode(shipsToPlace, _, _)))
+      case Some(gameState @ GameState(_, Rules(shipsInThisGame), me, _, PreGameMode(_, _)))
           if me.myBoard.ships.nonEmpty =>
         val meUpdated: Player =
           me.modify(_.shipsLeftToPlace)
-            .setTo(shipsToPlace)
+            .setTo(shipsInThisGame)
             .modify(_.myBoard)
             .using(_.resetBoard)
 
@@ -427,7 +436,7 @@ class GamePresenter(
 
   def randomPlacement(): Unit = {
     gameStateProperty.get match {
-      case Some(gameState @ GameState(_, me, _, PreGameMode(_, _, _))) =>
+      case Some(gameState @ GameState(_, _, me, _, PreGameMode(_, _))) =>
         me.shipsLeftToPlace match {
           case headShip :: _ =>
             val possibleCoorList =
@@ -455,7 +464,7 @@ class GamePresenter(
     (gameModel.get.turnAttacks, gameStateProperty.get) match {
       case (
             turnAttacks,
-            Some(GameState(gameId, _, _, InGameMode(_, halfTurns, _)))
+            Some(GameState(gameId, _, _, _, InGameMode(_, halfTurns, _)))
           ) if turnAttacks.forall(_.isPlaced) =>
         gameModel.subProp(_.turnAttacksSent).set(true)
         gameRpc.sendTurnAttacks(gameId, halfTurns, turnAttacks)
@@ -465,7 +474,7 @@ class GamePresenter(
 
   def isValidCoordinateTarget(enemyBoardCoor: Coordinate): Boolean = {
     gameStateProperty.get match {
-      case Some(GameState(_, me, _, InGameMode(_, _, _))) =>
+      case Some(GameState(_, _, me, _, InGameMode(_, _, _))) =>
         val Coordinate(x, y) = enemyBoardCoor
         val (turnNumberOpt, boardMark) = me.enemyBoardMarks(x)(y)
         turnNumberOpt.isEmpty && !boardMark.isPermanent

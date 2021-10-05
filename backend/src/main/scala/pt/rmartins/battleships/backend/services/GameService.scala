@@ -90,7 +90,7 @@ class GameService(rpcClientsService: RpcClientsService) {
         Player(
           clientId.id,
           username,
-          game.shipsToPlace,
+          game.shipsThisGame,
           Board(myBoard.boardSize, myBoard.ships),
           Vector.empty,
           Nil
@@ -110,7 +110,7 @@ class GameService(rpcClientsService: RpcClientsService) {
   case class Game(
       gameId: GameId,
       boardSize: Coordinate,
-      shipsToPlace: List[Ship],
+      shipsThisGame: List[Ship],
       player1: ServerPlayer,
       player2: ServerPlayer,
       halfTurnsOpt: Option[Int],
@@ -133,7 +133,7 @@ class GameService(rpcClientsService: RpcClientsService) {
       val gameMode =
         (halfTurnsOpt, playerWhoWonOpt) match {
           case (None, _) =>
-            PreGameMode(shipsToPlace, me.myBoard.ships.nonEmpty, enemy.myBoard.ships.nonEmpty)
+            PreGameMode(me.myBoard.ships.nonEmpty, enemy.myBoard.ships.nonEmpty)
           case (Some(halfTurns), None) =>
             InGameMode(
               me.startedFirst,
@@ -149,6 +149,7 @@ class GameService(rpcClientsService: RpcClientsService) {
 
       GameState(
         gameId,
+        Rules(shipsThisGame),
         me.toPlayer(this),
         SimplePlayer(
           enemy.clientId.id,
@@ -195,7 +196,7 @@ class GameService(rpcClientsService: RpcClientsService) {
       rpcClientsService.getClientIdByUsername(player2Username)
     ) match {
       case (Some(player1Id), Some(player2Id)) =>
-        val shipsToPlace: List[Ship] =
+        val shipsThisGame: List[Ship] =
           (
             List.fill(4)(Ship.Submarine) ++
               List.fill(3)(Ship.PatrolBoat2) ++
@@ -217,7 +218,7 @@ class GameService(rpcClientsService: RpcClientsService) {
           ServerEnemyBoard(
             boardSize,
             Vector.fill(10)(Vector.fill(10)((None, BoardMark.Empty))),
-            shipsToPlace.size
+            shipsThisGame.size
           )
 
         val player1First: Boolean = Random.nextBoolean()
@@ -231,7 +232,7 @@ class GameService(rpcClientsService: RpcClientsService) {
         val game = Game(
           gameId = gameId,
           boardSize = boardSize,
-          shipsToPlace = shipsToPlace,
+          shipsThisGame = shipsThisGame,
           player1 = player1,
           player2 = player2,
           halfTurnsOpt = None,

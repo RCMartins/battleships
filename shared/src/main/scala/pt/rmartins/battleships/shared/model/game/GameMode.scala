@@ -15,7 +15,6 @@ sealed trait GameMode {
 object GameMode extends HasGenCodec[GameMode] {
 
   case class PreGameMode(
-      shipsToPlace: List[Ship],
       iPlacedShips: Boolean,
       enemyPlacedShips: Boolean
   ) extends GameMode {

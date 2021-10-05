@@ -176,7 +176,7 @@ class GameView(
             div(`class` := "mx-2"),
             div(`class` := "mx-1", mainStartButton)
           ).render
-        case Some(PreGameMode(_, false, _)) =>
+        case Some(PreGameMode(false, _)) =>
           div(
             `class` := "row",
             div(`class` := "mx-2"),
@@ -185,7 +185,7 @@ class GameView(
             div(`class` := "mx-1", resetButton),
             div(`class` := "mx-1", randomPlacementButton)
           ).render
-        case Some(PreGameMode(_, true, _)) =>
+        case Some(PreGameMode(true, _)) =>
           div(
             `class` := "row",
             div(`class` := "mx-2"),
@@ -488,9 +488,17 @@ class GameView(
                   span(s"Logged in as ", b(username)).render
                 else
                   span("").render,
+                nested(
+                  produce(presenter.gameStateProperty.transform(_.map(_.enemy.username))) {
+                    case Some(enemyUsername) if enemyUsername.nonEmpty =>
+                      span(" - playing against ", b(enemyUsername)).render
+                    case _ =>
+                      span.render
+                  }
+                ),
                 br,
                 nested(produce(presenter.gameModeProperty) {
-                  case Some(PreGameMode(_, iPlacedShips, enemyPlacedShips)) =>
+                  case Some(PreGameMode(iPlacedShips, enemyPlacedShips)) =>
                     val placeShipsBinding =
                       translatedDynamic(
                         if (iPlacedShips)
