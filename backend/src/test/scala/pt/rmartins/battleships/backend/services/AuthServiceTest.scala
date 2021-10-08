@@ -22,8 +22,8 @@ class AuthServiceTest extends AsyncWordSpec with Matchers with AsyncMockFactory 
         ctx2 <- service.login("u2", "p2")
         _ <- recoverToSucceededIf[SharedExceptions.UserNotFound](service.login("u1", "p3"))
       } yield {
-        ctx1.name should be("u1")
-        ctx2.name should be("u2")
+        ctx1.username should be("u1")
+        ctx2.username should be("u2")
       }
     }
 

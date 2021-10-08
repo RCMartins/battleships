@@ -2,9 +2,10 @@ package pt.rmartins.battleships.frontend.views.game
 
 import io.udash._
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
+import pt.rmartins.battleships.shared.model.game.Username
 
 case class ChatModel(
-    username: String,
+    username: Username,
     msgs: Seq[ChatMessage],
     msgInput: String,
     connectionsCount: Int
@@ -13,6 +14,6 @@ case class ChatModel(
 object ChatModel extends HasModelPropertyCreator[ChatModel] {
 
   val default: ChatModel =
-    ChatModel("", Seq.empty, "", 0)
+    ChatModel(Username(""), Seq.empty, "", 0)
 
 }

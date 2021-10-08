@@ -15,6 +15,7 @@ import io.udash.component.ComponentId
 import io.udash.css._
 import io.udash.i18n._
 import com.avsystem.commons._
+import pt.rmartins.battleships.shared.model.game.Username
 
 class LoginPageView(
     model: ModelProperty[LoginPageModel],
@@ -47,7 +48,7 @@ class LoginPageView(
     factory.input.formGroup(groupId = ComponentId("username"))(
       nested =>
         factory.input
-          .textInput(model.subProp(_.username))(
+          .textInput(model.subProp(_.username).bitransform(_.username)(Username(_)))(
             Some(nested =>
               nested(
                 translatedAttrDynamic(Translations.Auth.usernameFieldPlaceholder, "placeholder")(
@@ -92,7 +93,8 @@ class LoginPageView(
   private val submitButton = UdashButton(
     buttonStyle = Color.Primary.toProperty,
     block = true.toProperty,
-    disabled = model.subProp(_.username).combine(model.subProp(_.password))(_.isEmpty || _.isEmpty),
+    disabled =
+      model.subProp(_.username).combine(model.subProp(_.password))(_.username.isEmpty || _.isEmpty),
     componentId = ComponentId("login")
   )(nested =>
     Seq[Modifier](

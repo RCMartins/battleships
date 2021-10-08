@@ -18,7 +18,7 @@ class ChatEndpoint(implicit
 
   override def sendMsg(msg: String): Future[Unit] = {
     require(Permission.ChatWrite)
-    chatService.sendMsg(ctx.name, msg)
+    chatService.sendMsg(ctx.username, msg)
   }
 
   override def latestMessages(): Future[Seq[ChatMessage]] = {

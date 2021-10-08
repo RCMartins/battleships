@@ -12,14 +12,13 @@ import io.udash.component.ComponentId
 import io.udash.css._
 import io.udash.i18n._
 import org.scalajs.dom
-import org.scalajs.dom.html.{Canvas, Div, Span}
-import org.scalajs.dom.{MouseEvent, Node, UIEvent, WheelEvent, window}
+import org.scalajs.dom.html.{Canvas, Div}
+import org.scalajs.dom.{MouseEvent, UIEvent, WheelEvent, window}
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.shared.css.ChatStyles
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game._
-import scalatags.JsDom
 import scalatags.JsDom.all._
 
 import scala.util.chaining.scalaUtilChainingOps
@@ -199,7 +198,7 @@ class GameView(
             div(`class` := "mx-1", undoButton),
             div(`class` := "mx-1", resetButton)
           ).render
-        case Some(InGameMode(_, _, _)) =>
+        case Some(_: InGameMode) =>
           div(
             `class` := "row",
             div(`class` := "mx-2"),
@@ -229,7 +228,7 @@ class GameView(
 //              UdashInputGroup.appendButton(resetButton)
 //            )
 //          ).render
-//        case Some(InGameMode(_, _, _)) =>
+//        case Some(_: InGameMode) =>
 //          UdashInputGroup()(
 //            Seq(
 //              UdashInputGroup.appendButton(launchAttackButton)
@@ -393,7 +392,7 @@ class GameView(
   private def turnPlaysToHtml(turnPlay: TurnPlay): Seq[dom.Element] =
     div(
       ChatStyles.msgContainer,
-      strong(turnPlay.turnNumber, ": "),
+      strong(turnPlay.turn.toTurnString, ": "),
       span(
         Utils.addSeparator(
           turnPlay.hitHints
@@ -486,88 +485,81 @@ class GameView(
     UdashCard(componentId = ComponentId("game-panel"))(factory =>
       Seq(
         factory.header(nested =>
-          nested(produceWithNested(chatModel.subProp(_.username)) { case (username, nested) =>
-            div(
-              `class` := "row justify-content-between",
+          nested(produceWithNested(chatModel.subProp(_.username)) {
+            case (Username(username), nested) =>
               div(
-                `class` := "col-8",
-                if (username.nonEmpty)
-                  span(s"Logged in as ", b(username)).render
-                else
-                  span("").render,
-                nested(
-                  produce(presenter.gameStateProperty.transform(_.map(_.enemy.username))) {
-                    case Some(enemyUsername) if enemyUsername.nonEmpty =>
-                      span(" - playing against ", b(enemyUsername)).render
-                    case _ =>
-                      span.render
-                  }
-                ),
-                br,
-                nested(produce(presenter.gameModeProperty) {
-                  case Some(PreGameMode(iPlacedShips, enemyPlacedShips)) =>
-                    val placeShipsBinding =
-                      translatedDynamic(
-                        if (iPlacedShips)
-                          Translations.Game.placeShipsWaitEnemy
-                        else if (enemyPlacedShips)
-                          Translations.Game.placeShipsEnemyReady
-                        else
-                          Translations.Game.placeShips
-                      )(_.apply())
-                    span(color := "#FF0000", b(placeShipsBinding)).render
-                  case Some(InGameMode(isFirstPlayer, halfTurns, _)) =>
-                    val isMyTurn =
-                      halfTurns % 2 == (if (isFirstPlayer) 1 else 0)
-                    val currentTurn: Int =
-                      (halfTurns + 1) / 2
-
-                    val turnStrBinding: Binding =
-                      translatedDynamic(
-                        if (isMyTurn)
-                          Translations.Game.yourTurn
-                        else
-                          Translations.Game.enemyTurn
-                      )(_.apply())
-
-                    span(
-                      span("Turn "),
-                      span(currentTurn),
-                      span(": "),
-                      span(color := "#FF0000", b(turnStrBinding))
-                    ).render
-                  case Some(GameOverMode(halfTurns, youWon)) =>
-                    val currentTurn: Int =
-                      (halfTurns + 1) / 2
-
-                    val turnStrBinding: Binding =
-                      translatedDynamic(
-                        if (youWon)
-                          Translations.Game.youWon
-                        else
-                          Translations.Game.enemyWon
-                      )(_.apply())
-
-                    span(
-                      span("Turn "),
-                      span(currentTurn),
-                      span(": "),
-                      span(color := "#FF0000", b(turnStrBinding))
-                    ).render
-                  case _ =>
-                    span("").render
-                })
-              ),
-              div(
-                `class` := "col-4 container",
+                `class` := "row justify-content-between",
                 div(
-                  `class` := "row justify-content-end",
-                  showIf(presenter.gameStateProperty.transform(_.nonEmpty))(
-                    span(quitGameButton).render
+                  `class` := "col-8",
+                  if (username.nonEmpty)
+                    span(s"Logged in as ", b(username)).render
+                  else
+                    span("").render,
+                  nested(
+                    produce(presenter.gameStateProperty.transform(_.map(_.enemy.username))) {
+                      case Some(Username(enemyUsername)) if enemyUsername.nonEmpty =>
+                        span(" - playing against ", b(enemyUsername)).render
+                      case _ =>
+                        span.render
+                    }
+                  ),
+                  br,
+                  nested(produce(presenter.gameModeProperty) {
+                    case Some(PreGameMode(iPlacedShips, enemyPlacedShips)) =>
+                      val placeShipsBinding =
+                        translatedDynamic(
+                          if (iPlacedShips)
+                            Translations.Game.placeShipsWaitEnemy
+                          else if (enemyPlacedShips)
+                            Translations.Game.placeShipsEnemyReady
+                          else
+                            Translations.Game.placeShips
+                        )(_.apply())
+                      span(color := "#FF0000", b(placeShipsBinding)).render
+                    case Some(InGameMode(isMyTurn, turn, _)) =>
+                      val turnStrBinding: Binding =
+                        translatedDynamic(
+                          if (isMyTurn)
+                            Translations.Game.yourTurn
+                          else
+                            Translations.Game.enemyTurn
+                        )(_.apply())
+
+                      span(
+                        "Turn ",
+                        turn.toTurnString,
+                        ": ",
+                        span(color := "#FF0000", b(turnStrBinding))
+                      ).render
+                    case Some(GameOverMode(turn, youWon)) =>
+                      val turnStrBinding: Binding =
+                        translatedDynamic(
+                          if (youWon)
+                            Translations.Game.youWon
+                          else
+                            Translations.Game.enemyWon
+                        )(_.apply())
+
+                      span(
+                        "Turn ",
+                        turn.toTurnString,
+                        ": ",
+                        span(color := "#FF0000", b(turnStrBinding))
+                      ).render
+                    case _ =>
+                      span("").render
+                  })
+                ),
+                div(
+                  `class` := "col-4 container",
+                  div(
+                    `class` := "row justify-content-end",
+                    showIf(presenter.gameStateProperty.transform(_.nonEmpty))(
+                      span(quitGameButton).render
+                    )
                   )
                 )
-              )
-            ).render
+              ).render
           })
         ),
         factory.body(_ =>

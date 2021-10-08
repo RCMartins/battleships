@@ -5,10 +5,10 @@ import pt.rmartins.battleships.shared.model.utils.Utils
 
 case class Player(
     clientId: String,
-    username: String,
-    shipsLeftToPlace: List[Ship],
+    username: Username,
+    shipsLeftToPlace: List[Ship], // TODO remove this from here to GameModel?
     myBoard: Board,
-    enemyBoardMarks: Vector[Vector[(Option[Int], BoardMark)]],
+    enemyBoardMarks: Vector[Vector[(Option[Turn], BoardMark)]],
     turnPlayHistory: List[TurnPlay]
 ) {
 
@@ -21,7 +21,7 @@ case class Player(
       )
     )
 
-  def enemyBoardMarksWithCoor: Vector[(Coordinate, Option[Int], BoardMark)] =
+  def enemyBoardMarksWithCoor: Vector[(Coordinate, Option[Turn], BoardMark)] =
     enemyBoardMarks.zipWithIndex.flatMap { case (vectorY, x) =>
       vectorY.zipWithIndex.map { case ((turnNumberOpt, boardMark), y) =>
         (Coordinate(x, y), turnNumberOpt, boardMark)

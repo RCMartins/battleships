@@ -2,6 +2,7 @@ package pt.rmartins.battleships.backend.services
 
 import com.softwaremill.quicklens.ModifyPimp
 import io.udash.rpc.ClientId
+import pt.rmartins.battleships.shared.model.game.BonusReward.ExtraTurn
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game.HitHint.{ShipHit, Water}
 import pt.rmartins.battleships.shared.model.game._
@@ -16,7 +17,7 @@ import scala.util.chaining.scalaUtilChainingOps
 
 class GameService(rpcClientsService: RpcClientsService) {
 
-  private val activeGamesByPlayer: mutable.Map[String, Game] = mutable.Map.empty
+  private val activeGamesByPlayer: mutable.Map[Username, Game] = mutable.Map.empty
   private val activeGames: mutable.Map[GameId, Game] = mutable.Map.empty
 
   def updateServerState(game: Game): Unit = {
@@ -51,12 +52,13 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   case class ServerEnemyBoard(
       boardSize: Coordinate,
-      boardMarks: Vector[Vector[(Option[Int], BoardMark)]],
+      boardMarks: Vector[Vector[(Option[Turn], BoardMark)]],
+      totalShips: Int,
       shipsLeft: Int
   ) {
 
     def updateMarks(
-        turnNumber: Int,
+        turn: Turn,
         hits: List[(Coordinate, Option[ShipInGame])]
     ): ServerEnemyBoard = {
       val allWater = hits.forall(_._2.isEmpty)
@@ -65,11 +67,11 @@ class GameService(rpcClientsService: RpcClientsService) {
       val updatedBoardMarks =
         hits.foldLeft(boardMarks) { case (marks, (coor, _)) =>
           if (allWater)
-            updateVectorUsing(marks, coor, _ => (Some(turnNumber), BoardMark.Miss))
+            updateVectorUsing(marks, coor, _ => (Some(turn), BoardMark.Miss))
           else if (allShipHit)
-            updateVectorUsing(marks, coor, _ => (Some(turnNumber), BoardMark.ShipHit))
+            updateVectorUsing(marks, coor, _ => (Some(turn), BoardMark.ShipHit))
           else
-            updateVectorUsing(marks, coor, { case (_, boardMark) => (Some(turnNumber), boardMark) })
+            updateVectorUsing(marks, coor, { case (_, boardMark) => (Some(turn), boardMark) })
         }
       copy(boardMarks = updatedBoardMarks)
     }
@@ -78,24 +80,20 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   case class ServerPlayer(
       clientId: ClientId,
-      username: String,
+      username: Username,
       startedFirst: Boolean,
       myBoard: ServerMyBoard,
       enemyBoard: ServerEnemyBoard,
-      turnPlayHistory: List[TurnPlay]
+      turnPlayHistory: List[TurnPlay],
+      currentTurnOpt: Option[Turn],
+      currentTurnAttackTypes: List[AttackType],
+      extraTurnQueue: List[ExtraTurn]
   ) {
 
+    def kills: Int = enemyBoard.totalShips - enemyBoard.shipsLeft
+
     def toPlayer(game: Game): Player =
-      if (game.halfTurnsOpt.isEmpty)
-        Player(
-          clientId.id,
-          username,
-          game.shipsThisGame,
-          Board(myBoard.boardSize, myBoard.ships),
-          Vector.empty,
-          Nil
-        )
-      else
+      if (game.gameStarted) {
         Player(
           clientId.id,
           username,
@@ -104,24 +102,46 @@ class GameService(rpcClientsService: RpcClientsService) {
           enemyBoard.boardMarks,
           turnPlayHistory
         )
+      } else {
+        Player(
+          clientId.id,
+          username,
+          game.rules.shipsInThisGame,
+          Board(myBoard.boardSize, myBoard.ships),
+          Vector.empty,
+          Nil
+        )
+      }
 
   }
 
   case class Game(
       gameId: GameId,
       boardSize: Coordinate,
-      shipsThisGame: List[Ship],
+      rules: Rules,
       player1: ServerPlayer,
       player2: ServerPlayer,
-      halfTurnsOpt: Option[Int],
-      playerWhoWonOpt: Option[String] // TODO player username to as a new type?
+      playerWhoWonOpt: Option[Username],
+      currentTurnPlayer: Option[Username]
   ) {
 
-    def getPlayer(playerUsername: String): ServerPlayer =
+    val gameStarted: Boolean = currentTurnPlayer.nonEmpty
+
+    val bothPlayers: List[ServerPlayer] = List(player1, player2)
+
+    def getPlayerSafe(playerUsername: Username): Option[ServerPlayer] =
+      if (player1.username == playerUsername) Some(player1)
+      else if (player2.username == playerUsername) Some(player2)
+      else None
+
+    private def getPlayerUnsafe(playerUsername: Username): ServerPlayer =
       if (player1.username == playerUsername) player1 else player2
 
     def enemyPlayer(player: ServerPlayer): ServerPlayer =
-      if (player1.username == player.username) player2 else player1
+      enemyPlayer(player.username)
+
+    def enemyPlayer(playerUsername: Username): ServerPlayer =
+      if (player1.username == playerUsername) player2 else player1
 
     def toGameStatePlayer1: GameState =
       toGameState(player1, player2)
@@ -130,26 +150,28 @@ class GameService(rpcClientsService: RpcClientsService) {
       toGameState(player2, player1)
 
     private def toGameState(me: ServerPlayer, enemy: ServerPlayer): GameState = {
-      val gameMode =
-        (halfTurnsOpt, playerWhoWonOpt) match {
-          case (None, _) =>
+      val gameMode: GameMode =
+        (me.currentTurnOpt, currentTurnPlayer, playerWhoWonOpt) match {
+          case (None, _, _) =>
             PreGameMode(me.myBoard.ships.nonEmpty, enemy.myBoard.ships.nonEmpty)
-          case (Some(halfTurns), None) =>
+          case (Some(turn), Some(currentPlayerUsername), None) =>
             InGameMode(
-              me.startedFirst,
-              halfTurns,
-              turnAttackTypes = List.fill(3)(AttackType.Simple)
+              currentPlayerUsername == me.username,
+              turn = turn,
+              turnAttackTypes = me.currentTurnAttackTypes
             )
-          case (Some(halfTurns), Some(playerWhoWon)) =>
+          case (Some(turn), _, Some(playerWhoWon)) =>
             GameOverMode(
-              halfTurns,
+              turn,
               me.username == playerWhoWon
             )
+          case _ =>
+            ???
         }
 
       GameState(
         gameId,
-        Rules(shipsThisGame),
+        rules,
         me.toPlayer(this),
         SimplePlayer(
           enemy.clientId.id,
@@ -161,8 +183,8 @@ class GameService(rpcClientsService: RpcClientsService) {
       )
     }
 
-    def placeShips(playerUsername: String, shipPositions: List[ShipInGame]): Game =
-      updatePlayer(getPlayer(playerUsername).modify(_.myBoard.ships).setTo(shipPositions))
+    def placeShips(playerUsername: Username, shipPositions: List[ShipInGame]): Game =
+      updatePlayer(getPlayerUnsafe(playerUsername).modify(_.myBoard.ships).setTo(shipPositions))
 
     def updatePlayer(updatedPlayer: ServerPlayer): Game =
       if (updatedPlayer.username == player1.username)
@@ -170,27 +192,31 @@ class GameService(rpcClientsService: RpcClientsService) {
       else
         copy(player2 = updatedPlayer)
 
+    def updatePlayerByUsername(playerUsername: Username, f: ServerPlayer => ServerPlayer): Game =
+      getPlayerSafe(playerUsername)
+        .map(serverPlayer => updatePlayer(f(serverPlayer)))
+        .getOrElse(this)
+
     def getCurrentTurnPlayer: Option[ServerPlayer] =
-      halfTurnsOpt.map(halfTurns =>
-        if (halfTurns % 2 == 1)
-          if (player1.startedFirst) player1 else player2
-        else if (player1.startedFirst) player2
-        else player1
+      currentTurnPlayer.map(currentUsername =>
+        if (currentUsername == player1.username) player1 else player2
       )
 
   }
 
-  def reload(clientId: ClientId, playerUsername: String): Future[Unit] = Future {
+  def reload(clientId: ClientId, playerUsername: Username): Future[Unit] = Future {
     activeGamesByPlayer.get(playerUsername).foreach { game =>
       val updatedGame =
-        game.updatePlayer(game.getPlayer(playerUsername).copy(clientId = clientId))
+        game.updatePlayerByUsername(playerUsername, _.copy(clientId = clientId))
 
       updateServerState(updatedGame)
+
+      // TODO could this reset any state of enemy? like placed ships or placed targets???
       updateBothGameState(updatedGame)
     }
   }
 
-  def startGame(player1Username: String, player2Username: String): Future[Unit] = Future {
+  def startGame(player1Username: Username, player2Username: Username): Future[Unit] = Future {
     (
       rpcClientsService.getClientIdByUsername(player1Username),
       rpcClientsService.getClientIdByUsername(player2Username)
@@ -211,6 +237,14 @@ class GameService(rpcClientsService: RpcClientsService) {
             }
             .flatMap(_._2)
 
+        val defaultTurnAttackTypes = List.fill(3)(AttackType.Simple)
+        val turnBonuses: List[TurnBonus] =
+          List(
+            TurnBonus(BonusType.FirstBlood, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
+            TurnBonus(BonusType.DoubleKill, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
+            TurnBonus(BonusType.TripleKill, List(ExtraTurn(List.fill(3)(AttackType.Simple))))
+          )
+
         val boardSize = Coordinate(10, 10)
         val myBoard: ServerMyBoard =
           ServerMyBoard(boardSize, Nil)
@@ -218,26 +252,52 @@ class GameService(rpcClientsService: RpcClientsService) {
           ServerEnemyBoard(
             boardSize,
             Vector.fill(10)(Vector.fill(10)((None, BoardMark.Empty))),
+            shipsThisGame.size,
             shipsThisGame.size
           )
 
         val player1First: Boolean = Random.nextBoolean()
 
         val player1: ServerPlayer =
-          ServerPlayer(player1Id, player1Username, player1First, myBoard, enemyBoard, Nil)
+          ServerPlayer(
+            clientId = player1Id,
+            username = player1Username,
+            startedFirst = player1First,
+            myBoard = myBoard,
+            enemyBoard = enemyBoard,
+            turnPlayHistory = Nil,
+            currentTurnOpt = None,
+            currentTurnAttackTypes = Nil,
+            extraTurnQueue = Nil
+          )
         val player2: ServerPlayer =
-          ServerPlayer(player2Id, player2Username, !player1First, myBoard, enemyBoard, Nil)
+          ServerPlayer(
+            clientId = player2Id,
+            username = player2Username,
+            startedFirst = !player1First,
+            myBoard = myBoard,
+            enemyBoard = enemyBoard,
+            turnPlayHistory = Nil,
+            currentTurnOpt = None,
+            currentTurnAttackTypes = Nil,
+            extraTurnQueue = Nil
+          )
 
         val gameId = GameId(UUID.randomUUID().toString)
-        val game = Game(
-          gameId = gameId,
-          boardSize = boardSize,
-          shipsThisGame = shipsThisGame,
-          player1 = player1,
-          player2 = player2,
-          halfTurnsOpt = None,
-          playerWhoWonOpt = None
-        )
+        val game: Game =
+          Game(
+            gameId = gameId,
+            boardSize = boardSize,
+            rules = Rules(
+              shipsInThisGame = shipsThisGame,
+              defaultTurnAttackTypes = defaultTurnAttackTypes,
+              turnBonuses = turnBonuses
+            ),
+            player1 = player1,
+            player2 = player2,
+            playerWhoWonOpt = None,
+            currentTurnPlayer = None
+          )
 
         updateServerState(game)
         updateBothGameState(game)
@@ -246,7 +306,7 @@ class GameService(rpcClientsService: RpcClientsService) {
     }
   }
 
-  def quitCurrentGame(gameId: GameId, playerUsername: String): Future[Unit] =
+  def quitCurrentGame(gameId: GameId, playerUsername: Username): Future[Unit] =
     Future {
       activeGames.get(gameId) match {
         case None =>
@@ -274,14 +334,14 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   def confirmShips(
       gameId: GameId,
-      playerUsername: String,
+      playerUsername: Username,
       shipPositions: List[ShipInGame]
   ): Future[Unit] =
     Future {
       activeGames.get(gameId) match {
         case None =>
           rpcClientsService.sendMessage(s"Error finding game!")
-        case Some(game) => // TODO check game mode is InPlacingShips...
+        case Some(game) if !game.gameStarted =>
           val gameWithShips = game.placeShips(playerUsername, shipPositions)
 
           val readyToStart =
@@ -289,9 +349,21 @@ class GameService(rpcClientsService: RpcClientsService) {
               gameWithShips.player2.myBoard.ships.nonEmpty
 
           val gameWithUpdatedMode =
-            if (readyToStart)
-              gameWithShips.copy(halfTurnsOpt = Some(1))
-            else
+            if (readyToStart) {
+              val playerThatStartsUsername: Username =
+                if (gameWithShips.player1.startedFirst)
+                  gameWithShips.player1.username
+                else
+                  gameWithShips.player2.username
+
+              gameWithShips
+                .modifyAll(_.player1.currentTurnOpt, _.player2.currentTurnOpt)
+                .setTo(Some(Turn(1, None)))
+                .modifyAll(_.player1.currentTurnAttackTypes, _.player2.currentTurnAttackTypes)
+                .setTo(gameWithShips.rules.defaultTurnAttackTypes)
+                .modify(_.currentTurnPlayer)
+                .setTo(Some(playerThatStartsUsername))
+            } else
               gameWithShips
 
           updateServerState(gameWithUpdatedMode)
@@ -299,35 +371,37 @@ class GameService(rpcClientsService: RpcClientsService) {
             updateBothGameState(gameWithUpdatedMode)
           else
             updateBothGameMode(gameWithUpdatedMode)
+        case _ =>
+          rpcClientsService.sendMessage("Invalid request!")
       }
     }
 
-  def cancelShipsPlacement(gameId: GameId, playerUsername: String): Future[Unit] =
+  def cancelShipsPlacement(gameId: GameId, playerUsername: Username): Future[Unit] =
     Future {
-      activeGames.get(gameId) match {
+      activeGames.get(gameId).map(game => (game, game.getPlayerSafe(playerUsername))) match {
         case None =>
           rpcClientsService.sendMessage(s"Error finding game!")
-        case Some(game) => // TODO check game mode is InPlacingShips...
-          val player = game.getPlayer(playerUsername)
-          if (player.myBoard.ships.nonEmpty) {
-            val updatedPlayer = player.modify(_.myBoard.ships).setTo(Nil)
-            val updatedGame = game.updatePlayer(updatedPlayer)
+        case Some((game, Some(player))) if !game.gameStarted && player.myBoard.ships.nonEmpty =>
+          val updatedPlayer = player.modify(_.myBoard.ships).setTo(Nil)
+          val updatedGame = game.updatePlayer(updatedPlayer)
 
-            updateServerState(updatedGame)
-            updateBothGameMode(updatedGame)
-          }
+          updateServerState(updatedGame)
+          updateBothGameMode(updatedGame)
+        case _ =>
+          rpcClientsService.sendMessage("Invalid request!")
       }
     }
 
   def sendTurnAttacks(
       gameId: GameId,
-      playerUsername: String,
-      halfTurns: Int,
+      playerUsername: Username,
+      currentTurn: Turn,
       turnAttacks: List[Attack]
   ): Future[Unit] = {
     def validateTurnAttacks(me: ServerPlayer): Boolean =
-      turnAttacks.forall {
-        case Attack(_, Some(Coordinate(x, y))) =>
+      turnAttacks.zip(me.currentTurnAttackTypes).forall {
+        case (Attack(attackType, Some(Coordinate(x, y))), expectedAttackType)
+            if attackType == expectedAttackType =>
           val (hitTurnOpt, boardMark) = me.enemyBoard.boardMarks(x)(y)
           hitTurnOpt.isEmpty && !boardMark.isPermanent
         case _ =>
@@ -335,14 +409,17 @@ class GameService(rpcClientsService: RpcClientsService) {
       }
 
     Future {
-      activeGames.get(gameId).map(game => (game, game.getPlayer(playerUsername))) match {
+      activeGames.get(gameId).map(game => (game, game.getPlayerSafe(playerUsername))) match {
         case None =>
           rpcClientsService.sendMessage(s"Error finding game!")
-        case Some((game, player))
-            if game.playerWhoWonOpt.isEmpty &&
-              game.halfTurnsOpt.contains(halfTurns) &&
-              game.getCurrentTurnPlayer.exists(_.username == player.username) &&
-              validateTurnAttacks(player) =>
+        case Some((game, Some(player))) if {
+              val currentPlayer = game.getCurrentTurnPlayer
+
+              game.playerWhoWonOpt.isEmpty &&
+              currentPlayer.exists(_.currentTurnOpt.exists(_ == currentTurn)) &&
+              currentPlayer.exists(_.username == player.username) &&
+              validateTurnAttacks(player)
+            } =>
           val enemy = game.enemyPlayer(player)
           val hits: List[(Coordinate, Option[ShipInGame])] =
             turnAttacks.map(_.coordinateOpt.get).map { case coor @ Coordinate(x, y) =>
@@ -376,62 +453,108 @@ class GameService(rpcClientsService: RpcClientsService) {
                   shipId + (if (destroyed) 10000 else 0)
               }
 
-          val turnNumber: Int =
-            (halfTurns + 1) / 2
-
           val turnPlay: TurnPlay =
-            TurnPlay(turnNumber, turnAttacks, hitHints)
+            TurnPlay(currentTurn, turnAttacks, hitHints)
+
+          val killsThisTurn = hitHints.count(_.isDestroyed)
 
           val updatedPlayer =
             player
               .modify(_.turnPlayHistory)
               .using(turnPlay :: _)
               .modify(_.enemyBoard)
-              .using(_.updateMarks(turnNumber, hits))
+              .using(_.updateMarks(currentTurn, hits))
               .modify(_.enemyBoard.shipsLeft)
-              .using(_ - hitHints.count(_.isDestroyed))
+              .using(_ - killsThisTurn)
 
           val gameOver = updatedPlayer.enemyBoard.shipsLeft == 0
           val updatedGame: Game = game.updatePlayer(updatedPlayer)
-          val updatedGame2: Game =
+          val updatedGameWithNextTurn: Game =
             if (gameOver) {
-              rpcClientsService.sendMessage(s"Game Over! Player ${updatedPlayer.username} won!")
-
+              rpcClientsService.sendMessage(
+                s"Game Over! Player '${updatedPlayer.username.username}' won!"
+              )
               updatedGame.modify(_.playerWhoWonOpt).setTo(Some(updatedPlayer.username))
-            } else
-              updatedGame.modify(_.halfTurnsOpt).using(_.map(_ + 1))
+            } else {
+              val bonusRewardList: List[BonusReward] =
+                rewardExtraTurns(gameBeforeHits = game, turnPlay = turnPlay)
+              val extraTurnBonuses: List[ExtraTurn] =
+                bonusRewardList.collect { case extraTurn @ ExtraTurn(_) => extraTurn }
 
-          updateServerState(updatedGame2)
-          updateBothGameState(updatedGame2)
-        case Some((game, player)) =>
+              updatedPlayer.extraTurnQueue ++ extraTurnBonuses match {
+                case ExtraTurn(attackTypes) :: nextExtraTurns =>
+                  val updatedPlayerWithExtraTurns =
+                    updatedPlayer
+                      .modify(_.currentTurnOpt)
+                      .using(_.map { case Turn(currentTurn, extraTurn) =>
+                        Turn(currentTurn, extraTurn.map(_ + 1).orElse(Some(1)))
+                      })
+                      .modify(_.currentTurnAttackTypes)
+                      .setTo(attackTypes)
+                      .modify(_.extraTurnQueue)
+                      .setTo(nextExtraTurns)
+
+                  updatedGame.updatePlayer(updatedPlayerWithExtraTurns)
+                case Nil =>
+                  val updatedPlayerWithExtraTurns =
+                    updatedPlayer
+                      .modify(_.currentTurnOpt)
+                      .using(_.map { case Turn(currentTurn, _) => Turn(currentTurn + 1, None) })
+                      .modify(_.currentTurnAttackTypes)
+                      .setTo(updatedGame.rules.defaultTurnAttackTypes)
+
+                  updatedGame
+                    .updatePlayer(updatedPlayerWithExtraTurns)
+                    .modify(_.currentTurnPlayer)
+                    .using(_.map(updatedGame.enemyPlayer(_).username))
+              }
+            }
+
+          updateServerState(updatedGameWithNextTurn)
+          updateBothGameState(updatedGameWithNextTurn)
+        case Some((game, _)) =>
           rpcClientsService.sendMessage(
-            s"Invalid request! ${(
-              game.playerWhoWonOpt,
-              game.halfTurnsOpt.contains(halfTurns),
-              game.getCurrentTurnPlayer.exists(_.username == player.username),
-              validateTurnAttacks(player),
-              game.getCurrentTurnPlayer,
-              player.username,
-              validateTurnAttacks(player),
-              game.halfTurnsOpt,
-              halfTurns
-            )}"
+            (
+              "Invalid request!",
+              game,
+              playerUsername,
+              currentTurn,
+              turnAttacks
+            ).toString
           )
+      }
+    }
+  }
+
+  private def rewardExtraTurns(gameBeforeHits: Game, turnPlay: TurnPlay): List[BonusReward] = {
+    val killsThisTurn = turnPlay.hitHints.count(_.isDestroyed)
+
+    gameBeforeHits.rules.turnBonuses.flatMap { case TurnBonus(bonusType, bonusReward) =>
+      bonusType match {
+        case BonusType.FirstBlood
+            if killsThisTurn > 0 && gameBeforeHits.bothPlayers.forall(_.kills == 0) =>
+          bonusReward
+        case BonusType.DoubleKill if killsThisTurn == 2 =>
+          bonusReward
+        case BonusType.TripleKill if killsThisTurn == 3 =>
+          bonusReward
+        case _ =>
+          Nil
       }
     }
   }
 
   def sendBoardMarks(
       gameId: GameId,
-      playerUsername: String,
+      playerUsername: Username,
       updatedBoardMarksList: List[(Coordinate, BoardMark)]
   ): Future[Unit] =
     Future {
-      activeGames.get(gameId).map(game => (game, game.getPlayer(playerUsername))) match {
+      activeGames.get(gameId).map(game => (game, game.getPlayerSafe(playerUsername))) match {
         case None =>
           rpcClientsService.sendMessage(s"Error finding game!")
-        case Some((game, player)) if game.halfTurnsOpt.nonEmpty =>
-          val updatedBoardMarks: Vector[Vector[(Option[Int], BoardMark)]] =
+        case Some((game, Some(player))) if game.gameStarted =>
+          val updatedBoardMarks: Vector[Vector[(Option[Turn], BoardMark)]] =
             updatedBoardMarksList.foldLeft(player.enemyBoard.boardMarks) {
               case (boardMarks, (coor, newBoardMark)) =>
                 updateVectorUsing(
@@ -448,6 +571,7 @@ class GameService(rpcClientsService: RpcClientsService) {
           val updatedGame: Game = game.updatePlayer(updatedPlayer)
           updateServerState(updatedGame)
         case _ =>
+          rpcClientsService.sendMessage("Invalid request!")
       }
     }
 

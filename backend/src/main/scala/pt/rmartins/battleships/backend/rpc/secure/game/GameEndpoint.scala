@@ -16,11 +16,11 @@ class GameEndpoint(implicit
 ) extends GameRPC
     with AuthRequires {
 
-  override def startGameWith(otherPlayerUsername: String): Future[Unit] =
-    gameService.startGame(ctx.name, otherPlayerUsername)
+  override def startGameWith(otherPlayerUsername: Username): Future[Unit] =
+    gameService.startGame(ctx.username, otherPlayerUsername)
 
   override def quitCurrentGame(gameId: GameId): Future[Unit] =
-    gameService.quitCurrentGame(gameId, ctx.name)
+    gameService.quitCurrentGame(gameId, ctx.username)
 
   override def restartGame(gameId: GameId): Future[Unit] =
     gameService.restartGame(gameId)
@@ -29,18 +29,18 @@ class GameEndpoint(implicit
       gameId: GameId,
       shipPositions: List[ShipInGame]
   ): Future[Unit] =
-    gameService.confirmShips(gameId, ctx.name, shipPositions)
+    gameService.confirmShips(gameId, ctx.username, shipPositions)
 
   override def cancelShipsPlacement(gameId: GameId): Future[Unit] =
-    gameService.cancelShipsPlacement(gameId, ctx.name)
+    gameService.cancelShipsPlacement(gameId, ctx.username)
 
-  def sendTurnAttacks(gameId: GameId, halfTurns: Int, turnAttacks: List[Attack]): Future[Unit] =
-    gameService.sendTurnAttacks(gameId, ctx.name, halfTurns, turnAttacks)
+  def sendTurnAttacks(gameId: GameId, currentTurn: Turn, turnAttacks: List[Attack]): Future[Unit] =
+    gameService.sendTurnAttacks(gameId, ctx.username, currentTurn, turnAttacks)
 
   def sendBoardMarks(
       gameId: GameId,
       updatedBoardMarksList: List[(Coordinate, BoardMark)]
   ): Future[Unit] =
-    gameService.sendBoardMarks(gameId, ctx.name, updatedBoardMarksList)
+    gameService.sendBoardMarks(gameId, ctx.username, updatedBoardMarksList)
 
 }

@@ -1,13 +1,14 @@
 package pt.rmartins.battleships.backend.rpc.auth
 
+import io.udash.rpc.ClientId
 import pt.rmartins.battleships.backend.services.{AuthService, GameService, RpcClientsService}
 import pt.rmartins.battleships.shared.model.auth.UserContext
+import pt.rmartins.battleships.shared.model.game.Username
 import pt.rmartins.battleships.shared.rpc.server.open.AuthRPC
-import io.udash.rpc.ClientId
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
-import scala.concurrent.ExecutionContext.Implicits.global
 
 class AuthEndpoint(implicit
     authService: AuthService,
@@ -16,7 +17,7 @@ class AuthEndpoint(implicit
     clientId: ClientId
 ) extends AuthRPC {
 
-  override def login(username: String, password: String): Future[UserContext] = {
+  override def login(username: Username, password: String): Future[UserContext] = {
     val response = authService.login(username, password)
     response.onComplete {
       case Success(ctx) =>

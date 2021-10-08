@@ -109,7 +109,7 @@ class BoardView(
 
   private val shipsSummaryRelCoordinates: ReadableProperty[List[(Int, List[ViewShip])]] =
     gamePresenter.rulesProperty.transform {
-      case Some(Rules(shipsInThisGame)) =>
+      case Some(Rules(shipsInThisGame, _, _)) =>
         def getShipsToPlacePos(
             posX: Int,
             posY: Int,
@@ -366,7 +366,7 @@ class BoardView(
           SquareSizeBig.get,
           fillEmptySquares = false
         )
-      case Some(GameState(_, _, me, enemy, InGameMode(_, _, _))) =>
+      case Some(GameState(_, _, me, enemy, _: InGameMode)) =>
         drawMyBoard(
           renderingCtx,
           me,
@@ -499,26 +499,25 @@ class BoardView(
         .foreach(drawBoardSquare(renderingCtx, boardPosition, _, squareSize, CanvasColor.Ship()))
     }
 
-    enemy.turnPlayHistory.zipWithIndex.foreach {
-      case (TurnPlay(turnNumber, turnAttacks, _), index) =>
-        turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
-          drawTurnNumberCoor(
-            renderingCtx = renderingCtx,
-            boardPosition = boardPosition,
-            coor = coor,
-            size = squareSize,
-            turnNumber = turnNumber,
-            textSize = (squareSize * 0.6).toInt
+    enemy.turnPlayHistory.zipWithIndex.foreach { case (TurnPlay(turn, turnAttacks, _), index) =>
+      turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
+        drawTurnNumberCoor(
+          renderingCtx = renderingCtx,
+          boardPosition = boardPosition,
+          coor = coor,
+          size = squareSize,
+          turn = turn,
+          textSize = (squareSize * 0.6).toInt
+        )
+        if (index == 0)
+          drawBoardSquare(
+            renderingCtx,
+            boardPosition,
+            coor,
+            squareSize,
+            CanvasColor.White(CanvasBorder.RedBold())
           )
-          if (index == 0)
-            drawBoardSquare(
-              renderingCtx,
-              boardPosition,
-              coor,
-              squareSize,
-              CanvasColor.White(CanvasBorder.RedBold())
-            )
-        }
+      }
     }
 
     (mousePositionOpt, selectedShipOpt) match {
@@ -608,7 +607,7 @@ class BoardView(
   ): Unit = {
     drawBoardLimits(renderingCtx, "Enemy board", enemy.boardSize, boardPosition, squareSize)
 
-    val boardMarksWithCoor: Seq[(Coordinate, Option[Int], BoardMark)] =
+    val boardMarksWithCoor: Seq[(Coordinate, Option[Turn], BoardMark)] =
       me.enemyBoardMarksWithCoor
 
     boardMarksWithCoor.foreach { case (coor, turnNumberOpt, mark) =>
@@ -635,9 +634,9 @@ class BoardView(
       }
     }
 
-    me.turnPlayHistory.headOption.map(_.turnNumber).foreach { lastTurnNumber =>
+    me.turnPlayHistory.headOption.map(_.turn).foreach { lastTurn =>
       boardMarksWithCoor.foreach {
-        case (coor, Some(turnNumber), _) if turnNumber == lastTurnNumber =>
+        case (coor, Some(turn), _) if turn == lastTurn =>
           drawBoardSquare(
             renderingCtx,
             boardPosition,

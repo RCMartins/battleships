@@ -3,7 +3,7 @@ package pt.rmartins.battleships.backend.services
 import io.udash.rpc.{ClientId, ClientRPCTarget, DefaultClientRPC}
 import pt.rmartins.battleships.shared.model.auth.UserContext
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
-import pt.rmartins.battleships.shared.model.game.{GameMode, GameState}
+import pt.rmartins.battleships.shared.model.game.{GameMode, GameState, Username}
 import pt.rmartins.battleships.shared.rpc.client.MainClientRPC
 
 import java.util.Date
@@ -15,7 +15,7 @@ class RpcClientsService(sendToClientFactory: ClientRPCTarget => MainClientRPC) {
 
   private val clients: mutable.Set[ClientId] = mutable.HashSet.empty
   private val authClients: mutable.Map[ClientId, UserContext] = mutable.HashMap.empty
-  private val clientUsernames: mutable.Map[String, ClientId] = mutable.HashMap.empty
+  private val clientUsernames: mutable.Map[Username, ClientId] = mutable.HashMap.empty
 
   def sendToClient(target: ClientRPCTarget): MainClientRPC =
     sendToClientFactory(target)
@@ -23,7 +23,7 @@ class RpcClientsService(sendToClientFactory: ClientRPCTarget => MainClientRPC) {
   /** Returns active client ids. */
   def activeClients: Set[ClientId] = clients.toSet
 
-  def getClientIdByUsername(username: String): Option[ClientId] = clientUsernames.get(username)
+  def getClientIdByUsername(username: Username): Option[ClientId] = clientUsernames.get(username)
 
   /** Returns authenticated client ids. */
   def authenticatedClients: Map[ClientId, UserContext] = authClients.toMap
@@ -36,7 +36,7 @@ class RpcClientsService(sendToClientFactory: ClientRPCTarget => MainClientRPC) {
   /** Adds new connection ID to the authenticated set. */
   def registerAuthenticatedConnection(
       clientId: ClientId,
-      username: String,
+      username: Username,
       userContext: UserContext
   ): Unit = {
     clientUsernames.get(username) match {

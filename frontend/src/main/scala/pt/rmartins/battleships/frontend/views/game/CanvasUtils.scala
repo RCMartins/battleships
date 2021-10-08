@@ -2,7 +2,7 @@ package pt.rmartins.battleships.frontend.views.game
 
 import org.scalajs.dom.CanvasRenderingContext2D
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasBorder._
-import pt.rmartins.battleships.shared.model.game.Coordinate
+import pt.rmartins.battleships.shared.model.game.{Coordinate, Turn}
 
 object CanvasUtils {
 
@@ -102,7 +102,7 @@ object CanvasUtils {
       boardPosition: Coordinate,
       coor: Coordinate,
       size: Int,
-      turnNumber: Int,
+      turn: Turn,
       textSize: Int,
       textColor: String = "0, 0, 0"
   ): Unit = {
@@ -112,7 +112,7 @@ object CanvasUtils {
     renderingCtx.textBaseline = "middle"
     renderingCtx.textAlign = "center"
     renderingCtx.lineWidth = 2.0
-    renderingCtx.strokeText(turnNumber.toString, relCoor.x, relCoor.y)
+    renderingCtx.strokeText(turn.toTurnString, relCoor.x, relCoor.y)
   }
 
   def drawCrosshair(

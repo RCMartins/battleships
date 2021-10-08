@@ -7,7 +7,7 @@ import scala.concurrent.Future
 
 trait GameRPC {
 
-  def startGameWith(otherPlayerUsername: String): Future[Unit]
+  def startGameWith(otherPlayerUsername: Username): Future[Unit]
 
   def quitCurrentGame(gameId: GameId): Future[Unit]
 
@@ -17,7 +17,7 @@ trait GameRPC {
 
   def cancelShipsPlacement(gameId: GameId): Future[Unit]
 
-  def sendTurnAttacks(gameId: GameId, halfTurns: Int, turnAttacks: List[Attack]): Future[Unit]
+  def sendTurnAttacks(gameId: GameId, currentTurn: Turn, turnAttacks: List[Attack]): Future[Unit]
 
   def sendBoardMarks(gameId: GameId, updatedBoardMarks: List[(Coordinate, BoardMark)]): Future[Unit]
 

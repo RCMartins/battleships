@@ -7,7 +7,6 @@ import org.scalajs.dom.html.Div
 import pt.rmartins.battleships.frontend.routing.RoutingInGameState
 import pt.rmartins.battleships.frontend.services.UserContextService
 import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
-import pt.rmartins.battleships.frontend.views.game.BoardView.ToPlaceShip
 import pt.rmartins.battleships.shared.model.auth.Permission
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
@@ -43,8 +42,8 @@ class GamePresenter(
 
   val inGameModeProperty: ReadableProperty[Option[InGameMode]] =
     gameModeProperty.transform {
-      case Some(mode @ InGameMode(_, _, _)) => Some(mode)
-      case _                                => None
+      case Some(mode: InGameMode) => Some(mode)
+      case _                      => None
     }
 
   val rulesProperty: ReadableProperty[Option[Rules]] =
@@ -104,29 +103,24 @@ class GamePresenter(
 
   def updateGameMode(fromGameMode: Option[GameMode], to: Option[GameState]): Unit = {
     (fromGameMode, to) match {
-      case (None, Some(GameState(_, _, me, _, PreGameMode(_, _)))) =>
+      case (None, Some(GameState(_, _, me, _, _: PreGameMode))) =>
         me.shipsLeftToPlace.headOption.foreach { headShip =>
           gameModel.subProp(_.selectedShip).set(Some(headShip))
         }
-      case (None | Some(PreGameMode(_, _)), Some(GameState(_, _, _, _, InGameMode(_, _, _)))) =>
+      case (
+            None | Some(_: PreGameMode),
+            Some(GameState(_, _, _, _, InGameMode(_, _, turnAttackTypes)))
+          ) =>
         screenModel.subProp(_.selectedTab).set(ScreenModel.myMovesTab)
+        gameModel.subProp(_.turnAttacks).set(turnAttackTypes.map(Attack(_, None)))
       case _ =>
     }
   }
 
-  inGameModeProperty.transform(_.map(_.turnAttackTypes)).listen {
-    case Some(turnAttackTypes) =>
-      if (gameModel.get.turnAttacksSent)
-        gameModel.subProp(_.turnAttacksSent).set(false)
-      gameModel.subProp(_.turnAttacks).set(turnAttackTypes.map(Attack(_, None)))
-    case None =>
-      gameModel.subProp(_.turnAttacks).set(Nil)
-  }
-
   inGameModeProperty
-    .transform(_.map(inGameMode => (inGameMode.isMyTurn, inGameMode.turnAttackTypes)))
+    .transform(_.map(inGameMode => (inGameMode.turn, inGameMode.turnAttackTypes)))
     .listen {
-      case Some((false, turnAttackTypes)) if gameModel.get.turnAttacksSent =>
+      case Some((_, turnAttackTypes)) if gameModel.get.turnAttacksSent =>
         gameModel.subProp(_.turnAttacksSent).set(false)
         gameModel.subProp(_.turnAttacks).set(turnAttackTypes.map(Attack(_, None)))
       case _ =>
@@ -148,7 +142,7 @@ class GamePresenter(
         .set(Seq(ChatMessage(s"You don't have access to read the messages.", "System", new Date)))
     }
 
-    chatModel.subProp(_.username).set(userService.getCurrentContext.name)
+    chatModel.subProp(_.username).set(userService.getCurrentContext.username)
 
     chatRpc.connectedClientsCount().onComplete {
       case Success(count) =>
@@ -187,7 +181,9 @@ class GamePresenter(
   }
 
   def startGameWith(): Unit = {
-    gameRpc.startGameWith(if (chatModel.get.username == "player1") "player2" else "player1")
+    gameRpc.startGameWith(
+      Username(if (chatModel.get.username.username == "player1") "player2" else "player1")
+    )
   }
 
   def restartGame(): Unit = {
@@ -465,7 +461,7 @@ class GamePresenter(
 
   def resetPlacedShips(): Unit =
     gameStateProperty.get match {
-      case Some(gameState @ GameState(_, Rules(shipsInThisGame), me, _, PreGameMode(_, _)))
+      case Some(gameState @ GameState(_, Rules(shipsInThisGame, _, _), me, _, PreGameMode(_, _)))
           if me.myBoard.ships.nonEmpty =>
         val meUpdated: Player =
           me.modify(_.shipsLeftToPlace)
@@ -514,17 +510,17 @@ class GamePresenter(
     (gameModel.get.turnAttacks, gameStateProperty.get) match {
       case (
             turnAttacks,
-            Some(GameState(gameId, _, _, _, InGameMode(_, halfTurns, _)))
+            Some(GameState(gameId, _, _, _, InGameMode(_, turn, _)))
           ) if turnAttacks.forall(_.isPlaced) =>
         gameModel.subProp(_.turnAttacksSent).set(true)
-        gameRpc.sendTurnAttacks(gameId, halfTurns, turnAttacks)
+        gameRpc.sendTurnAttacks(gameId, turn, turnAttacks)
       case _ =>
     }
   }
 
   def isValidCoordinateTarget(enemyBoardCoor: Coordinate): Boolean = {
     gameStateProperty.get match {
-      case Some(GameState(_, _, me, _, InGameMode(_, _, _))) =>
+      case Some(GameState(_, _, me, _, _: InGameMode)) =>
         val Coordinate(x, y) = enemyBoardCoor
         val (turnNumberOpt, boardMark) = me.enemyBoardMarks(x)(y)
         turnNumberOpt.isEmpty && !boardMark.isPermanent

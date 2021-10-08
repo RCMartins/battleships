@@ -4,7 +4,7 @@ import com.avsystem.commons.serialization.HasGenCodec
 
 case class SimplePlayer(
     clientId: String,
-    username: String,
+    username: Username,
     boardSize: Coordinate,
     turnPlayHistory: List[TurnPlay]
 )
