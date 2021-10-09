@@ -54,11 +54,6 @@ class GameView(
     presenter.onCanvasResize(canvasDiv)
   }
 
-  window.setTimeout(
-    () => presenter.onCanvasResize(canvasDiv),
-    1
-  )
-
   private val boardView =
     new BoardView(gameModel, screenModel, presenter, myBoardCanvas)
 
@@ -145,10 +140,11 @@ class GameView(
 
   private val launchAttackButton = {
     val launchAttackIsDisabledProperty =
-      presenter.inGameModeProperty.combine(gameModel.subProp(_.turnAttacks)) {
-        case (inGameMode, turnAttacks) =>
-          !inGameMode.exists(inGameMode => inGameMode.isMyTurn && turnAttacks.forall(_.isPlaced))
-      }
+      presenter.inGameModeProperty
+        .transform(_.map(_.isMyTurn))
+        .combine(gameModel.subProp(_.turnAttacks)) { case (isMyTurnOpt, turnAttacks) =>
+          !isMyTurnOpt.exists(isMyTurn => isMyTurn && turnAttacks.forall(_.isPlaced))
+        }
 
     UdashButton(
       buttonStyle = Color.Primary.toProperty,
@@ -175,14 +171,18 @@ class GameView(
     componentId = ComponentId("main-game-from")
   )(factory =>
     factory.disabled(presenter.hasWriteAccess.toProperty.transform(!_))(nested =>
-      nested(produce(presenter.gameModeProperty) {
+      nested(produce(presenter.gameModeProperty.transform(_.map {
+        case PreGameMode(iPlacedShips, _) => (iPlacedShips, false, false)
+        case InGameMode(_, _, _, _, _)    => (false, true, false)
+        case GameOverMode(_, _)           => (false, false, true)
+      })) {
         case None =>
           div(
             `class` := "row",
             div(`class` := "mx-2"),
             div(`class` := "mx-1", mainStartButton)
           ).render
-        case Some(PreGameMode(false, _)) =>
+        case Some((false, false, false)) =>
           div(
             `class` := "row",
             div(`class` := "mx-2"),
@@ -191,55 +191,25 @@ class GameView(
             div(`class` := "mx-1", resetButton),
             div(`class` := "mx-1", randomPlacementButton)
           ).render
-        case Some(PreGameMode(true, _)) =>
+        case Some((true, _, _)) =>
           div(
             `class` := "row",
             div(`class` := "mx-2"),
             div(`class` := "mx-1", undoButton),
             div(`class` := "mx-1", resetButton)
           ).render
-        case Some(_: InGameMode) =>
+        case Some((_, true, _)) =>
           div(
             `class` := "row",
             div(`class` := "mx-2"),
             div(`class` := "mx-1", launchAttackButton)
           ).render
-        case Some(GameOverMode(_, _)) =>
+        case Some((_, _, true)) =>
           div(
             `class` := "row",
             div(`class` := "mx-2"),
             div(`class` := "mx-1", restartButton)
           ).render
-//        case None =>
-//          UdashInputGroup()(UdashInputGroup.appendButton(mainStartButton)).render
-//        case Some(PreGameMode(_, false, _)) =>
-//          UdashInputGroup()(
-//            Seq(
-//              UdashInputGroup.appendButton(confirmShipsButton),
-//              UdashInputGroup.appendButton(undoButton),
-//              UdashInputGroup.appendButton(resetButton),
-//              UdashInputGroup.appendButton(randomPlacementButton)
-//            )
-//          ).render
-//        case Some(PreGameMode(_, true, _)) =>
-//          UdashInputGroup()(
-//            Seq(
-//              UdashInputGroup.appendButton(undoButton),
-//              UdashInputGroup.appendButton(resetButton)
-//            )
-//          ).render
-//        case Some(_: InGameMode) =>
-//          UdashInputGroup()(
-//            Seq(
-//              UdashInputGroup.appendButton(launchAttackButton)
-//            )
-//          ).render
-//        case Some(GameOverMode(_, _)) =>
-//          UdashInputGroup()(
-//            Seq(
-//              UdashInputGroup.appendButton(restartButton)
-//            )
-//          ).render
         case _ =>
           span.render
       })
@@ -490,7 +460,7 @@ class GameView(
               div(
                 `class` := "row justify-content-between",
                 div(
-                  `class` := "col-8",
+                  `class` := "col-7",
                   if (username.nonEmpty)
                     span(s"Logged in as ", b(username)).render
                   else
@@ -516,7 +486,7 @@ class GameView(
                             Translations.Game.placeShips
                         )(_.apply())
                       span(color := "#FF0000", b(placeShipsBinding)).render
-                    case Some(InGameMode(isMyTurn, turn, _)) =>
+                    case Some(InGameMode(isMyTurn, turn, _, _, _)) =>
                       val turnStrBinding: Binding =
                         translatedDynamic(
                           if (isMyTurn)
@@ -547,11 +517,46 @@ class GameView(
                         span(color := "#FF0000", b(turnStrBinding))
                       ).render
                     case _ =>
-                      span("").render
+                      span.render
                   })
                 ),
+                nested(produce(presenter.gameModeProperty) {
+                  case Some(InGameMode(_, _, _, Some(myTimeLeft), Some(enemyTimeLeft))) =>
+                    def toTimeStr(seconds: Int): String =
+                      "%02d:%02d".format(seconds / 60, seconds % 60)
+
+                    def toShortTimeStr(secondsOpt: Option[Int]): String =
+                      secondsOpt
+                        .map { seconds =>
+                          if (seconds >= 60)
+                            " + %02d:%02d".format(seconds / 60, seconds % 60)
+                          else
+                            " + %02d".format(seconds)
+                        }
+                        .getOrElse("")
+
+                    div(
+                      `class` := "col-3 row",
+                      div(
+                        `class` := "col",
+                        span("My Time:"),
+                        br,
+                        span(b(toTimeStr(myTimeLeft.totalTimeLeftMillis / 1000))),
+                        span(b(toShortTimeStr(myTimeLeft.turnTimeLeftMillisOpt.map(_ / 1000))))
+                      ),
+                      div(
+                        `class` := "col",
+                        span("Enemy Time:"),
+                        br,
+                        span(b(toTimeStr(enemyTimeLeft.totalTimeLeftMillis / 1000))),
+                        span(b(toShortTimeStr(enemyTimeLeft.turnTimeLeftMillisOpt.map(_ / 1000))))
+                      )
+                    ).render
+                  case _ =>
+                    div.render
+                }),
                 div(
-                  `class` := "col-4 container",
+                  `class` := "col-2 container",
                   div(
                     `class` := "row justify-content-end",
                     showIf(presenter.gameStateProperty.transform(_.nonEmpty))(
@@ -574,5 +579,10 @@ class GameView(
       )
     )
   }
+
+  window.setTimeout(
+    () => presenter.onCanvasResize(canvasDiv),
+    1
+  )
 
 }

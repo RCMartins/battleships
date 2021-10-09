@@ -5,7 +5,8 @@ import com.avsystem.commons.serialization.HasGenCodec
 case class Rules(
     shipsInThisGame: List[Ship],
     defaultTurnAttackTypes: List[AttackType],
-    turnBonuses: List[TurnBonus]
+    turnBonuses: List[TurnBonus],
+    timeLimit: Option[RuleTimeLimit]
 )
 
 object Rules extends HasGenCodec[Rules]

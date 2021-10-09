@@ -23,8 +23,13 @@ object GameMode extends HasGenCodec[GameMode] {
 
   }
 
-  case class InGameMode(isMyTurn: Boolean, turn: Turn, turnAttackTypes: List[AttackType])
-      extends GameMode {
+  case class InGameMode(
+      isMyTurn: Boolean,
+      turn: Turn,
+      turnAttackTypes: List[AttackType],
+      myTimeLeft: Option[TimeLeft],
+      enemyTimeLeft: Option[TimeLeft]
+  ) extends GameMode {
 
     override def isInGame: Boolean = true
 

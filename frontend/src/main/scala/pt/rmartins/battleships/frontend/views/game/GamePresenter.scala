@@ -4,6 +4,7 @@ import com.softwaremill.quicklens.ModifyPimp
 import io.udash._
 import io.udash.auth.AuthRequires
 import org.scalajs.dom.html.Div
+import org.scalajs.dom.window
 import pt.rmartins.battleships.frontend.routing.RoutingInGameState
 import pt.rmartins.battleships.frontend.services.UserContextService
 import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
@@ -37,14 +38,19 @@ class GamePresenter(
   val gameStateProperty: Property[Option[GameState]] =
     gameStateModel.bitransform(_.gameState)(GameStateModel(_))
 
-  val gameModeProperty: ReadableProperty[Option[GameMode]] =
-    gameStateProperty.transform(_.map(_.gameMode))
+  val gameModeProperty: Property[Option[GameMode]] =
+    gameStateProperty.bitransform[Option[GameMode]](_.map(_.gameMode)) {
+      case None =>
+        gameStateModel.get.gameState
+      case Some(gameMode) =>
+        gameStateModel.get.gameState.map(_.copy(gameMode = gameMode))
+    }
 
-  val inGameModeProperty: ReadableProperty[Option[InGameMode]] =
-    gameModeProperty.transform {
+  val inGameModeProperty: Property[Option[InGameMode]] =
+    gameModeProperty.bitransform[Option[InGameMode]] {
       case Some(mode: InGameMode) => Some(mode)
       case _                      => None
-    }
+    }(identity)
 
   val rulesProperty: ReadableProperty[Option[Rules]] =
     gameStateProperty.transform(_.map(_.rules))
@@ -101,21 +107,72 @@ class GamePresenter(
     gameStateProperty.set(updatedGameState)
   }
 
-  def updateGameMode(fromGameMode: Option[GameMode], to: Option[GameState]): Unit = {
+  private var timeLeftIntervalHandle: Option[Int] = None
+  private val timeLeftIntervalMillis: Int = 100
+
+  def updateGameMode(fromGameMode: Option[GameMode], to: Option[GameState]): Unit =
     (fromGameMode, to) match {
       case (None, Some(GameState(_, _, me, _, _: PreGameMode))) =>
         me.shipsLeftToPlace.headOption.foreach { headShip =>
           gameModel.subProp(_.selectedShip).set(Some(headShip))
         }
+        println("Removed timer (1)...")
+        timeLeftIntervalHandle.foreach(window.clearTimeout)
+        timeLeftIntervalHandle = None
       case (
             None | Some(_: PreGameMode),
-            Some(GameState(_, _, _, _, InGameMode(_, _, turnAttackTypes)))
+            Some(GameState(_, _, _, _, InGameMode(_, _, turnAttackTypes, _, _)))
           ) =>
         screenModel.subProp(_.selectedTab).set(ScreenModel.myMovesTab)
         gameModel.subProp(_.turnAttacks).set(turnAttackTypes.map(Attack(_, None)))
+
+        timeLeftIntervalHandle = Some(
+          window.setInterval(
+            () => {
+              def reduceTime(timeLeft: TimeLeft): TimeLeft = {
+                val timeInterval = timeLeftIntervalMillis
+                timeLeft match {
+                  case TimeLeft(totalTimeLeftMillis, None) =>
+                    TimeLeft(Math.max(0, totalTimeLeftMillis - timeInterval), None)
+                  case TimeLeft(totalTimeLeftMillis, Some(turnTimeLeftMillis)) =>
+                    if (turnTimeLeftMillis >= timeInterval)
+                      TimeLeft(totalTimeLeftMillis, Some(turnTimeLeftMillis - timeInterval))
+                    else
+                      TimeLeft(
+                        Math.max(0, totalTimeLeftMillis + turnTimeLeftMillis - timeInterval),
+                        Some(0)
+                      )
+                }
+              }
+
+              inGameModeProperty.get.foreach {
+                case inGameMode @ InGameMode(
+                      isMyTurn,
+                      _,
+                      _,
+                      Some(myTimeLeft),
+                      Some(enemyTimeLeft)
+                    ) =>
+                  inGameModeProperty.set(
+                    Some(
+                      if (isMyTurn)
+                        inGameMode.modify(_.myTimeLeft).setTo(Some(reduceTime(myTimeLeft)))
+                      else
+                        inGameMode.modify(_.enemyTimeLeft).setTo(Some(reduceTime(enemyTimeLeft)))
+                    )
+                  )
+                case _ =>
+              }
+            },
+            timeout = timeLeftIntervalMillis
+          )
+        )
+      case (_, None | Some(GameState(_, _, _, _, _: GameOverMode))) =>
+        println("Removed timer (2)...")
+        timeLeftIntervalHandle.foreach(window.clearTimeout)
+        timeLeftIntervalHandle = None
       case _ =>
     }
-  }
 
   inGameModeProperty
     .transform(_.map(inGameMode => (inGameMode.turn, inGameMode.turnAttackTypes)))
@@ -180,19 +237,17 @@ class GamePresenter(
     }
   }
 
-  def startGameWith(): Unit = {
+  def startGameWith(): Unit =
     gameRpc.startGameWith(
       Username(if (chatModel.get.username.username == "player1") "player2" else "player1")
     )
-  }
 
-  def restartGame(): Unit = {
+  def restartGame(): Unit =
     gameStateProperty.get match {
       case Some(GameState(gameId, _, _, _, _)) =>
         gameRpc.restartGame(gameId)
       case _ =>
     }
-  }
 
   def quitCurrentGame(): Unit =
     gameStateProperty.get match {
@@ -213,7 +268,15 @@ class GamePresenter(
     (gameModel.get, gameStateProperty.get) match {
       case (
             GameModel(Some(_), Some(button @ (0 | 2)), _, _, _, selectedBoardMarkOpt),
-            Some(gameState @ GameState(gameId, _, me, _, InGameMode(_, _, _) | GameOverMode(_, _)))
+            Some(
+              gameState @ GameState(
+                gameId,
+                _,
+                me,
+                _,
+                InGameMode(_, _, _, _, _) | GameOverMode(_, _)
+              )
+            )
           ) =>
         (boardView.enemyBoardMouseCoordinate.get, selectedBoardMarkOpt, button) match {
           case (Some(enemyBoardCoor), _, 2) =>
@@ -271,7 +334,15 @@ class GamePresenter(
         }
       case (
             GameModel(Some(_), Some(2), _, _, _, _),
-            Some(gameState @ GameState(gameId, _, me, _, InGameMode(_, _, _) | GameOverMode(_, _)))
+            Some(
+              gameState @ GameState(
+                gameId,
+                _,
+                me,
+                _,
+                InGameMode(_, _, _, _, _) | GameOverMode(_, _)
+              )
+            )
           ) =>
         boardView.enemyBoardMouseCoordinate.get match {
           case Some(enemyBoardCoor) =>
@@ -287,7 +358,15 @@ class GamePresenter(
         }
       case (
             GameModel(Some(_), Some(0), _, turnAttacks, turnAttacksSent, selectedBoardMarkOpt),
-            Some(gameState @ GameState(gameId, _, me, _, InGameMode(_, _, _) | GameOverMode(_, _)))
+            Some(
+              gameState @ GameState(
+                gameId,
+                _,
+                me,
+                _,
+                InGameMode(_, _, _, _, _) | GameOverMode(_, _)
+              )
+            )
           ) =>
         (
           boardView.enemyBoardMouseCoordinate.get,
@@ -350,7 +429,7 @@ class GamePresenter(
       me: Player,
       ship: Ship,
       coordinate: Coordinate
-  ): Boolean = {
+  ): Boolean =
     if (
       me.shipsLeftToPlace.exists(_.shipId == ship.shipId) && canPlace(me.myBoard, ship, coordinate)
     ) {
@@ -374,7 +453,6 @@ class GamePresenter(
       true
     } else
       false
-  }
 
   def keyDown(key: String): Unit = {
     if (key == "R")
@@ -461,7 +539,7 @@ class GamePresenter(
 
   def resetPlacedShips(): Unit =
     gameStateProperty.get match {
-      case Some(gameState @ GameState(_, Rules(shipsInThisGame, _, _), me, _, PreGameMode(_, _)))
+      case Some(gameState @ GameState(_, Rules(shipsInThisGame, _, _, _), me, _, PreGameMode(_, _)))
           if me.myBoard.ships.nonEmpty =>
         val meUpdated: Player =
           me.modify(_.shipsLeftToPlace)
@@ -480,7 +558,7 @@ class GamePresenter(
       case _ =>
     }
 
-  def randomPlacement(): Unit = {
+  def randomPlacement(): Unit =
     gameStateProperty.get match {
       case Some(gameState @ GameState(_, _, me, _, PreGameMode(_, _))) =>
         me.shipsLeftToPlace match {
@@ -504,21 +582,19 @@ class GamePresenter(
         }
       case _ =>
     }
-  }
 
-  def launchAttack(): Unit = {
+  def launchAttack(): Unit =
     (gameModel.get.turnAttacks, gameStateProperty.get) match {
       case (
             turnAttacks,
-            Some(GameState(gameId, _, _, _, InGameMode(_, turn, _)))
+            Some(GameState(gameId, _, _, _, InGameMode(_, turn, _, _, _)))
           ) if turnAttacks.forall(_.isPlaced) =>
         gameModel.subProp(_.turnAttacksSent).set(true)
         gameRpc.sendTurnAttacks(gameId, turn, turnAttacks)
       case _ =>
     }
-  }
 
-  def isValidCoordinateTarget(enemyBoardCoor: Coordinate): Boolean = {
+  def isValidCoordinateTarget(enemyBoardCoor: Coordinate): Boolean =
     gameStateProperty.get match {
       case Some(GameState(_, _, me, _, _: InGameMode)) =>
         val Coordinate(x, y) = enemyBoardCoor
@@ -527,7 +603,6 @@ class GamePresenter(
       case _ =>
         false
     }
-  }
 
   def setSelectedTab(selectedTab: String): Unit = {
     screenModel.subProp(_.selectedTab).set(selectedTab)

@@ -95,13 +95,8 @@ class BoardView(
   private val PlaceShipBoardMargin = Coordinate.square(20)
 
   private class Image(src: String) {
-//    private var ready: Boolean = false
-
     val element: html.Image = dom.document.createElement("img").asInstanceOf[HTMLImageElement]
-//    element.onload = (e: dom.Event) => ready = true
     element.src = src
-
-//    def isReady: Boolean = ready
   }
 
   private val attackSimple: Image =
@@ -109,7 +104,7 @@ class BoardView(
 
   private val shipsSummaryRelCoordinates: ReadableProperty[List[(Int, List[ViewShip])]] =
     gamePresenter.rulesProperty.transform {
-      case Some(Rules(shipsInThisGame, _, _)) =>
+      case Some(Rules(shipsInThisGame, _, _, _)) =>
         def getShipsToPlacePos(
             posX: Int,
             posY: Int,
@@ -226,7 +221,7 @@ class BoardView(
       case (
             shipsSummary,
             Some(turnPlayHistory),
-            Some(InGameMode(_, _, _) | GameOverMode(_, _)),
+            Some(InGameMode(_, _, _, _, _) | GameOverMode(_, _)),
             destructionSummaryPos,
             destructionSummarySqSize
           ) =>
@@ -287,7 +282,7 @@ class BoardView(
     ).transform {
       case (
             Some(mousePosition),
-            Some(GameState(_, _, _, enemy, InGameMode(_, _, _) | GameOverMode(_, _))),
+            Some(GameState(_, _, _, enemy, InGameMode(_, _, _, _, _) | GameOverMode(_, _))),
             enemyBoardPos,
             defaultSquareSize
           ) =>
@@ -309,7 +304,7 @@ class BoardView(
       BoardMarksSelectorCombined
     ).transform {
       case (
-            Some(InGameMode(_, _, _) | GameOverMode(_, _)),
+            Some(InGameMode(_, _, _, _, _) | GameOverMode(_, _)),
             (boardMarksSelectorPos, boardMarksSelectorSize, boardMarksSelectorMargin)
           ) =>
         BoardMarksSelectorOrder.zipWithIndex.map { case (boardMark, index) =>
@@ -332,7 +327,7 @@ class BoardView(
     ).transform {
       case (
             Some(mousePosition),
-            Some(InGameMode(_, _, _) | GameOverMode(_, _)),
+            Some(InGameMode(_, _, _, _, _) | GameOverMode(_, _)),
             boardMarksSelectorAllPositions,
             boardMarksSelectorSize
           ) =>
