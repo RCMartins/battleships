@@ -4,6 +4,7 @@ import io.udash.auth.PermissionId
 import io.udash.auth.{Permission => UdashPermission}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import pt.rmartins.battleships.shared.model.game.Username
 
 class UserContextTest extends AnyWordSpec with Matchers {
   "UserContext" should {
@@ -12,7 +13,7 @@ class UserContextTest extends AnyWordSpec with Matchers {
 
       val ctx = UserContext(
         UserToken("token"),
-        "name",
+        Username("name"),
         Set(PermissionId("p1"), PermissionId("p2"))
       )
 

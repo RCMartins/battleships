@@ -21,15 +21,23 @@ class GameService(rpcClientsService: RpcClientsService) {
   private val activeGamesByPlayer: mutable.Map[Username, Game] = mutable.Map.empty
   private val activeGames: mutable.Map[GameId, Game] = mutable.Map.empty
 
+  private val BotClientId: ClientId = ClientId("0")
+  private val BotUsername: Username = Username("Bot")
+
+  def updateActiveGamesByPlayer(player: ServerPlayer, game: Game): Unit = {
+    if (player.isHuman)
+      activeGamesByPlayer.update(player.username, game)
+  }
+
   val clock: Runnable = () => {
     val cycleTimeMillis: Long = 200L
     while (true) {
-      val initialInstant = Instant.now()
       clock.synchronized {
+        val initialInstant = Instant.now()
         activeGames.values.toList.filter(game => game.gameIsActive).foreach { game =>
           val updatedGame = updateGameTime(game, initialInstant)
-          activeGamesByPlayer.update(updatedGame.player1.username, updatedGame)
-          activeGamesByPlayer.update(updatedGame.player2.username, updatedGame)
+          updateActiveGamesByPlayer(updatedGame.player1, updatedGame)
+          updateActiveGamesByPlayer(updatedGame.player2, updatedGame)
           activeGames.update(updatedGame.gameId, updatedGame)
 
           if (updatedGame.gameIsOver)
@@ -42,64 +50,89 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   new Thread(clock).start()
 
+  val botUpdater: Runnable = () => {
+    val cycleTimeMillis: Long = 500L
+    while (true) {
+      clock.synchronized {
+        activeGames.values.toList
+          .flatMap(game => game.getCurrentTurnPlayer.map((game, _)))
+          .filter(!_._2.isHuman)
+          .foreach { case (game, bot) =>
+//            val updatedGame =
+            if (bot.myBoard.ships.isEmpty) {
+              // TODO try some times
+              //  the fleet should be validated before starting game...
+              //  Create Fleet class to hold ship lists and to validate fleets ?????
+              //  Also needs board size + any specific data
+              BotHelpers.placeShipsAtRandom(
+                bot.myBoard.boardSize,
+                game.rules.shipsInThisGame
+              ) match {
+                case Left(_) =>
+                // Try placing ships in the next botUpdater loop ...
+                case Right(value) =>
+              }
+            }
+//            else if (game.gameIsActive)
+//            game
+          }
+      }
+      Thread.sleep(cycleTimeMillis)
+    }
+  }
+
   def updateGameTime(game: Game, instant: Instant): Game = {
     val updatedGame =
-      if (!game.gameIsActive)
-        game
-      else
-        game.getCurrentTurnPlayer match {
-          case None =>
-            game
-          case Some(serverPlayer) =>
-            serverPlayer.timeLeft match {
+      game.getCurrentTurnPlayer.flatMap(serverPlayer =>
+        serverPlayer.timeLeft.map((serverPlayer, _))
+      ) match {
+        case Some((serverPlayer, ServerTimeLeft(totalTimeLeftNanos, turnTimeLeftNanosOpt))) =>
+          val betweenNanos: Long =
+            game.lastUpdateTimeOpt.map(Duration.between(_, instant).toNanos).getOrElse(0L)
+
+          val updatedServerTimeLeft: ServerTimeLeft =
+            turnTimeLeftNanosOpt match {
               case None =>
-                game
-              case Some(ServerTimeLeft(totalTimeLeftNanos, turnTimeLeftNanosOpt)) =>
-                val betweenDuration = Duration.between(game.lastUpdateTime, instant)
-                val betweenNanos = betweenDuration.toNanos
-
-                val updatedServerTimeLeft: ServerTimeLeft =
-                  turnTimeLeftNanosOpt match {
-                    case None =>
-                      val updatedTime: Long = Math.max(0L, totalTimeLeftNanos - betweenNanos)
-                      ServerTimeLeft(updatedTime, turnTimeLeftNanosOpt)
-                    case Some(turnTimeLeftNanos) =>
-                      if (turnTimeLeftNanos >= betweenNanos)
-                        ServerTimeLeft(totalTimeLeftNanos, Some(turnTimeLeftNanos - betweenNanos))
-                      else {
-                        val updatedTime: Long =
-                          Math.max(0L, totalTimeLeftNanos + turnTimeLeftNanos - betweenNanos)
-                        ServerTimeLeft(updatedTime, Some(0))
-                      }
-                  }
-
-                val updatedPlayer: ServerPlayer =
-                  serverPlayer.copy(timeLeft = Some(updatedServerTimeLeft))
-                val updatedGame: Game =
-                  game.updatePlayer(updatedPlayer)
-
-                if (updatedServerTimeLeft.totalTimeLeftNanos == 0)
-                  setGameOver(
-                    updatedGame,
-                    updatedGame.enemyPlayer(updatedPlayer.username).username
-                  )
-                else
-                  updatedGame
+                val updatedTime: Long = Math.max(0L, totalTimeLeftNanos - betweenNanos)
+                ServerTimeLeft(updatedTime, turnTimeLeftNanosOpt)
+              case Some(turnTimeLeftNanos) =>
+                if (turnTimeLeftNanos >= betweenNanos)
+                  ServerTimeLeft(totalTimeLeftNanos, Some(turnTimeLeftNanos - betweenNanos))
+                else {
+                  val updatedTime: Long =
+                    Math.max(0L, totalTimeLeftNanos + turnTimeLeftNanos - betweenNanos)
+                  ServerTimeLeft(updatedTime, Some(0))
+                }
             }
-        }
 
-    updatedGame.copy(lastUpdateTime = instant)
+          val updatedPlayer: ServerPlayer =
+            serverPlayer.copy(timeLeft = Some(updatedServerTimeLeft))
+          val updatedGame: Game =
+            game.updatePlayer(updatedPlayer)
+
+          if (updatedServerTimeLeft.totalTimeLeftNanos == 0)
+            setGameOver(
+              updatedGame,
+              updatedGame.enemyPlayer(updatedPlayer.username).username
+            )
+          else
+            updatedGame
+        case _ =>
+          game
+      }
+
+    updatedGame.copy(lastUpdateTimeOpt = Some(instant))
   }
 
   def setGameOver(game: Game, whoWonUsername: Username): Game =
     game.modify(_.playerWhoWonOpt).setTo(Some(whoWonUsername))
 
-  def updateServerState(game: Game, instantNow: Instant = Instant.now()): Game =
+  def updateServerState(game: Game, instantNow: Option[Instant] = Some(Instant.now())): Game =
     clock.synchronized {
-      val updatedGame = updateGameTime(game, instantNow)
+      val updatedGame = instantNow.map(updateGameTime(game, _)).getOrElse(game)
 
-      activeGamesByPlayer.update(game.player1.username, updatedGame)
-      activeGamesByPlayer.update(game.player2.username, updatedGame)
+      updateActiveGamesByPlayer(updatedGame.player1, updatedGame)
+      updateActiveGamesByPlayer(updatedGame.player2, updatedGame)
       activeGames.update(game.gameId, updatedGame)
 
       updatedGame
@@ -176,6 +209,8 @@ class GameService(rpcClientsService: RpcClientsService) {
       timeLeft: Option[ServerTimeLeft]
   ) {
 
+    val isHuman: Boolean = clientId != BotClientId
+
     def kills: Int = enemyBoard.totalShips - enemyBoard.shipsLeft
 
     def toPlayer(game: Game): Player =
@@ -216,8 +251,11 @@ class GameService(rpcClientsService: RpcClientsService) {
       player2: ServerPlayer,
       playerWhoWonOpt: Option[Username],
       currentTurnPlayer: Option[Username],
-      lastUpdateTime: Instant
+      lastUpdateTimeOpt: Option[Instant]
   ) {
+
+    val isInPlacingShipsMode: Boolean =
+      player1.myBoard.ships.isEmpty || player2.myBoard.ships.isEmpty
 
     val gameStarted: Boolean = currentTurnPlayer.nonEmpty
 
@@ -299,9 +337,12 @@ class GameService(rpcClientsService: RpcClientsService) {
         .getOrElse(this)
 
     def getCurrentTurnPlayer: Option[ServerPlayer] =
-      currentTurnPlayer.map(currentUsername =>
-        if (currentUsername == player1.username) player1 else player2
-      )
+      if (gameIsActive)
+        currentTurnPlayer.map(currentUsername =>
+          if (currentUsername == player1.username) player1 else player2
+        )
+      else
+        None
 
   }
 
@@ -317,110 +358,131 @@ class GameService(rpcClientsService: RpcClientsService) {
     }
   }
 
-  def startGame(player1Username: Username, player2Username: Username): Future[Unit] = Future {
-    (
-      rpcClientsService.getClientIdByUsername(player1Username),
-      rpcClientsService.getClientIdByUsername(player2Username)
-    ) match {
-      case (Some(player1Id), Some(player2Id)) =>
-        val shipsThisGame: List[Ship] =
-          (
-            List.fill(4)(Ship.Submarine) ++
-              List.fill(3)(Ship.PatrolBoat2) ++
-              List.fill(2)(Ship.PatrolBoat3) ++
-              List.fill(1)(Ship.PatrolBoat4) ++
-              List.fill(1)(Ship.Carrier)
-          )
-            .groupBy(_.shipId)
-            .toList
-            .sortBy { case (id, list) =>
-              (-list.head.piecesSize, id)
-            }
-            .flatMap(_._2)
+  def startGameWithBots(playerUsername: Username): Future[Unit] = Future {
+    rpcClientsService.getClientIdByUsername(playerUsername) match {
+      case Some(playerId) =>
+        val game: Game = createNewGame((playerId, playerUsername), None)
 
-        val defaultTurnAttackTypes = List.fill(3)(AttackType.Simple)
-        val turnBonuses: List[TurnBonus] =
-          List(
-            TurnBonus(BonusType.FirstBlood, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
-            TurnBonus(BonusType.DoubleKill, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
-            TurnBonus(BonusType.TripleKill, List(ExtraTurn(List.fill(3)(AttackType.Simple))))
-          )
-
-        val timeLimit: Option[RuleTimeLimit] =
-          Some(
-            RuleTimeLimit(
-              initialTotalTimeSeconds = 600,
-              additionalTurnTimeSeconds = Some((10, false))
-            )
-          )
-
-        val rules: Rules =
-          Rules(
-            shipsInThisGame = shipsThisGame,
-            defaultTurnAttackTypes = defaultTurnAttackTypes,
-            turnBonuses = turnBonuses,
-            timeLimit = timeLimit
-          )
-
-        val boardSize = Coordinate(10, 10)
-        val myBoard: ServerMyBoard =
-          ServerMyBoard(boardSize, Nil)
-        val enemyBoard: ServerEnemyBoard =
-          ServerEnemyBoard(
-            boardSize,
-            Vector.fill(10)(Vector.fill(10)((None, BoardMark.Empty))),
-            shipsThisGame.size,
-            shipsThisGame.size
-          )
-
-        val player1First: Boolean = Random.nextBoolean()
-
-        val player1: ServerPlayer =
-          ServerPlayer(
-            clientId = player1Id,
-            username = player1Username,
-            startedFirst = player1First,
-            myBoard = myBoard,
-            enemyBoard = enemyBoard,
-            turnPlayHistory = Nil,
-            currentTurnOpt = None,
-            currentTurnAttackTypes = Nil,
-            extraTurnQueue = Nil,
-            timeLeft = None
-          )
-        val player2: ServerPlayer =
-          ServerPlayer(
-            clientId = player2Id,
-            username = player2Username,
-            startedFirst = !player1First,
-            myBoard = myBoard,
-            enemyBoard = enemyBoard,
-            turnPlayHistory = Nil,
-            currentTurnOpt = None,
-            currentTurnAttackTypes = Nil,
-            extraTurnQueue = Nil,
-            timeLeft = None
-          )
-
-        val gameId = GameId(UUID.randomUUID().toString)
-        val instantNow = Instant.now()
-        val game: Game =
-          Game(
-            gameId = gameId,
-            boardSize = boardSize,
-            rules = rules,
-            player1 = player1,
-            player2 = player2,
-            playerWhoWonOpt = None,
-            currentTurnPlayer = None,
-            instantNow
-          )
-
-        updateServerState(game, instantNow)
+        updateServerState(game, None)
         updateBothGameState(game)
       case _ =>
-        rpcClientsService.sendMessage(s"Error starting game!")
+        rpcClientsService.sendMessage("Error starting game vs bot!")
     }
+  }
+
+  def startGame(player1Username: Username, player2Username: Username): Future[Unit] =
+    Future {
+      (
+        rpcClientsService.getClientIdByUsername(player1Username),
+        rpcClientsService.getClientIdByUsername(player2Username)
+      ) match {
+        case (Some(player1Id), Some(player2Id)) =>
+          val game: Game =
+            createNewGame((player1Id, player1Username), Some((player2Id, player2Username)))
+
+          updateServerState(game, None)
+          updateBothGameState(game)
+        case _ =>
+          rpcClientsService.sendMessage(s"Error starting game vs player '$player2Username'!")
+      }
+    }
+
+  private def createNewGame(
+      player1Data: (ClientId, Username),
+      player2DataOpt: Option[(ClientId, Username)]
+  ): Game = {
+    val shipsThisGame: List[Ship] =
+      (
+        List.fill(4)(Ship.Submarine) ++
+          List.fill(3)(Ship.PatrolBoat2) ++
+          List.fill(2)(Ship.PatrolBoat3) ++
+          List.fill(1)(Ship.PatrolBoat4) ++
+          List.fill(1)(Ship.Carrier)
+      )
+        .groupBy(_.shipId)
+        .toList
+        .sortBy { case (id, list) =>
+          (-list.head.piecesSize, id)
+        }
+        .flatMap(_._2)
+
+    val defaultTurnAttackTypes = List.fill(3)(AttackType.Simple)
+    val turnBonuses: List[TurnBonus] =
+      List(
+        TurnBonus(BonusType.FirstBlood, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
+        TurnBonus(BonusType.DoubleKill, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
+        TurnBonus(BonusType.TripleKill, List(ExtraTurn(List.fill(3)(AttackType.Simple))))
+      )
+
+    val timeLimit: Option[RuleTimeLimit] =
+      Some(
+        RuleTimeLimit(
+          initialTotalTimeSeconds = 600,
+          additionalTurnTimeSeconds = Some((10, false))
+        )
+      )
+
+    val rules: Rules =
+      Rules(
+        shipsInThisGame = shipsThisGame,
+        defaultTurnAttackTypes = defaultTurnAttackTypes,
+        turnBonuses = turnBonuses,
+        timeLimit = timeLimit
+      )
+
+    val boardSize = Coordinate(10, 10)
+    val myBoard: ServerMyBoard =
+      ServerMyBoard(boardSize, Nil)
+    val enemyBoard: ServerEnemyBoard =
+      ServerEnemyBoard(
+        boardSize,
+        Vector.fill(10)(Vector.fill(10)((None, BoardMark.Empty))),
+        shipsThisGame.size,
+        shipsThisGame.size
+      )
+
+    val player1First: Boolean = Random.nextBoolean()
+
+    val (player1Id, player1Username) = player1Data
+    val player1: ServerPlayer =
+      ServerPlayer(
+        clientId = player1Id,
+        username = player1Username,
+        startedFirst = player1First,
+        myBoard = myBoard,
+        enemyBoard = enemyBoard,
+        turnPlayHistory = Nil,
+        currentTurnOpt = None,
+        currentTurnAttackTypes = Nil,
+        extraTurnQueue = Nil,
+        timeLeft = None
+      )
+    val (player2Id, player2Username) = player2DataOpt.getOrElse((BotClientId, BotUsername))
+    val player2: ServerPlayer =
+      ServerPlayer(
+        clientId = player2Id,
+        username = player2Username,
+        startedFirst = !player1First,
+        myBoard = myBoard,
+        enemyBoard = enemyBoard,
+        turnPlayHistory = Nil,
+        currentTurnOpt = None,
+        currentTurnAttackTypes = Nil,
+        extraTurnQueue = Nil,
+        timeLeft = None
+      )
+
+    val gameId = GameId(UUID.randomUUID().toString)
+    Game(
+      gameId = gameId,
+      boardSize = boardSize,
+      rules = rules,
+      player1 = player1,
+      player2 = player2,
+      playerWhoWonOpt = None,
+      currentTurnPlayer = None,
+      lastUpdateTimeOpt = None
+    )
   }
 
   def quitCurrentGame(gameId: GameId, playerUsername: Username): Future[Unit] =
@@ -495,7 +557,7 @@ class GameService(rpcClientsService: RpcClientsService) {
               gameWithShips
 
           val instantNow = Instant.now()
-          updateServerState(gameWithUpdatedMode.copy(lastUpdateTime = instantNow), instantNow)
+          updateServerState(gameWithUpdatedMode.copy(lastUpdateTimeOpt = Some(instantNow)), None)
 
           if (readyToStart)
             updateBothGameState(gameWithUpdatedMode)
@@ -543,7 +605,6 @@ class GameService(rpcClientsService: RpcClientsService) {
         case None =>
           rpcClientsService.sendMessage(s"Error finding game!")
         case Some((game, Some(player))) if {
-              game.gameIsActive &&
               game.getCurrentTurnPlayer.exists { currentPlayer =>
                 currentPlayer.currentTurnOpt.contains(currentTurn) &&
                 currentPlayer.username == player.username
@@ -664,6 +725,7 @@ class GameService(rpcClientsService: RpcClientsService) {
               }
             }
 
+          // TODO update with a new Instant.now here to be fair?
           updateServerState(updatedGameWithTurnTime)
           updateBothGameState(updatedGameWithTurnTime)
         case Some((game, _)) =>

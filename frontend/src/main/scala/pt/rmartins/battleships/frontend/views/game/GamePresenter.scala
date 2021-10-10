@@ -12,6 +12,7 @@ import pt.rmartins.battleships.shared.model.auth.Permission
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game._
+import pt.rmartins.battleships.shared.model.utils.Utils.canPlaceInBoard
 import pt.rmartins.battleships.shared.rpc.server.game.GameRPC
 import pt.rmartins.battleships.shared.rpc.server.secure.chat.ChatRPC
 
@@ -85,23 +86,11 @@ class GamePresenter(
   }
 
   private val onGameStateCallback = notificationsCenter.onGameState { case updatedGameState =>
-//    (inGameModeProperty.get, updatedGameState.gameMode) match {
-//      case (Some(InGameMode(_, halfTurns1, _)), InGameMode(_, halfTurns2, _))
-//          if halfTurns1 != halfTurns2 =>
-//        chatRpc.sendMsg(s"Changed turn $halfTurns1 -> $halfTurns2")
-//      case _ =>
-//    }
     updateGameMode(gameStateProperty.get.map(_.gameMode), Some(updatedGameState))
     gameStateProperty.set(Some(updatedGameState))
   }
 
   private val onGameModeCallback = notificationsCenter.onGameMode { case updatedGameMode =>
-//    (inGameModeProperty.get, updatedGameMode) match {
-//      case (Some(InGameMode(_, halfTurns1, _)), InGameMode(_, halfTurns2, _))
-//          if halfTurns1 != halfTurns2 =>
-//        chatRpc.sendMsg(s"Changed turn $halfTurns1 -> $halfTurns2")
-//      case _ =>
-//    }
     val updatedGameState = gameStateProperty.get.map(_.copy(gameMode = updatedGameMode))
     updateGameMode(gameStateProperty.get.map(_.gameMode), updatedGameState)
     gameStateProperty.set(updatedGameState)
@@ -277,6 +266,9 @@ class GamePresenter(
     }
   }
 
+  def startGameWithBots(): Unit =
+    gameRpc.startGameWithBots()
+
   def startGameWith(): Unit =
     gameRpc.startGameWith(
       Username(if (chatModel.get.username.username == "player1") "player2" else "player1")
@@ -355,7 +347,7 @@ class GamePresenter(
     (gameModel.get, gameStateProperty.get) match {
       case (
             GameModel(Some(_), Some(0), selectedShipOpt, _, _, _),
-            Some(gameState @ GameState(_, _, me, _, PreGameMode(_, _)))
+            Some(gameState @ GameState(_, _, me, _, _: PreGameMode))
           ) =>
         boardView.shipToPlaceHover.get.map(_.ship) match {
           case Some(ship) =>
@@ -471,7 +463,8 @@ class GamePresenter(
       coordinate: Coordinate
   ): Boolean =
     if (
-      me.shipsLeftToPlace.exists(_.shipId == ship.shipId) && canPlace(me.myBoard, ship, coordinate)
+      me.shipsLeftToPlace.exists(_.shipId == ship.shipId) &&
+      canPlaceInBoard(me.myBoard, ship, coordinate)
     ) {
       val playerUpdated =
         me
@@ -502,14 +495,6 @@ class GamePresenter(
   def mouseWheel(wheelRotation: Int): Unit =
     if (wheelRotation != 0)
       rotateSelectedShip(wheelRotation)
-
-  def canPlace(myBoard: Board, shipToPlace: Ship, boardCoor: Coordinate): Boolean = {
-    val actualPiecePositions = shipToPlace.pieces.map(_ + boardCoor)
-
-    actualPiecePositions.forall(_.isInsideBoard(myBoard.boardSize)) &&
-    !actualPiecePositions
-      .exists(coor => myBoard.ships.exists(_.shipActualPieces.exists(_.distance(coor) <= 1)))
-  }
 
   private def rotateSelectedShip(directionDelta: Int): Unit =
     (gameModel.get.selectedShip, gameModeProperty.get) match {
@@ -600,7 +585,7 @@ class GamePresenter(
 
   def randomPlacement(): Unit =
     gameStateProperty.get match {
-      case Some(gameState @ GameState(_, _, me, _, PreGameMode(_, _))) =>
+      case Some(gameState @ GameState(_, _, me, _, _: PreGameMode)) =>
         me.shipsLeftToPlace match {
           case headShip :: _ =>
             val possibleCoorList =

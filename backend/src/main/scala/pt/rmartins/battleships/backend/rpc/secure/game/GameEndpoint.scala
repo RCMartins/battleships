@@ -19,6 +19,9 @@ class GameEndpoint(implicit
   override def startGameWith(otherPlayerUsername: Username): Future[Unit] =
     gameService.startGame(ctx.username, otherPlayerUsername)
 
+  override def startGameWithBots(): Future[Unit] =
+    gameService.startGameWithBots(ctx.username)
+
   override def quitCurrentGame(gameId: GameId): Future[Unit] =
     gameService.quitCurrentGame(gameId, ctx.username)
 
