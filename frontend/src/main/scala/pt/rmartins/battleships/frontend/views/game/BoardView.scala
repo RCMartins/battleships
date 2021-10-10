@@ -2,10 +2,10 @@ package pt.rmartins.battleships.frontend.views.game
 
 import io.udash.{ModelProperty, ReadableProperty}
 import org.scalajs.dom
-import org.scalajs.dom.html.Canvas
+import org.scalajs.dom.html.{Canvas, Span}
 import org.scalajs.dom.raw.HTMLImageElement
 import org.scalajs.dom.{CanvasRenderingContext2D, html}
-import pt.rmartins.battleships.frontend.views.game.BoardView.{SummaryShip, ToPlaceShip, ViewShip}
+import pt.rmartins.battleships.frontend.views.game.BoardView._
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
@@ -383,7 +383,10 @@ class BoardView(
           selectedBoardMarkOpt
         )
 
-        drawMissiles(renderingCtx, turnAttacks)
+        val ScreenModel(_, _, missilesPopupMillisOpt, extraTurnPopup, extraTurnText) =
+          screenModel.get
+        drawMissiles(renderingCtx, turnAttacks, missilesPopupMillisOpt)
+        drawExtraTurnPopup(renderingCtx, turnAttacks, extraTurnPopup, extraTurnText)
         drawDestructionSummary(renderingCtx)
         drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
       case Some(GameState(_, _, me, enemy, GameOverMode(_, _))) =>
@@ -583,12 +586,10 @@ class BoardView(
 
     val fontSize = Math.max(15, squareSize / 2)
     renderingCtx.fillStyle = s"rgb(0, 0, 0)"
-    renderingCtx.strokeStyle = s"rgb(0, 0, 0)"
     renderingCtx.font = s"${fontSize}px serif"
     renderingCtx.textBaseline = "bottom"
     renderingCtx.textAlign = "left"
-    renderingCtx.lineWidth = 1.0
-    renderingCtx.strokeText(boardTitle, boardPosition.x, boardPosition.y - 2)
+    renderingCtx.fillText(boardTitle, boardPosition.x, boardPosition.y - 2)
   }
 
   def drawEnemyBoard(
@@ -685,10 +686,29 @@ class BoardView(
     }
   }
 
-  def drawMissiles(renderingCtx: CanvasRenderingContext2D, turnAttacks: List[Attack]): Unit = {
+  def drawMissiles(
+      renderingCtx: CanvasRenderingContext2D,
+      turnAttacks: List[Attack],
+      missilesPopupMillisOpt: Option[Int]
+  ): Unit = {
     val missilesPos = MissilesInicialPos.get
     val missilesSize = MissilesSqSize.get
     val missilesPosDiff = MissilesPosDiff.get
+
+    val currentMissilesSize: Int =
+      missilesPopupMillisOpt match {
+        case None =>
+          missilesSize
+        case Some(timeMillis) if timeMillis > MissilesFastPopupTime =>
+          val perc: Double =
+            (timeMillis - MissilesFastPopupTime).toDouble / MissilesInitialPopupTime
+          (missilesSize * (1 + MissilesMaxOversize * (MissilesFastPerc + (1 - MissilesFastPerc) * perc))).toInt
+        case Some(timeMillis) =>
+          val perc: Double = timeMillis.toDouble / MissilesFastPopupTime
+          (missilesSize * (1 + MissilesMaxOversize * MissilesFastPerc * perc)).toInt
+      }
+    val currentMissilesDiff: Coordinate =
+      Coordinate.square((currentMissilesSize - missilesSize) / 2)
 
     turnAttacks.zipWithIndex.foreach {
       case (Attack(AttackType.Simple, coorOpt), index) =>
@@ -703,13 +723,65 @@ class BoardView(
           0,
           500,
           500,
-          missilesPos.x + index * missilesPosDiff.x,
-          missilesPos.y + index * missilesPosDiff.y,
-          missilesSize,
-          missilesSize
+          missilesPos.x + index * missilesPosDiff.x - currentMissilesDiff.x,
+          missilesPos.y + index * missilesPosDiff.y - currentMissilesDiff.y,
+          currentMissilesSize,
+          currentMissilesSize
         )
 
         renderingCtx.globalAlpha = 1.0
+      case _ =>
+    }
+  }
+
+  def drawExtraTurnPopup(
+      renderingCtx: CanvasRenderingContext2D,
+      turnAttacks: List[Attack],
+      extraTurnPopupOpt: Option[Int],
+      extraTurnPopupTextOpt: Option[Span]
+  ): Unit = {
+    (extraTurnPopupOpt, extraTurnPopupTextOpt.map(_.innerText)) match {
+      case (Some(timeLeft), Some(extraTurnText)) =>
+        val middleX = myBoardCanvas.width / 2
+        val bottomY = myBoardCanvas.height - SquareSizeMedium.get
+        val textSize = (SquareSizeBig.get * 1.6).toInt
+        val fadeAlpha =
+          if (timeLeft > ExtraTurnPopupTimeFade)
+            1.0
+          else
+            timeLeft.toDouble / ExtraTurnPopupTimeFade
+        val extraTurnPopupMissileSize = (SquareSizeBig.get * 1.0).toInt
+        val missilesDiff: Coordinate =
+          Coordinate(extraTurnPopupMissileSize, 0)
+        val missilesInitialPos: Coordinate =
+          Coordinate(
+            (-missilesDiff.x * (turnAttacks.size / 2.0)).toInt,
+            -textSize - extraTurnPopupMissileSize
+          )
+
+        if (ExtraTurnAppear(timeLeft)) {
+          renderingCtx.fillStyle = s"rgb(0, 0, 0, $fadeAlpha)"
+          renderingCtx.font = s"${textSize}px serif"
+          renderingCtx.textBaseline = "bottom"
+          renderingCtx.textAlign = "center"
+          renderingCtx.fillText(extraTurnText, middleX, bottomY)
+
+          renderingCtx.globalAlpha = fadeAlpha
+          turnAttacks.zipWithIndex.foreach { case (Attack(_, _), index) =>
+            renderingCtx.drawImage(
+              attackSimple.element,
+              0,
+              0,
+              500,
+              500,
+              middleX + missilesInitialPos.x + (missilesDiff * index).x,
+              bottomY + missilesInitialPos.y + (missilesDiff * index).y,
+              extraTurnPopupMissileSize,
+              extraTurnPopupMissileSize
+            )
+          }
+          renderingCtx.globalAlpha = 1.0
+        }
       case _ =>
     }
   }
@@ -761,5 +833,15 @@ object BoardView {
   case class SummaryShip(ship: Ship, pieces: List[Coordinate], destroyed: Boolean)
 
   val CanvasSize: Coordinate = Coordinate(1000, 400)
+
+  val MissilesInitialPopupTime: Int = 2000
+  val MissilesFastPopupTime: Int = 600
+  val MissilesMaxOversize: Double = 0.5
+  val MissilesFastPerc: Double = 0.9
+
+  val ExtraTurnPopupTime: Int = 6800
+  def ExtraTurnAppear(timeLeft: Int): Boolean =
+    timeLeft < 4000 || ((timeLeft / 400) % 2 == 0)
+  val ExtraTurnPopupTimeFade: Int = 2000
 
 }

@@ -54,7 +54,7 @@ class GameView(
     presenter.onCanvasResize(canvasDiv)
   }
 
-  private val boardView =
+  private val boardView: BoardView =
     new BoardView(gameModel, screenModel, presenter, myBoardCanvas)
 
   private def reloadBoardView(): Unit = {
@@ -63,12 +63,19 @@ class GameView(
       myBoardCanvas.setAttribute("width", canvasSize.x.toString)
       myBoardCanvas.setAttribute("height", canvasSize.y.toString)
     }
+
+    if (screenModel.get.extraTurnText.isEmpty)
+      screenModel
+        .subProp(_.extraTurnText)
+        .set(Some(span(translatedDynamic(Translations.Game.extraTurnPopup)(_.apply())).render))
+
     boardView.paint()
   }
 
-  screenModel.subProp(_.canvasSize).listen(_ => reloadBoardView())
+  // TODO This is marking the screen refresh every time the one of the 'timeLeft' values changes
   gameStateModel.listen(_ => reloadBoardView())
   gameModel.listen(_ => reloadBoardView())
+  screenModel.subProp(_.canvasSize).listen(_ => reloadBoardView())
 
   myBoardCanvas.onmousemove = (mouseEvent: MouseEvent) => {
     val rect = myBoardCanvas.getBoundingClientRect()

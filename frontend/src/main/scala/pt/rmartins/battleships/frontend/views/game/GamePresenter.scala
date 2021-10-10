@@ -116,7 +116,6 @@ class GamePresenter(
         me.shipsLeftToPlace.headOption.foreach { headShip =>
           gameModel.subProp(_.selectedShip).set(Some(headShip))
         }
-        println("Removed timer (1)...")
         timeLeftIntervalHandle.foreach(window.clearTimeout)
         timeLeftIntervalHandle = None
       case (
@@ -126,6 +125,7 @@ class GamePresenter(
         screenModel.subProp(_.selectedTab).set(ScreenModel.myMovesTab)
         gameModel.subProp(_.turnAttacks).set(turnAttackTypes.map(Attack(_, None)))
 
+        timeLeftIntervalHandle.foreach(window.clearTimeout)
         timeLeftIntervalHandle = Some(
           window.setInterval(
             () => {
@@ -168,18 +168,58 @@ class GamePresenter(
           )
         )
       case (_, None | Some(GameState(_, _, _, _, _: GameOverMode))) =>
-        println("Removed timer (2)...")
         timeLeftIntervalHandle.foreach(window.clearTimeout)
         timeLeftIntervalHandle = None
       case _ =>
     }
 
+  private var newTurnAnimationHandle: Option[Int] = None
+  private val newTurnAnimationMillis: Int = 50
+
+  private def stopNewTurnAnimation(): Unit = {
+    newTurnAnimationHandle.foreach(window.clearTimeout)
+    newTurnAnimationHandle = None
+  }
+
   inGameModeProperty
     .transform(_.map(inGameMode => (inGameMode.turn, inGameMode.turnAttackTypes)))
     .listen {
-      case Some((_, turnAttackTypes)) if gameModel.get.turnAttacksSent =>
+      case Some((Turn(_, extraTurn), turnAttackTypes)) if gameModel.get.turnAttacksSent =>
         gameModel.subProp(_.turnAttacksSent).set(false)
         gameModel.subProp(_.turnAttacks).set(turnAttackTypes.map(Attack(_, None)))
+        screenModel
+          .subProp(_.missilesPopupMillisOpt)
+          .set(Some(BoardView.MissilesInitialPopupTime))
+        screenModel
+          .subProp(_.extraTurnPopup)
+          .set(extraTurn.map(_ => BoardView.ExtraTurnPopupTime))
+
+        if (newTurnAnimationHandle.isEmpty) {
+          newTurnAnimationHandle = Some(
+            window.setInterval(
+              () => {
+                val screen = screenModel.get
+
+                screen.missilesPopupMillisOpt.foreach { missilesPopupMillis =>
+                  val updatedTime = missilesPopupMillis - newTurnAnimationMillis
+                  screenModel
+                    .subProp(_.missilesPopupMillisOpt)
+                    .set(Some(updatedTime).filter(_ > 0))
+                }
+                screen.extraTurnPopup.foreach { timeLeft =>
+                  val updatedTime = timeLeft - newTurnAnimationMillis
+                  screenModel
+                    .subProp(_.extraTurnPopup)
+                    .set(Some(updatedTime).filter(_ > 0))
+                }
+
+                if (screen.missilesPopupMillisOpt.isEmpty && screen.extraTurnPopup.isEmpty)
+                  stopNewTurnAnimation()
+              },
+              newTurnAnimationMillis
+            )
+          )
+        }
       case _ =>
     }
 
@@ -591,6 +631,8 @@ class GamePresenter(
           ) if turnAttacks.forall(_.isPlaced) =>
         gameModel.subProp(_.turnAttacksSent).set(true)
         gameRpc.sendTurnAttacks(gameId, turn, turnAttacks)
+
+        stopNewTurnAnimation()
       case _ =>
     }
 

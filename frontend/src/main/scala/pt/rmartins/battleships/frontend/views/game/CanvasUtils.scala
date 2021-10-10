@@ -107,12 +107,11 @@ object CanvasUtils {
       textColor: String = "0, 0, 0"
   ): Unit = {
     val relCoor = boardPosition + coor * size + Coordinate(size / 2, size / 2 + 2)
-    renderingCtx.strokeStyle = s"rgb($textColor)"
+    renderingCtx.fillStyle = s"rgb($textColor)"
     renderingCtx.font = s"${textSize}px serif"
     renderingCtx.textBaseline = "middle"
     renderingCtx.textAlign = "center"
-    renderingCtx.lineWidth = 2.0
-    renderingCtx.strokeText(turn.toTurnString, relCoor.x, relCoor.y)
+    renderingCtx.fillText(turn.toTurnString, relCoor.x, relCoor.y)
   }
 
   def drawCrosshair(
