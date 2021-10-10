@@ -7,6 +7,9 @@ import pt.rmartins.battleships.shared.model.game.Coordinate
 case class ScreenModel(
     canvasSize: Coordinate,
     selectedTab: String,
+    lastSeenMessagesChat: Int,
+    lastSeenMessagesMyMoves: Int,
+    lastSeenMessagesEnemyMoves: Int,
     missilesPopupMillisOpt: Option[Int],
     extraTurnPopup: Option[Int],
     extraTurnText: Option[Span]
@@ -22,6 +25,9 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
     ScreenModel(
       canvasSize = BoardView.CanvasSize,
       selectedTab = myMovesTab,
+      lastSeenMessagesChat = 0,
+      lastSeenMessagesMyMoves = 0,
+      lastSeenMessagesEnemyMoves = 0,
       missilesPopupMillisOpt = None,
       extraTurnPopup = None,
       extraTurnText = None

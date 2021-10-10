@@ -12,13 +12,16 @@ import io.udash.component.ComponentId
 import io.udash.css._
 import io.udash.i18n._
 import org.scalajs.dom
-import org.scalajs.dom.html.{Canvas, Div}
+import org.scalajs.dom.html.{Canvas, Div, LI}
 import org.scalajs.dom.{MouseEvent, UIEvent, WheelEvent, window}
 import pt.rmartins.battleships.frontend.services.TranslationsService
+import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.css.ChatStyles
 import pt.rmartins.battleships.shared.i18n.Translations
+import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game._
+import scalatags.JsDom
 import scalatags.JsDom.all._
 
 import scala.util.chaining.scalaUtilChainingOps
@@ -251,51 +254,108 @@ class GameView(
     presenter.restartGame()
   }
 
+  private val chatMessagesProperty: ReadableSeqProperty[ChatMessage] =
+    chatModel.subSeq(_.msgs)
+  private val chatMessagesSizeProperty: ReadableProperty[Int] =
+    chatModel.subSeq(_.msgs).transform(_.size)
+  private val chatMessagesShowNotification: ReadableProperty[Option[Int]] =
+    combine(
+      chatMessagesSizeProperty,
+      screenModel.subProp(_.lastSeenMessagesChat),
+      screenModel.subProp(_.selectedTab)
+    ).transform { case (totalSize, lastSeenMessageCount, selectedTab) =>
+      Some(totalSize - lastSeenMessageCount).filter(_ > 0 && selectedTab != ScreenModel.chatTab)
+    }
+
+  private val myMovesHistoryProperty: ReadableSeqProperty[TurnPlay] =
+    presenter.gameStateProperty
+      .transformToSeq(_.map(_.me.turnPlayHistory).getOrElse(Seq.empty))
+  private val myMovesHistorySizeProperty: ReadableProperty[Int] =
+    myMovesHistoryProperty.transform(_.size)
+  private val myMovesHistoryShowNotification: ReadableProperty[Option[Int]] =
+    combine(
+      myMovesHistorySizeProperty,
+      screenModel.subProp(_.lastSeenMessagesMyMoves),
+      screenModel.subProp(_.selectedTab)
+    ).transform { case (totalSize, lastSeenMessageCount, selectedTab) =>
+      Some(totalSize - lastSeenMessageCount).filter(_ > 0 && selectedTab != ScreenModel.myMovesTab)
+    }
+
+  private val enemyMovesHistoryProperty: ReadableSeqProperty[TurnPlay] =
+    presenter.gameStateProperty
+      .transformToSeq(_.map(_.enemy.turnPlayHistory).getOrElse(Seq.empty))
+  private val enemyMovesHistorySizeProperty: ReadableProperty[Int] =
+    enemyMovesHistoryProperty.transform(_.size)
+  private val enemyMovesHistoryShowNotification: ReadableProperty[Option[Int]] =
+    combine(
+      enemyMovesHistorySizeProperty,
+      screenModel.subProp(_.lastSeenMessagesEnemyMoves),
+      screenModel.subProp(_.selectedTab)
+    ).transform { case (totalSize, lastSeenMessageCount, selectedTab) =>
+      Some(totalSize - lastSeenMessageCount)
+        .filter(_ > 0 && selectedTab != ScreenModel.enemyMovesTab)
+    }
+
+  combine(
+    screenModel.subProp(_.selectedTab),
+    chatMessagesSizeProperty,
+    myMovesHistorySizeProperty,
+    enemyMovesHistorySizeProperty
+  ).listen { case (selectedTab, chatSize, myMovesSize, enemyMovesSize) =>
+    if (selectedTab == ScreenModel.chatTab)
+      screenModel.subProp(_.lastSeenMessagesChat).set(chatSize)
+    else if (selectedTab == ScreenModel.myMovesTab)
+      screenModel.subProp(_.lastSeenMessagesMyMoves).set(myMovesSize)
+    else if (selectedTab == ScreenModel.enemyMovesTab)
+      screenModel.subProp(_.lastSeenMessagesEnemyMoves).set(enemyMovesSize)
+  }
+
   private val chatTabButton: UdashButton =
-    UdashButton()(_ =>
-      Seq(
+    UdashButton()(nested =>
+      Seq[Modifier](
         `class` := "nav-link btn-outline-primary" +
           (if (presenter.selectedTabProperty.get == ScreenModel.chatTab) " active" else ""),
         data("bs-toggle") := "tab",
-        data("bs-target") := "#" + ScreenModel.chatTab,
-        span("Chat")
+//        data("bs-target") := "#" + ScreenModel.chatTab,
+        "Chat",
+        nested(produce(chatMessagesShowNotification) {
+          case None         => span.render
+          case Some(number) => span(`class` := "badge badge-light ml-1", number).render
+        })
       )
     )
 
   private val myMovesTabButton: UdashButton =
     UdashButton(
       disabled = presenter.inPreGameMode
-    )(_ =>
+    )(nested =>
       Seq[Modifier](
         `class` := "nav-link btn-outline-primary" +
           (if (presenter.selectedTabProperty.get == ScreenModel.myMovesTab) " active" else ""),
-//        (`class` := "nav-link btn-outline-primary active")
-//          .attrIf(presenter.selectedTabProperty.transform(_ == ScreenModel.myMovesTab)),
-//        (`class` := "nav-link btn-outline-primary")
-//          .attrIf(presenter.selectedTabProperty.transform(_ != ScreenModel.myMovesTab)),
-//        `class` := "nav-link btn-outline-primary",
-//        (`class` :+= "active")
-//          .attrIf(presenter.selectedTabProperty.transform(_ == ScreenModel.myMovesTab)),
         data("bs-toggle") := "tab",
-        data("bs-target") := "#" + ScreenModel.myMovesTab,
-        "My Moves"
+//        data("bs-target") := "#" + ScreenModel.myMovesTab,
+        "My Moves",
+        nested(produce(myMovesHistoryShowNotification) {
+          case None         => span.render
+          case Some(number) => span(`class` := "badge badge-light ml-1", number).render
+        })
       )
     )
 
   private val enemyMovesTabButton: UdashButton =
     UdashButton(
       disabled = presenter.inPreGameMode
-    )(_ =>
+    )(nested =>
       Seq[Modifier](
         `class` := "nav-link btn-outline-primary" +
           (if (presenter.selectedTabProperty.get == ScreenModel.enemyMovesTab) " active" else ""),
-//        (`class` := "nav-link btn-outline-primary active")
-//          .attrIf(presenter.selectedTabProperty.transform(_ == ScreenModel.enemyMovesTab)),
-//        (`class` := "nav-link btn-outline-primary")
-//          .attrIf(presenter.selectedTabProperty.transform(_ != ScreenModel.enemyMovesTab)),
         data("bs-toggle") := "tab",
-        data("bs-target") := "#" + ScreenModel.enemyMovesTab,
-        "Enemy Moves"
+//        data("bs-target") := "#" + ScreenModel.enemyMovesTab,
+        "Enemy Moves",
+        nested(produce(enemyMovesHistoryShowNotification) {
+          case None         => span.render
+          case Some(number) => span(`class` := "badge badge-light ml-1", number).render
+        })
       )
     )
 
@@ -314,24 +374,19 @@ class GameView(
   private def messagesTab(nested: Binding.NestedInterceptor) = {
     val navTabs =
       nested(produce(screenModel.subProp(_.selectedTab)) { _ =>
+        def makeNavItem(button: UdashButton): JsDom.TypedTag[LI] =
+          li(
+            `class` := "nav-item",
+            role := "presentation",
+            nested(button)
+          )
+
         ul(
           `class` := "nav nav-tabs",
           `role` := "tablist",
-          li(
-            `class` := "nav-item",
-            role := "presentation",
-            nested(chatTabButton)
-          ),
-          li(
-            `class` := "nav-item",
-            role := "presentation",
-            nested(myMovesTabButton)
-          ),
-          li(
-            `class` := "nav-item",
-            role := "presentation",
-            nested(enemyMovesTabButton)
-          )
+          makeNavItem(chatTabButton),
+          makeNavItem(myMovesTabButton),
+          makeNavItem(enemyMovesTabButton)
         ).render
       })
 
@@ -354,7 +409,7 @@ class GameView(
         id := ScreenModel.chatTab,
         role := "tabpanel",
         ChatStyles.messagesWindow,
-        nested2(repeat(chatModel.subSeq(_.msgs)) { msgProperty =>
+        nested2(repeat(chatMessagesProperty) { msgProperty =>
           val msg = msgProperty.get
           div(
             ChatStyles.msgContainer,
@@ -397,10 +452,7 @@ class GameView(
         role := "tabpanel",
         ChatStyles.messagesWindow,
         nested2(
-          repeat(
-            presenter.gameStateProperty
-              .transformToSeq(_.map(_.me.turnPlayHistory).getOrElse(Seq.empty))
-          )(turnPlayProperty => turnPlaysToHtml(turnPlayProperty.get))
+          repeat(myMovesHistoryProperty)(turnPlayProperty => turnPlaysToHtml(turnPlayProperty.get))
         )
       ).render
     })
@@ -414,10 +466,9 @@ class GameView(
         role := "tabpanel",
         ChatStyles.messagesWindow,
         nested2(
-          repeat(
-            presenter.gameStateProperty
-              .transformToSeq(_.map(_.enemy.turnPlayHistory).getOrElse(Seq.empty))
-          )(turnPlayProperty => turnPlaysToHtml(turnPlayProperty.get))
+          repeat(enemyMovesHistoryProperty)(turnPlayProperty =>
+            turnPlaysToHtml(turnPlayProperty.get)
+          )
         )
       ).render
     })

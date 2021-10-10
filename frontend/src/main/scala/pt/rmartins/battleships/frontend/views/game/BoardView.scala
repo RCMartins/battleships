@@ -383,7 +383,7 @@ class BoardView(
           selectedBoardMarkOpt
         )
 
-        val ScreenModel(_, _, missilesPopupMillisOpt, extraTurnPopup, extraTurnText) =
+        val ScreenModel(_, _, _, _, _, missilesPopupMillisOpt, extraTurnPopup, extraTurnText) =
           screenModel.get
         drawMissiles(renderingCtx, turnAttacks, missilesPopupMillisOpt)
         drawExtraTurnPopup(renderingCtx, turnAttacks, extraTurnPopup, extraTurnText)
