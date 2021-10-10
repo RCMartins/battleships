@@ -24,9 +24,17 @@ class GameService(rpcClientsService: RpcClientsService) {
   private val BotClientId: ClientId = ClientId("0")
   private val BotUsername: Username = Username("Bot")
 
-  def updateActiveGamesByPlayer(player: ServerPlayer, game: Game): Unit = {
+  @inline
+  private def updateActiveGamesByPlayer(player: ServerPlayer, game: Game): Unit = {
     if (player.isHuman)
       activeGamesByPlayer.update(player.username, game)
+  }
+
+  private def unsafeUpdateServerState(game: Game): Game = {
+    updateActiveGamesByPlayer(game.player1, game)
+    updateActiveGamesByPlayer(game.player2, game)
+    activeGames.update(game.gameId, game)
+    game
   }
 
   val clock: Runnable = () => {
@@ -36,9 +44,7 @@ class GameService(rpcClientsService: RpcClientsService) {
         val initialInstant = Instant.now()
         activeGames.values.toList.filter(game => game.gameIsActive).foreach { game =>
           val updatedGame = updateGameTime(game, initialInstant)
-          updateActiveGamesByPlayer(updatedGame.player1, updatedGame)
-          updateActiveGamesByPlayer(updatedGame.player2, updatedGame)
-          activeGames.update(updatedGame.gameId, updatedGame)
+          unsafeUpdateServerState(updatedGame)
 
           if (updatedGame.gameIsOver)
             updateBothGameState(updatedGame)
@@ -54,32 +60,57 @@ class GameService(rpcClientsService: RpcClientsService) {
     val cycleTimeMillis: Long = 500L
     while (true) {
       clock.synchronized {
-        activeGames.values.toList
+        val gamesList = activeGames.values.toList
+
+        gamesList
+          .filter(game =>
+            game.isInPlacingShipsMode && (!game.player1.isHuman || !game.player2.isHuman)
+          )
+          .foreach { game =>
+            def placePlayerShips(player: ServerPlayer): Unit =
+              if (!player.isHuman && player.myBoard.ships.isEmpty) {
+                // TODO try some times
+                //  the fleet should be validated before starting game...
+                //  Create Fleet class to hold ship lists and to validate fleets ?????
+                //  Also needs board size + any specific data
+                BotHelpers.placeShipsAtRandom(
+                  player.myBoard.boardSize,
+                  game.rules.shipsInThisGame
+                ) match {
+                  case Left(_) =>
+                    // Try placing ships in the next botUpdater loop ...
+                    println("Failed placing ships... Waiting for next loop...")
+                  case Right(placedShips) =>
+                    confirmShips(game.gameId, player.username, placedShips)
+                }
+              }
+            placePlayerShips(game.player1)
+            placePlayerShips(game.player2)
+          }
+        gamesList
           .flatMap(game => game.getCurrentTurnPlayer.map((game, _)))
           .filter(!_._2.isHuman)
-          .foreach { case (game, bot) =>
-//            val updatedGame =
-            if (bot.myBoard.ships.isEmpty) {
-              // TODO try some times
-              //  the fleet should be validated before starting game...
-              //  Create Fleet class to hold ship lists and to validate fleets ?????
-              //  Also needs board size + any specific data
-              BotHelpers.placeShipsAtRandom(
-                bot.myBoard.boardSize,
-                game.rules.shipsInThisGame
-              ) match {
-                case Left(_) =>
-                // Try placing ships in the next botUpdater loop ...
-                case Right(value) =>
+          .foreach {
+            case (game, bot) if !bot.isHuman =>
+              // TODO check if we are 'out' of time for this loop
+
+              bot.currentTurnOpt.foreach { currentTurn =>
+                val turnAttacks: List[Attack] =
+                  BotHelpers.placeAttacks(
+                    bot.enemyBoard.boardSize,
+                    bot.enemyBoard.boardMarks,
+                    bot.currentTurnAttackTypes
+                  )
+                sendTurnAttacks(game.gameId, bot.username, currentTurn, turnAttacks)
               }
-            }
-//            else if (game.gameIsActive)
-//            game
+            case _ =>
           }
       }
       Thread.sleep(cycleTimeMillis)
     }
   }
+
+  new Thread(botUpdater).start()
 
   def updateGameTime(game: Game, instant: Instant): Game = {
     val updatedGame =
@@ -130,12 +161,7 @@ class GameService(rpcClientsService: RpcClientsService) {
   def updateServerState(game: Game, instantNow: Option[Instant] = Some(Instant.now())): Game =
     clock.synchronized {
       val updatedGame = instantNow.map(updateGameTime(game, _)).getOrElse(game)
-
-      updateActiveGamesByPlayer(updatedGame.player1, updatedGame)
-      updateActiveGamesByPlayer(updatedGame.player2, updatedGame)
-      activeGames.update(game.gameId, updatedGame)
-
-      updatedGame
+      unsafeUpdateServerState(updatedGame)
     }
 
   def removeServerGame(game: Game): Unit =
@@ -180,7 +206,7 @@ class GameService(rpcClientsService: RpcClientsService) {
       val updatedBoardMarks =
         hits.foldLeft(boardMarks) { case (marks, (coor, _)) =>
           if (allWater)
-            updateVectorUsing(marks, coor, _ => (Some(turn), BoardMark.Miss))
+            updateVectorUsing(marks, coor, _ => (Some(turn), BoardMark.Water))
           else if (allShipHit)
             updateVectorUsing(marks, coor, _ => (Some(turn), BoardMark.ShipHit))
           else
@@ -188,6 +214,11 @@ class GameService(rpcClientsService: RpcClientsService) {
         }
       copy(boardMarks = updatedBoardMarks)
     }
+
+    lazy val hasNFreeSpaces: Int =
+      boardMarks.map {
+        _.count { case (opt, boardMark) => opt.isEmpty && !boardMark.isPermanent }
+      }.sum
 
   }
 
@@ -590,8 +621,17 @@ class GameService(rpcClientsService: RpcClientsService) {
       currentTurn: Turn,
       turnAttacks: List[Attack]
   ): Future[Unit] = {
-    def validateTurnAttacks(me: ServerPlayer): Boolean =
+    def validateTurnAttacks(me: ServerPlayer): Boolean = {
+      val sizeIsValid = {
+        val turnAttacksSize = turnAttacks.size
+        turnAttacksSize == me.currentTurnAttackTypes.size || {
+          me.enemyBoard.hasNFreeSpaces == turnAttacksSize
+        }
+      }
+
+      sizeIsValid &&
       turnAttacks.zip(me.currentTurnAttackTypes).forall {
+        // TODO this does not work property when turnAttacks.size < me.currentTurnAttackTypes.size
         case (Attack(attackType, Some(Coordinate(x, y))), expectedAttackType)
             if attackType == expectedAttackType =>
           val (hitTurnOpt, boardMark) = me.enemyBoard.boardMarks(x)(y)
@@ -599,6 +639,7 @@ class GameService(rpcClientsService: RpcClientsService) {
         case _ =>
           false
       }
+    }
 
     Future {
       activeGames.get(gameId).map(game => (game, game.getPlayerSafe(playerUsername))) match {
@@ -792,30 +833,36 @@ class GameService(rpcClientsService: RpcClientsService) {
     }
 
   private def updateBothGameState(game: Game): Unit = {
-    rpcClientsService.sendGameState(
-      game.player1.clientId,
-      game.toGameStatePlayer1
-    )
-    rpcClientsService.sendGameState(
-      game.player2.clientId,
-      game.toGameStatePlayer2
-    )
+    if (game.player1.isHuman)
+      rpcClientsService.sendGameState(
+        game.player1.clientId,
+        game.toGameStatePlayer1
+      )
+    if (game.player2.isHuman)
+      rpcClientsService.sendGameState(
+        game.player2.clientId,
+        game.toGameStatePlayer2
+      )
   }
 
   private def updateBothGameMode(game: Game): Unit = {
-    rpcClientsService.sendGameMode(
-      game.player1.clientId,
-      game.toGameStatePlayer1.gameMode
-    )
-    rpcClientsService.sendGameMode(
-      game.player2.clientId,
-      game.toGameStatePlayer2.gameMode
-    )
+    if (game.player1.isHuman)
+      rpcClientsService.sendGameMode(
+        game.player1.clientId,
+        game.toGameStatePlayer1.gameMode
+      )
+    if (game.player2.isHuman)
+      rpcClientsService.sendGameMode(
+        game.player2.clientId,
+        game.toGameStatePlayer2.gameMode
+      )
   }
 
   private def updateBothQuitGame(game: Game): Unit = {
-    rpcClientsService.sendQuitGame(game.player1.clientId)
-    rpcClientsService.sendQuitGame(game.player2.clientId)
+    if (game.player1.isHuman)
+      rpcClientsService.sendQuitGame(game.player1.clientId)
+    if (game.player2.isHuman)
+      rpcClientsService.sendQuitGame(game.player2.clientId)
   }
 
 }

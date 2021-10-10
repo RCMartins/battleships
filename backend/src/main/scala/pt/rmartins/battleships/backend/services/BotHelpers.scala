@@ -1,9 +1,10 @@
 package pt.rmartins.battleships.backend.services
 
-import pt.rmartins.battleships.shared.model.game.{Board, Coordinate, Rotation, Ship, ShipInGame}
+import pt.rmartins.battleships.shared.model.game._
 
 import scala.annotation.tailrec
 import scala.util.Random
+import scala.util.chaining.scalaUtilChainingOps
 
 object BotHelpers {
 
@@ -59,6 +60,29 @@ object BotHelpers {
 
     loopPlaceAllShips(shipsToPlace, Nil)
 
+  }
+
+  def placeAttacks(
+      boardSize: Coordinate,
+      boardMarks: Vector[Vector[(Option[Turn], BoardMark)]],
+      currentTurnAttackTypes: List[AttackType]
+  ): List[Attack] = {
+    val possibleCoorList: Seq[Coordinate] =
+      for {
+        x <- 0 until boardSize.x
+        y <- 0 until boardSize.y
+        if {
+          val (turnOpt, boardMark) = boardMarks(x)(y)
+          turnOpt.isEmpty && !boardMark.isPermanent
+        }
+      } yield Coordinate(x, y)
+
+    LazyList
+      .from(Random.shuffle(possibleCoorList))
+      .take(currentTurnAttackTypes.size)
+      .zip(currentTurnAttackTypes)
+      .map { case (coor, attackType) => Attack(attackType, Some(coor)) }
+      .toList
   }
 
 }
