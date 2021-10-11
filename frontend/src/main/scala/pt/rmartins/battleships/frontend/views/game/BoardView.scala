@@ -79,9 +79,10 @@ class BoardView(
     }
 
   private val PlaceShipsPos: ReadableProperty[Coordinate] =
-    combine(MyBoardPreGamePos, MyBoardPreGameSqSize, MyBoardMargin).transform {
-      case (myBoardPreGamePos, myBoardPreGameSqSize, myBoardMargin) =>
-        myBoardPreGamePos + Coordinate(10 * myBoardPreGameSqSize + myBoardMargin, 0)
+    combine(MyBoardPreGamePos, MyBoardPreGameSqSize).transform {
+      case (myBoardPreGamePos, myBoardPreGameSqSize) =>
+        myBoardPreGamePos +
+          Coordinate(10 * myBoardPreGameSqSize + myBoardPreGameSqSize, 0)
     }
 
   private val PlaceShipsSqSize: ReadableProperty[Int] = SquareSizeSmall

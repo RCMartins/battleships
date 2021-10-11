@@ -155,8 +155,10 @@ class GameService(rpcClientsService: RpcClientsService) {
     updatedGame.copy(lastUpdateTimeOpt = Some(instant))
   }
 
-  def setGameOver(game: Game, whoWonUsername: Username): Game =
+  def setGameOver(game: Game, whoWonUsername: Username): Game = {
+    rpcClientsService.sendMessage(s"Game Over! Player '$whoWonUsername' won!")
     game.modify(_.playerWhoWonOpt).setTo(Some(whoWonUsername))
+  }
 
   def updateServerState(game: Game, instantNow: Option[Instant] = Some(Instant.now())): Game =
     clock.synchronized {
@@ -706,9 +708,6 @@ class GameService(rpcClientsService: RpcClientsService) {
           val updatedGameWithPlayer: Game = gameWithLastTurnUpdated.updatePlayer(updatedPlayer)
           val updatedGameWithTurnTime =
             if (gameOver) {
-              rpcClientsService.sendMessage(
-                s"Game Over! Player '${updatedPlayer.username.username}' won!"
-              )
               setGameOver(updatedGameWithPlayer, updatedPlayer.username)
             } else {
               val bonusRewardList: List[BonusReward] =
