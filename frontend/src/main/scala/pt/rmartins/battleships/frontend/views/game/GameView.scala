@@ -110,11 +110,21 @@ class GameView(
     event.preventDefault()
   }
 
-  private val mainStartButton = UdashButton(
+  private val startGameVsBotButton = UdashButton(
     buttonStyle = Color.Primary.toProperty,
     block = true.toProperty,
-    componentId = ComponentId("start-game-button")
-  )(_ => Seq[Modifier](span("Start Game!"), tpe := "submit"))
+    componentId = ComponentId("start-game-bot-button")
+  )(nested =>
+    Seq[Modifier](span(nested(translatedDynamic(Translations.Game.startGameVsBot)(_.apply()))))
+  )
+
+  private val startGameVsPlayerButton = UdashButton(
+    buttonStyle = Color.Primary.toProperty,
+    block = true.toProperty,
+    componentId = ComponentId("start-game-player-button")
+  )(nested =>
+    Seq[Modifier](span(nested(translatedDynamic(Translations.Game.startGameVsPlayer)(_.apply()))))
+  )
 
   private val confirmShipsButton = UdashButton(
     buttonStyle = Color.Primary.toProperty,
@@ -190,7 +200,8 @@ class GameView(
           div(
             `class` := "row",
             div(`class` := "mx-2"),
-            div(`class` := "mx-1", mainStartButton)
+            div(`class` := "mx-1", startGameVsBotButton),
+            div(`class` := "mx-1", startGameVsPlayerButton)
           ).render
         case Some((false, false, false)) =>
           div(
@@ -226,7 +237,11 @@ class GameView(
     )
   )
 
-  mainStartButton.listen { _ =>
+  startGameVsBotButton.listen { _ =>
+    presenter.startGameWithBots()
+  }
+
+  startGameVsPlayerButton.listen { _ =>
     presenter.startGameWith()
   }
 
@@ -498,6 +513,7 @@ class GameView(
 
   msgForm.listen { case FormEvent(_, FormEvent.EventType.Submit) =>
     presenter.sendMsg()
+    presenter.setSelectedTab(ScreenModel.chatTab)
   }
 
   private val quitGameButton = UdashButton(

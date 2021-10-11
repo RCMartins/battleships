@@ -44,6 +44,8 @@ object Translations {
     val youWon = key("game.header.you_won")
     val enemyWon = key("game.header.enemy_won")
 
+    val startGameVsBot = key("game.buttons.start_game_bot")
+    val startGameVsPlayer = key("game.buttons.start_game_player")
     val restartButton = key("game.buttons.restart")
 
     val extraTurnPopup = key("game.popup.extra_turn")

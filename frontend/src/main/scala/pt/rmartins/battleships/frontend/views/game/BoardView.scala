@@ -11,6 +11,7 @@ import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit
 import pt.rmartins.battleships.shared.model.game._
+import pt.rmartins.battleships.shared.model.utils.Utils.canPlaceInBoard
 
 class BoardView(
     gameModel: ModelProperty[GameModel],
@@ -78,9 +79,10 @@ class BoardView(
     }
 
   private val PlaceShipsPos: ReadableProperty[Coordinate] =
-    combine(MyBoardPreGamePos, MyBoardPreGameSqSize, MyBoardMargin).transform {
-      case (myBoardPreGamePos, myBoardPreGameSqSize, myBoardMargin) =>
-        myBoardPreGamePos + Coordinate(10 * myBoardPreGameSqSize + myBoardMargin, 0)
+    combine(MyBoardPreGamePos, MyBoardPreGameSqSize).transform {
+      case (myBoardPreGamePos, myBoardPreGameSqSize) =>
+        myBoardPreGamePos +
+          Coordinate(10 * myBoardPreGameSqSize + myBoardPreGameSqSize, 0)
     }
 
   private val PlaceShipsSqSize: ReadableProperty[Int] = SquareSizeSmall
@@ -526,7 +528,7 @@ class BoardView(
               boardCoor.roundTo(boardSize - ship.size + Coordinate(1, 1))
 
             def drawCoordinate(coor: Coordinate): Unit =
-              if (gamePresenter.canPlace(me.myBoard, ship, roundedBoardCoor))
+              if (canPlaceInBoard(me.myBoard, ship, roundedBoardCoor))
                 drawBoardSquare(
                   renderingCtx,
                   boardPosition,
@@ -610,7 +612,7 @@ class BoardView(
       val canvasColor: CanvasColor =
         mark match {
           case BoardMark.Empty               => CanvasColor.White()
-          case BoardMark.Miss                => CanvasColor.WaterDarker()
+          case BoardMark.Water               => CanvasColor.WaterDarker()
           case BoardMark.ShipHit             => CanvasColor.ShipDarker()
           case BoardMark.ManualWater         => CanvasColor.Water()
           case BoardMark.ManualShip          => CanvasColor.Ship()

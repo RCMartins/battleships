@@ -20,7 +20,7 @@ object BoardMark extends HasGenCodec[BoardMark] {
 
   case object ManualQuestionWater extends BoardMark
 
-  case object Miss extends BoardMark {
+  case object Water extends BoardMark {
     override def isPermanent: Boolean = true
   }
 

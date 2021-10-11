@@ -13,28 +13,32 @@ name := "battleships"
 // idea.managed property is set by IntelliJ when running SBT (shell or import), idea.runid is set only for IntelliJ's
 // SBT shell. In order for this technique to work, you MUST NOT set the "Use the sbt shell for build and import"
 // option in IntelliJ's SBT settings.
-val forIdeaImport = System.getProperty("idea.managed", "false").toBoolean && System.getProperty("idea.runid") == null
+val forIdeaImport =
+  System.getProperty("idea.managed", "false").toBoolean && System.getProperty("idea.runid") == null
 
-inThisBuild(Seq(
-  version := "0.1.0-SNAPSHOT",
-  scalaVersion := Dependencies.versionOfScala,
-  organization := "pt.rmartins.battleships",
-  scalacOptions ++= Seq(
-    "-feature",
-    "-deprecation",
-    "-unchecked",
-    "-language:implicitConversions",
-    "-language:existentials",
-    "-language:dynamics",
-    "-Xfatal-warnings",
-    "-Xlint:-unused,_",
-    "-Ybackend-parallelism", "4",
-    "-Ycache-plugin-class-loader:last-modified",
-    "-Ycache-macro-class-loader:last-modified",
-    "-Xnon-strict-patmat-analysis",
-    "-Xlint:-strict-unsealed-patmat",
-  ),
-))
+inThisBuild(
+  Seq(
+    version := "0.1.0-SNAPSHOT",
+    scalaVersion := Dependencies.versionOfScala,
+    organization := "pt.rmartins.battleships",
+    scalacOptions ++= Seq(
+      "-feature",
+      "-deprecation",
+      "-unchecked",
+      "-language:implicitConversions",
+      "-language:existentials",
+      "-language:dynamics",
+      "-Xfatal-warnings",
+      "-Xlint:-unused,_",
+      "-Ybackend-parallelism",
+      "4",
+      "-Ycache-plugin-class-loader:last-modified",
+      "-Ycache-macro-class-loader:last-modified",
+      "-Xnon-strict-patmat-analysis",
+      "-Xlint:-strict-unsealed-patmat"
+    )
+  )
+)
 
 val TestAndCompileDep = "test->test;compile->compile"
 
@@ -57,7 +61,7 @@ val browserCapabilities: Capabilities = {
 
 val noPublishSettings = Seq(
   publish / skip := true,
-  Compile / packageDoc / mappings := Seq.empty,
+  Compile / packageDoc / mappings := Seq.empty
 )
 
 // Reusable settings for all modules
@@ -66,20 +70,20 @@ val commonSettings = noPublishSettings ++ Seq(
   // Use separate directories for IDE and SBT targets
   Compile / ideOutputDirectory := Some(target.value.getParentFile / "out/production"),
   Test / ideOutputDirectory := Some(target.value.getParentFile / "out/test"),
-  Test / fork := true,
+  Test / fork := true
 )
 
 // Reusable settings for modules compiled to JS
 val commonJsSettings = commonSettings ++ Seq(
   Test / parallelExecution := false,
   Test / fork := false,
-  Test / jsEnv := new SeleniumJSEnv(browserCapabilities),
+  Test / jsEnv := new SeleniumJSEnv(browserCapabilities)
 )
 
 def sourceDirsSettings(baseMapper: File => File): Seq[Def.Setting[Seq[File]]] = {
   def mkSourceDirs(base: File, scalaBinary: String, conf: String): Seq[File] = Seq(
     base / "src" / conf / "scala",
-    base / "src" / conf / s"scala-$scalaBinary",
+    base / "src" / conf / s"scala-$scalaBinary"
   )
 
   def mkResourceDirs(base: File, conf: String): Seq[File] = Seq(
@@ -93,43 +97,45 @@ def sourceDirsSettings(baseMapper: File => File): Seq[Def.Setting[Seq[File]]] = 
     Test / unmanagedSourceDirectories ++=
       mkSourceDirs(baseMapper(baseDirectory.value), scalaBinaryVersion.value, "test"),
     Test / unmanagedResourceDirectories ++=
-      mkResourceDirs(baseMapper(baseDirectory.value), "test"),
+      mkResourceDirs(baseMapper(baseDirectory.value), "test")
   )
 }
 
-lazy val root = project.in(file("."))
+lazy val root = project
+  .in(file("."))
   .aggregate(`shared-js`, `shared`, frontend, backend, packager)
   .settings(
     noPublishSettings,
     crossScalaVersions := Nil,
-    Compile / run := (backend / Compile / run).evaluated,
+    Compile / run := (backend / Compile / run).evaluated
   )
 
 def jvmProject(proj: Project): Project = {
   proj.settings(
     commonSettings,
-    sourceDirsSettings(_ / "jvm"),
+    sourceDirsSettings(_ / "jvm")
   )
 }
 
 def jsProjectFor(jvmProj: Project, jsProj: Project): Project = {
-  jsProj.in(jvmProj.base / "js")
+  jsProj
+    .in(jvmProj.base / "js")
     .enablePlugins(ScalaJSPlugin, JSDependenciesPlugin)
     .configure(p => if (forIdeaImport) p.dependsOn(jvmProj) else p)
     .settings(
       commonJsSettings,
-
       moduleName := jvmProj.id,
       sourceDirsSettings(_.getParentFile),
       // workaround for some cross-compilation problems in IntelliJ
       libraryDependencies :=
-        (if (forIdeaImport) (jvmProj / libraryDependencies).value else Seq.empty) ++ libraryDependencies.value
+        (if (forIdeaImport) (jvmProj / libraryDependencies).value
+         else Seq.empty) ++ libraryDependencies.value
     )
 }
 
 lazy val shared = jvmProject(project).settings(
-    libraryDependencies ++= Dependencies.crossDeps.value,
-    libraryDependencies ++= Dependencies.crossTestDeps.value
+  libraryDependencies ++= Dependencies.crossDeps.value,
+  libraryDependencies ++= Dependencies.crossTestDeps.value
 )
 
 lazy val `shared-js` = jsProjectFor(shared, project)
@@ -139,7 +145,8 @@ lazy val `shared-js` = jsProjectFor(shared, project)
   )
 
 val frontendWebContent = "UdashStatics/WebContent"
-lazy val frontend = project.in(file("frontend"))
+lazy val frontend = project
+  .in(file("frontend"))
   .enablePlugins(ScalaJSPlugin, JSDependenciesPlugin) // enables Scala.js plugin in this module
   .dependsOn(`shared-js` % TestAndCompileDep)
   .settings(
@@ -166,20 +173,29 @@ lazy val frontend = project.in(file("frontend"))
       val dir = (Compile / cssDir).value
       val path = dir.absolutePath
       dir.mkdirs()
-      (backend / Compile / runMain).toTask(s" pt.rmartins.battleships.backend.css.CssRenderer $path false")
+      (backend / Compile / runMain)
+        .toTask(s" pt.rmartins.battleships.backend.css.CssRenderer $path false")
     }.value,
 
     // Compiles JS files without full optimizations
     compileStatics := { (Compile / fastOptJS / target).value / "UdashStatics" },
-    compileStatics := compileStatics.dependsOn(
-      Compile / fastOptJS, Compile / copyAssets, Compile / compileCss
-    ).value,
+    compileStatics := compileStatics
+      .dependsOn(
+        Compile / fastOptJS,
+        Compile / copyAssets,
+        Compile / compileCss
+      )
+      .value,
 
     // Compiles JS files with full optimizations
     compileAndOptimizeStatics := { (Compile / fullOptJS / target).value / "UdashStatics" },
-    compileAndOptimizeStatics := compileAndOptimizeStatics.dependsOn(
-      Compile / fullOptJS, Compile / copyAssets, Compile / compileCss
-    ).value,
+    compileAndOptimizeStatics := compileAndOptimizeStatics
+      .dependsOn(
+        Compile / fullOptJS,
+        Compile / copyAssets,
+        Compile / compileCss
+      )
+      .value,
 
     // Target files for Scala.js plugin
     Compile / fastOptJS / artifactPath :=
@@ -197,15 +213,18 @@ lazy val frontend = project.in(file("frontend"))
 
     // Workaround for source JS dependencies overwriting the minified ones - just use the latter all the time
     Compile / packageJSDependencies / skip := true,
-    (Compile / fastOptJS) := (Compile / fastOptJS).dependsOn(Compile / packageMinifiedJSDependencies).value
+    (Compile / fastOptJS) := (Compile / fastOptJS)
+      .dependsOn(Compile / packageMinifiedJSDependencies)
+      .value
   )
 
-lazy val backend = project.in(file("backend"))
+lazy val backend = project
+  .in(file("backend"))
   .dependsOn(shared % TestAndCompileDep)
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Dependencies.backendDeps.value,
-    Compile / mainClass := Some("pt.rmartins.battleships.backend.Launcher"),
+    Compile / mainClass := Some("pt.rmartins.battleships.backend.Launcher")
   )
 
 lazy val packager = project
@@ -222,5 +241,5 @@ lazy val packager = project
       import Path.relativeTo
       val frontendStatics = (frontend / Compile / compileAndOptimizeStatics).value
       (frontendStatics.allPaths --- frontendStatics) pair relativeTo(frontendStatics.getParentFile)
-    },
+    }
   )

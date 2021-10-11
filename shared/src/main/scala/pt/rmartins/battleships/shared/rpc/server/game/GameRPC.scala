@@ -9,6 +9,8 @@ trait GameRPC {
 
   def startGameWith(otherPlayerUsername: Username): Future[Unit]
 
+  def startGameWithBots(): Future[Unit]
+
   def quitCurrentGame(gameId: GameId): Future[Unit]
 
   def restartGame(gameId: GameId): Future[Unit]
