@@ -765,9 +765,9 @@ class GameService(rpcClientsService: RpcClientsService) {
               }
             }
 
-          // TODO update with a new Instant.now here to be fair?
-          updateServerState(updatedGameWithTurnTime)
-          updateBothGameState(updatedGameWithTurnTime)
+          val finalGameUpdated = updateGameTime(updatedGameWithTurnTime, Instant.now())
+          updateServerState(finalGameUpdated)
+          updateBothGameState(finalGameUpdated)
         case Some((game, _)) =>
           rpcClientsService.sendMessage(
             (
