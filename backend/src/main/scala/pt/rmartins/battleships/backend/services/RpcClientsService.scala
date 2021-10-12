@@ -91,16 +91,6 @@ class RpcClientsService(sendToClientFactory: ClientRPCTarget => MainClientRPC) {
     }
   }
 
-//  def sendGameState(player1: ClientId, player2: ClientId, gameState: ): Unit = {
-//    List(player1, player2).map(clientId => (clientId, authClients.get(clientId))) match {
-//      case clientIds @ List(_, _) =>
-//        clientIds.foreach { case (id, _) =>
-//          sendToClient(id).game().gameStateUpdate(gameState)
-//        }
-//      case _ =>
-//    }
-//  }
-
 }
 
 object RpcClientsService {

@@ -115,33 +115,41 @@ class GameService(rpcClientsService: RpcClientsService) {
   def updateGameTime(game: Game, instant: Instant): Game = {
     val updatedGame =
       game.getCurrentTurnPlayer.flatMap(serverPlayer =>
-        serverPlayer.timeLeft.map((serverPlayer, _))
+        serverPlayer.timeRemaining.map((serverPlayer, _))
       ) match {
-        case Some((serverPlayer, ServerTimeLeft(totalTimeLeftNanos, turnTimeLeftNanosOpt))) =>
+        case Some(
+              (
+                serverPlayer,
+                ServerTimeRemaining(totalTimeRemainingNanos, turnTimeRemainingNanosOpt)
+              )
+            ) =>
           val betweenNanos: Long =
             game.lastUpdateTimeOpt.map(Duration.between(_, instant).toNanos).getOrElse(0L)
 
-          val updatedServerTimeLeft: ServerTimeLeft =
-            turnTimeLeftNanosOpt match {
+          val updatedServerTimeRemaining: ServerTimeRemaining =
+            turnTimeRemainingNanosOpt match {
               case None =>
-                val updatedTime: Long = Math.max(0L, totalTimeLeftNanos - betweenNanos)
-                ServerTimeLeft(updatedTime, turnTimeLeftNanosOpt)
-              case Some(turnTimeLeftNanos) =>
-                if (turnTimeLeftNanos >= betweenNanos)
-                  ServerTimeLeft(totalTimeLeftNanos, Some(turnTimeLeftNanos - betweenNanos))
+                val updatedTime: Long = Math.max(0L, totalTimeRemainingNanos - betweenNanos)
+                ServerTimeRemaining(updatedTime, turnTimeRemainingNanosOpt)
+              case Some(turnTimeRemainingNanos) =>
+                if (turnTimeRemainingNanos >= betweenNanos)
+                  ServerTimeRemaining(
+                    totalTimeRemainingNanos,
+                    Some(turnTimeRemainingNanos - betweenNanos)
+                  )
                 else {
                   val updatedTime: Long =
-                    Math.max(0L, totalTimeLeftNanos + turnTimeLeftNanos - betweenNanos)
-                  ServerTimeLeft(updatedTime, Some(0))
+                    Math.max(0L, totalTimeRemainingNanos + turnTimeRemainingNanos - betweenNanos)
+                  ServerTimeRemaining(updatedTime, Some(0))
                 }
             }
 
           val updatedPlayer: ServerPlayer =
-            serverPlayer.copy(timeLeft = Some(updatedServerTimeLeft))
+            serverPlayer.copy(timeRemaining = Some(updatedServerTimeRemaining))
           val updatedGame: Game =
             game.updatePlayer(updatedPlayer)
 
-          if (updatedServerTimeLeft.totalTimeLeftNanos == 0)
+          if (updatedServerTimeRemaining.totalTimeRemainingNanos == 0)
             setGameOver(
               updatedGame,
               updatedGame.enemyPlayer(updatedPlayer.username).username
@@ -224,9 +232,9 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   }
 
-  case class ServerTimeLeft(
-      totalTimeLeftNanos: Long,
-      turnTimeLeftNanosOpt: Option[Long]
+  case class ServerTimeRemaining(
+      totalTimeRemainingNanos: Long,
+      turnTimeRemainingNanosOpt: Option[Long]
   )
 
   case class ServerPlayer(
@@ -239,7 +247,7 @@ class GameService(rpcClientsService: RpcClientsService) {
       currentTurnOpt: Option[Turn],
       currentTurnAttackTypes: List[AttackType],
       extraTurnQueue: List[ExtraTurn],
-      timeLeft: Option[ServerTimeLeft]
+      timeRemaining: Option[ServerTimeRemaining]
   ) {
 
     val isHuman: Boolean = clientId != BotClientId
@@ -266,12 +274,13 @@ class GameService(rpcClientsService: RpcClientsService) {
           Nil
         )
 
-    def getTimeLeft: Option[TimeLeft] =
-      timeLeft.map { case ServerTimeLeft(totalTimeLeftNanos, turnTimeLeftNanos) =>
-        TimeLeft(
-          (totalTimeLeftNanos / 1000L / 1000L).toInt,
-          turnTimeLeftNanos.map(turnTime => (turnTime / 1000L / 1000L).toInt)
-        )
+    def getTimeRemaining: Option[TimeRemaining] =
+      timeRemaining.map {
+        case ServerTimeRemaining(totalTimeRemainingNanos, turnTimeRemainingNanos) =>
+          TimeRemaining(
+            (totalTimeRemainingNanos / 1000L / 1000L).toInt,
+            turnTimeRemainingNanos.map(turnTime => (turnTime / 1000L / 1000L).toInt)
+          )
       }
 
   }
@@ -331,13 +340,15 @@ class GameService(rpcClientsService: RpcClientsService) {
               currentPlayerUsername == me.username,
               turn = turn,
               turnAttackTypes = me.currentTurnAttackTypes,
-              myTimeLeft = me.getTimeLeft,
-              enemyTimeLeft = enemy.getTimeLeft
+              myTimeRemaining = me.getTimeRemaining,
+              enemyTimeRemaining = enemy.getTimeRemaining
             )
           case (Some((turn, _)), Some(playerWhoWon)) =>
             GameOverMode(
               turn,
-              me.username == playerWhoWon
+              me.username == playerWhoWon,
+              myTimeRemaining = me.getTimeRemaining,
+              enemyTimeRemaining = enemy.getTimeRemaining
             )
         }
 
@@ -488,7 +499,7 @@ class GameService(rpcClientsService: RpcClientsService) {
         currentTurnOpt = None,
         currentTurnAttackTypes = Nil,
         extraTurnQueue = Nil,
-        timeLeft = None
+        timeRemaining = None
       )
     val (player2Id, player2Username) = player2DataOpt.getOrElse((BotClientId, BotUsername))
     val player2: ServerPlayer =
@@ -502,7 +513,7 @@ class GameService(rpcClientsService: RpcClientsService) {
         currentTurnOpt = None,
         currentTurnAttackTypes = Nil,
         extraTurnQueue = Nil,
-        timeLeft = None
+        timeRemaining = None
       )
 
     val gameId = GameId(UUID.randomUUID().toString)
@@ -568,10 +579,10 @@ class GameService(rpcClientsService: RpcClientsService) {
                 else
                   gameWithShips.player2.username
 
-              val serverTimeLeft: Option[ServerTimeLeft] =
+              val serverTimeRemaining: Option[ServerTimeRemaining] =
                 gameWithShips.rules.timeLimit.map {
                   case RuleTimeLimit(initialTotalTimeSeconds, additionalTurnTimeSeconds) =>
-                    ServerTimeLeft(
+                    ServerTimeRemaining(
                       initialTotalTimeSeconds.toLong * 1000L * 1000L * 1000L,
                       additionalTurnTimeSeconds.map(_._1 * 1000L * 1000L * 1000L)
                     )
@@ -582,8 +593,8 @@ class GameService(rpcClientsService: RpcClientsService) {
                 .setTo(Some(Turn(1, None)))
                 .modifyAll(_.player1.currentTurnAttackTypes, _.player2.currentTurnAttackTypes)
                 .setTo(gameWithShips.rules.defaultTurnAttackTypes)
-                .modifyAll(_.player1.timeLeft, _.player2.timeLeft)
-                .setTo(serverTimeLeft)
+                .modifyAll(_.player1.timeRemaining, _.player2.timeRemaining)
+                .setTo(serverTimeRemaining)
                 .modify(_.currentTurnPlayer)
                 .setTo(Some(playerThatStartsUsername))
             } else
@@ -751,9 +762,9 @@ class GameService(rpcClientsService: RpcClientsService) {
                   updatedGameWithNextTurn.rules.timeLimit match {
                     case Some(RuleTimeLimit(_, Some((additionalTurnTimeSeconds, _)))) =>
                       updatedGameWithNextTurn.updatePlayer(
-                        serverPlayer.modify(_.timeLeft).using {
-                          _.map { serverTimeLeft =>
-                            serverTimeLeft.copy(turnTimeLeftNanosOpt =
+                        serverPlayer.modify(_.timeRemaining).using {
+                          _.map { serverTimeRemaining =>
+                            serverTimeRemaining.copy(turnTimeRemainingNanosOpt =
                               Some(additionalTurnTimeSeconds * 1000L * 1000L * 1000L)
                             )
                           }

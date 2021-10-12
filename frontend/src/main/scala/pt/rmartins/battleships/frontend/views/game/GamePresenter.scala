@@ -96,8 +96,8 @@ class GamePresenter(
     gameStateProperty.set(updatedGameState)
   }
 
-  private var timeLeftIntervalHandle: Option[Int] = None
-  private val timeLeftIntervalMillis: Int = 100
+  private var timeRemainingIntervalHandle: Option[Int] = None
+  private val timeRemainingIntervalMillis: Int = 100
 
   def updateGameMode(fromGameMode: Option[GameMode], to: Option[GameState]): Unit =
     (fromGameMode, to) match {
@@ -105,8 +105,8 @@ class GamePresenter(
         me.shipsLeftToPlace.headOption.foreach { headShip =>
           gameModel.subProp(_.selectedShip).set(Some(headShip))
         }
-        timeLeftIntervalHandle.foreach(window.clearTimeout)
-        timeLeftIntervalHandle = None
+        timeRemainingIntervalHandle.foreach(window.clearTimeout)
+        timeRemainingIntervalHandle = None
       case (
             None | Some(_: PreGameMode),
             Some(GameState(_, _, _, _, InGameMode(_, _, turnAttackTypes, _, _)))
@@ -114,21 +114,27 @@ class GamePresenter(
         screenModel.subProp(_.selectedTab).set(ScreenModel.myMovesTab)
         gameModel.subProp(_.turnAttacks).set(turnAttackTypes.map(Attack(_, None)))
 
-        timeLeftIntervalHandle.foreach(window.clearTimeout)
-        timeLeftIntervalHandle = Some(
+        timeRemainingIntervalHandle.foreach(window.clearTimeout)
+        timeRemainingIntervalHandle = Some(
           window.setInterval(
             () => {
-              def reduceTime(timeLeft: TimeLeft): TimeLeft = {
-                val timeInterval = timeLeftIntervalMillis
-                timeLeft match {
-                  case TimeLeft(totalTimeLeftMillis, None) =>
-                    TimeLeft(Math.max(0, totalTimeLeftMillis - timeInterval), None)
-                  case TimeLeft(totalTimeLeftMillis, Some(turnTimeLeftMillis)) =>
-                    if (turnTimeLeftMillis >= timeInterval)
-                      TimeLeft(totalTimeLeftMillis, Some(turnTimeLeftMillis - timeInterval))
+              def reduceTime(timeRemaining: TimeRemaining): TimeRemaining = {
+                val timeInterval = timeRemainingIntervalMillis
+                timeRemaining match {
+                  case TimeRemaining(totalTimeRemainingMillis, None) =>
+                    TimeRemaining(Math.max(0, totalTimeRemainingMillis - timeInterval), None)
+                  case TimeRemaining(totalTimeRemainingMillis, Some(turnTimeRemainingMillis)) =>
+                    if (turnTimeRemainingMillis >= timeInterval)
+                      TimeRemaining(
+                        totalTimeRemainingMillis,
+                        Some(turnTimeRemainingMillis - timeInterval)
+                      )
                     else
-                      TimeLeft(
-                        Math.max(0, totalTimeLeftMillis + turnTimeLeftMillis - timeInterval),
+                      TimeRemaining(
+                        Math.max(
+                          0,
+                          totalTimeRemainingMillis + turnTimeRemainingMillis - timeInterval
+                        ),
                         Some(0)
                       )
                 }
@@ -139,26 +145,30 @@ class GamePresenter(
                       isMyTurn,
                       _,
                       _,
-                      Some(myTimeLeft),
-                      Some(enemyTimeLeft)
+                      Some(myTimeRemaining),
+                      Some(enemyTimeRemaining)
                     ) =>
                   inGameModeProperty.set(
                     Some(
                       if (isMyTurn)
-                        inGameMode.modify(_.myTimeLeft).setTo(Some(reduceTime(myTimeLeft)))
+                        inGameMode
+                          .modify(_.myTimeRemaining)
+                          .setTo(Some(reduceTime(myTimeRemaining)))
                       else
-                        inGameMode.modify(_.enemyTimeLeft).setTo(Some(reduceTime(enemyTimeLeft)))
+                        inGameMode
+                          .modify(_.enemyTimeRemaining)
+                          .setTo(Some(reduceTime(enemyTimeRemaining)))
                     )
                   )
                 case _ =>
               }
             },
-            timeout = timeLeftIntervalMillis
+            timeout = timeRemainingIntervalMillis
           )
         )
       case (_, None | Some(GameState(_, _, _, _, _: GameOverMode))) =>
-        timeLeftIntervalHandle.foreach(window.clearTimeout)
-        timeLeftIntervalHandle = None
+        timeRemainingIntervalHandle.foreach(window.clearTimeout)
+        timeRemainingIntervalHandle = None
       case _ =>
     }
 
@@ -195,8 +205,8 @@ class GamePresenter(
                     .subProp(_.missilesPopupMillisOpt)
                     .set(Some(updatedTime).filter(_ > 0))
                 }
-                screen.extraTurnPopup.foreach { timeLeft =>
-                  val updatedTime = timeLeft - newTurnAnimationMillis
+                screen.extraTurnPopup.foreach { timeRemaining =>
+                  val updatedTime = timeRemaining - newTurnAnimationMillis
                   screenModel
                     .subProp(_.extraTurnPopup)
                     .set(Some(updatedTime).filter(_ > 0))
@@ -306,7 +316,7 @@ class GamePresenter(
                 _,
                 me,
                 _,
-                InGameMode(_, _, _, _, _) | GameOverMode(_, _)
+                InGameMode(_, _, _, _, _) | GameOverMode(_, _, _, _)
               )
             )
           ) =>
@@ -372,7 +382,7 @@ class GamePresenter(
                 _,
                 me,
                 _,
-                InGameMode(_, _, _, _, _) | GameOverMode(_, _)
+                InGameMode(_, _, _, _, _) | GameOverMode(_, _, _, _)
               )
             )
           ) =>
@@ -396,7 +406,7 @@ class GamePresenter(
                 _,
                 me,
                 _,
-                InGameMode(_, _, _, _, _) | GameOverMode(_, _)
+                InGameMode(_, _, _, _, _) | GameOverMode(_, _, _, _)
               )
             )
           ) =>

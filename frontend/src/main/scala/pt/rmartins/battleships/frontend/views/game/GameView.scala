@@ -75,7 +75,7 @@ class GameView(
     boardView.paint()
   }
 
-  // TODO This is marking the screen refresh every time the one of the 'timeLeft' values changes
+  // TODO This is marking the screen refresh every time the one of the 'timeRemaining' values changes
   gameStateModel.listen(_ => reloadBoardView())
   gameModel.listen(_ => reloadBoardView())
   screenModel.subProp(_.canvasSize).listen(_ => reloadBoardView())
@@ -194,7 +194,7 @@ class GameView(
       nested(produce(presenter.gameModeProperty.transform(_.map {
         case PreGameMode(iPlacedShips, _) => (iPlacedShips, false, false)
         case InGameMode(_, _, _, _, _)    => (false, true, false)
-        case GameOverMode(_, _)           => (false, false, true)
+        case GameOverMode(_, _, _, _)     => (false, false, true)
       })) {
         case None =>
           div(
@@ -575,7 +575,7 @@ class GameView(
                         ": ",
                         span(color := "#FF0000", b(turnStrBinding))
                       ).render
-                    case Some(GameOverMode(turn, youWon)) =>
+                    case Some(GameOverMode(turn, youWon, _, _)) =>
                       val turnStrBinding: Binding =
                         translatedDynamic(
                           if (youWon)
@@ -594,41 +594,71 @@ class GameView(
                       span.render
                   })
                 ),
-                nested(produce(presenter.gameModeProperty) {
-                  case Some(InGameMode(_, _, _, Some(myTimeLeft), Some(enemyTimeLeft))) =>
-                    def toTimeStr(seconds: Int): String =
-                      "%02d:%02d".format(seconds / 60, seconds % 60)
+                nested(
+                  produce(presenter.gameModeProperty) {
+                    gameModeOpt =>
+                      def toTimeStr(seconds: Int): String =
+                        "%02d:%02d".format(seconds / 60, seconds % 60)
 
-                    def toShortTimeStr(secondsOpt: Option[Int]): String =
-                      secondsOpt
-                        .map { seconds =>
-                          if (seconds >= 60)
-                            " + %02d:%02d".format(seconds / 60, seconds % 60)
-                          else
-                            " + %02d".format(seconds)
-                        }
-                        .getOrElse("")
+                      def toShortTimeStr(secondsOpt: Option[Int]): String =
+                        secondsOpt
+                          .map { seconds =>
+                            if (seconds >= 60)
+                              " + %02d:%02d".format(seconds / 60, seconds % 60)
+                            else
+                              " + %02d".format(seconds)
+                          }
+                          .getOrElse("")
 
-                    div(
-                      `class` := "col-3 row",
-                      div(
-                        `class` := "col",
-                        span("My Time:"),
-                        br,
-                        span(b(toTimeStr(myTimeLeft.totalTimeLeftMillis / 1000))),
-                        span(b(toShortTimeStr(myTimeLeft.turnTimeLeftMillisOpt.map(_ / 1000))))
-                      ),
-                      div(
-                        `class` := "col",
-                        span("Enemy Time:"),
-                        br,
-                        span(b(toTimeStr(enemyTimeLeft.totalTimeLeftMillis / 1000))),
-                        span(b(toShortTimeStr(enemyTimeLeft.turnTimeLeftMillisOpt.map(_ / 1000))))
-                      )
-                    ).render
-                  case _ =>
-                    div.render
-                }),
+                      def showTime(
+                          myTimeRemaining: TimeRemaining,
+                          enemyTimeRemaining: TimeRemaining
+                      ): Div = {
+                        div(
+                          `class` := "col-3 row",
+                          div(
+                            `class` := "col",
+                            span("My Time:"),
+                            br,
+                            span(b(toTimeStr(myTimeRemaining.totalTimeRemainingMillis / 1000))),
+                            span(
+                              b(
+                                toShortTimeStr(
+                                  myTimeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000)
+                                )
+                              )
+                            )
+                          ),
+                          div(
+                            `class` := "col",
+                            span("Enemy Time:"),
+                            br,
+                            span(b(toTimeStr(enemyTimeRemaining.totalTimeRemainingMillis / 1000))),
+                            span(
+                              b(
+                                toShortTimeStr(
+                                  enemyTimeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000)
+                                )
+                              )
+                            )
+                          )
+                        ).render
+                      }
+
+                      gameModeOpt match {
+                        case Some(
+                              InGameMode(_, _, _, Some(myTimeRemaining), Some(enemyTimeRemaining))
+                            ) =>
+                          showTime(myTimeRemaining, enemyTimeRemaining)
+                        case Some(
+                              GameOverMode(_, _, Some(myTimeRemaining), Some(enemyTimeRemaining))
+                            ) =>
+                          showTime(myTimeRemaining, enemyTimeRemaining)
+                        case _ =>
+                          div.render
+                      }
+                  }
+                ),
                 div(
                   `class` := "col-2 container",
                   div(

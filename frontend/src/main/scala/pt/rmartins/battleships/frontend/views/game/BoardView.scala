@@ -223,7 +223,7 @@ class BoardView(
       case (
             shipsSummary,
             Some(turnPlayHistory),
-            Some(InGameMode(_, _, _, _, _) | GameOverMode(_, _)),
+            Some(InGameMode(_, _, _, _, _) | GameOverMode(_, _, _, _)),
             destructionSummaryPos,
             destructionSummarySqSize
           ) =>
@@ -284,7 +284,7 @@ class BoardView(
     ).transform {
       case (
             Some(mousePosition),
-            Some(GameState(_, _, _, enemy, InGameMode(_, _, _, _, _) | GameOverMode(_, _))),
+            Some(GameState(_, _, _, enemy, InGameMode(_, _, _, _, _) | GameOverMode(_, _, _, _))),
             enemyBoardPos,
             defaultSquareSize
           ) =>
@@ -306,7 +306,7 @@ class BoardView(
       BoardMarksSelectorCombined
     ).transform {
       case (
-            Some(InGameMode(_, _, _, _, _) | GameOverMode(_, _)),
+            Some(InGameMode(_, _, _, _, _) | GameOverMode(_, _, _, _)),
             (boardMarksSelectorPos, boardMarksSelectorSize, boardMarksSelectorMargin)
           ) =>
         BoardMarksSelectorOrder.zipWithIndex.map { case (boardMark, index) =>
@@ -329,7 +329,7 @@ class BoardView(
     ).transform {
       case (
             Some(mousePosition),
-            Some(InGameMode(_, _, _, _, _) | GameOverMode(_, _)),
+            Some(InGameMode(_, _, _, _, _) | GameOverMode(_, _, _, _)),
             boardMarksSelectorAllPositions,
             boardMarksSelectorSize
           ) =>
@@ -391,7 +391,7 @@ class BoardView(
         drawExtraTurnPopup(renderingCtx, turnAttacks, extraTurnPopup, extraTurnText)
         drawDestructionSummary(renderingCtx)
         drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
-      case Some(GameState(_, _, me, enemy, GameOverMode(_, _))) =>
+      case Some(GameState(_, _, me, enemy, _: GameOverMode)) =>
         drawMyBoard(
           renderingCtx,
           me,
@@ -743,15 +743,15 @@ class BoardView(
       extraTurnPopupTextOpt: Option[Span]
   ): Unit = {
     (extraTurnPopupOpt, extraTurnPopupTextOpt.map(_.innerText)) match {
-      case (Some(timeLeft), Some(extraTurnText)) =>
+      case (Some(timeRemaining), Some(extraTurnText)) =>
         val middleX = myBoardCanvas.width / 2
         val bottomY = myBoardCanvas.height - SquareSizeMedium.get
         val textSize = (SquareSizeBig.get * 1.6).toInt
         val fadeAlpha =
-          if (timeLeft > ExtraTurnPopupTimeFade)
+          if (timeRemaining > ExtraTurnPopupTimeFade)
             1.0
           else
-            timeLeft.toDouble / ExtraTurnPopupTimeFade
+            timeRemaining.toDouble / ExtraTurnPopupTimeFade
         val extraTurnPopupMissileSize = (SquareSizeBig.get * 1.0).toInt
         val missilesDiff: Coordinate =
           Coordinate(extraTurnPopupMissileSize, 0)
@@ -761,7 +761,7 @@ class BoardView(
             -textSize - extraTurnPopupMissileSize
           )
 
-        if (ExtraTurnAppear(timeLeft)) {
+        if (ExtraTurnAppear(timeRemaining)) {
           renderingCtx.fillStyle = s"rgb(0, 0, 0, $fadeAlpha)"
           renderingCtx.font = s"${textSize}px serif"
           renderingCtx.textBaseline = "bottom"
@@ -842,8 +842,8 @@ object BoardView {
   val MissilesFastPerc: Double = 0.9
 
   val ExtraTurnPopupTime: Int = 6800
-  def ExtraTurnAppear(timeLeft: Int): Boolean =
-    timeLeft < 4000 || ((timeLeft / 400) % 2 == 0)
+  def ExtraTurnAppear(timeRemaining: Int): Boolean =
+    timeRemaining < 4000 || ((timeRemaining / 400) % 2 == 0)
   val ExtraTurnPopupTimeFade: Int = 2000
 
 }
