@@ -243,3 +243,7 @@ lazy val packager = project
       (frontendStatics.allPaths --- frontendStatics) pair relativeTo(frontendStatics.getParentFile)
     }
   )
+
+Global / onChangedBuildSource := ReloadOnSourceChanges
+Global / excludeLintKeys += frontend / Compile / packageJSDependencies / artifactPath
+Global / excludeLintKeys += frontend / Compile / packageMinifiedJSDependencies / artifactPath

@@ -212,8 +212,10 @@ class GameService(rpcClientsService: RpcClientsService) {
     ): ServerEnemyBoard = {
       val allWater = hits.forall(_._2.isEmpty)
       val allShipHit = hits.forall(_._2.nonEmpty)
+      val allSubmarineHits =
+        allShipHit && hits.forall(_._2.exists(_.ship.shipId == Ship.Submarine.shipId))
 
-      val updatedBoardMarks =
+      val updatedBoardMarks: Vector[Vector[(Option[Turn], BoardMark)]] =
         hits.foldLeft(boardMarks) { case (marks, (coor, _)) =>
           if (allWater)
             updateVectorUsing(marks, coor, _ => (Some(turn), BoardMark.Water))
@@ -222,7 +224,19 @@ class GameService(rpcClientsService: RpcClientsService) {
           else
             updateVectorUsing(marks, coor, { case (_, boardMark) => (Some(turn), boardMark) })
         }
-      copy(boardMarks = updatedBoardMarks)
+
+      val updatedBoardMarks2: Vector[Vector[(Option[Turn], BoardMark)]] =
+        if (allSubmarineHits)
+          hits
+            .flatMap(_._1.get8CoorAround)
+            .filter(_.isInsideBoard(boardSize))
+            .foldLeft(updatedBoardMarks) { case (marks, coor) =>
+              updateVectorUsing(marks, coor, { case (turnOpt, _) => (turnOpt, BoardMark.Water) })
+            }
+        else
+          updatedBoardMarks
+
+      copy(boardMarks = updatedBoardMarks2)
     }
 
     lazy val hasNFreeSpaces: Int =
