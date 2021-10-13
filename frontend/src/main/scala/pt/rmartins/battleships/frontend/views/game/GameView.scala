@@ -12,9 +12,10 @@ import io.udash.component.ComponentId
 import io.udash.css._
 import io.udash.i18n._
 import org.scalajs.dom
+import org.scalajs.dom._
 import org.scalajs.dom.html.{Canvas, Div, LI}
-import org.scalajs.dom.{MouseEvent, UIEvent, WheelEvent, window}
 import pt.rmartins.battleships.frontend.services.TranslationsService
+import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasColor
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.css.ChatStyles
 import pt.rmartins.battleships.shared.i18n.Translations
@@ -436,27 +437,78 @@ class GameView(
       ).render
     })
 
-  private def turnPlaysToHtml(turnPlay: TurnPlay): Seq[dom.Element] =
-    div(
-      ChatStyles.msgContainer,
-      strong(turnPlay.turn.toTurnString, ": "),
-      span(
-        Utils.addSeparator(
-          turnPlay.hitHints
-            .map {
-              case HitHint.Water =>
-                span(color := "blue", "Water")
-              case HitHint.ShipHit(shipId, destroyed) =>
-                val shipName = Ship.allShipsNames(shipId)
-                if (destroyed)
-                  span(color := "red", b(shipName + " destroyed!"))
-                else
-                  span(shipName)
-            },
-          span(", ")
+  private def turnPlaysToHtml(turnPlay: TurnPlay): Seq[dom.Element] = {
+    val sqSize = 9
+    val fleetMaxSize: Coordinate = {
+      val size =
+        gameStateModel.get.gameState.map(_.rules.gameFleet.size).getOrElse(Coordinate.origin)
+      if (size.y > size.x)
+        size.flipCoor
+      else
+        size
+    }
+    val canvasSize: Coordinate = fleetMaxSize * sqSize + Coordinate.square(4)
+
+    def createShipCanvas(ship: Ship, destroyed: Boolean): Canvas = {
+      val shipCanvas = canvas(`class` := "mr-3").render
+      shipCanvas.setAttribute("width", canvasSize.x.toString)
+      shipCanvas.setAttribute("height", canvasSize.y.toString)
+      val renderingCtx = shipCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+      val initialPosition = Coordinate(1, canvasSize.y / 2 - (ship.size.y * sqSize) / 2)
+      ship.pieces.foreach { shipPiece =>
+        CanvasUtils.drawBoardSquare(
+          renderingCtx,
+          initialPosition,
+          shipPiece,
+          sqSize,
+          CanvasColor.Ship()
         )
+        if (destroyed)
+          CanvasUtils.drawCrosshair(
+            renderingCtx,
+            initialPosition,
+            shipPiece,
+            sqSize,
+            lineWidth = 1.0,
+            alpha = 0.8
+          )
+      }
+      shipCanvas
+    }
+
+    def createWaterCanvas(): Canvas = {
+      val shipCanvas = canvas(`class` := "mr-3").render
+      shipCanvas.setAttribute("width", canvasSize.x.toString)
+      shipCanvas.setAttribute("height", canvasSize.y.toString)
+      val renderingCtx = shipCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+      val initialPosition = Coordinate(1, canvasSize.y / 2 - (sqSize / 2))
+      CanvasUtils.drawBoardSquare(
+        renderingCtx,
+        initialPosition,
+        Coordinate.origin,
+        sqSize,
+        CanvasColor.Water()
+      )
+      shipCanvas
+    }
+
+    div(
+      ChatStyles.turnContainer,
+      div(
+        minWidth := "40px",
+        strong(`class` := "col-6 px-0", turnPlay.turn.toTurnString, ": ")
+      ),
+      span(
+        turnPlay.hitHints
+          .map {
+            case HitHint.Water =>
+              createWaterCanvas()
+            case HitHint.ShipHit(shipId, destroyed) =>
+              createShipCanvas(Ship.shipLongXMap(shipId), destroyed)
+          }
       )
     ).render
+  }
 
   private def myMovesTabItem(nested: Binding.NestedInterceptor): Binding =
     nested(produceWithNested(presenter.selectedTabProperty) { case (selectedTab, nested2) =>
@@ -617,7 +669,7 @@ class GameView(
                         div(
                           `class` := "col-3 row",
                           div(
-                            `class` := "col",
+                            `class` := "col px-0",
                             span("My Time:"),
                             br,
                             span(b(toTimeStr(myTimeRemaining.totalTimeRemainingMillis / 1000))),
@@ -630,7 +682,7 @@ class GameView(
                             )
                           ),
                           div(
-                            `class` := "col",
+                            `class` := "col px-0",
                             span("Enemy Time:"),
                             br,
                             span(b(toTimeStr(enemyTimeRemaining.totalTimeRemainingMillis / 1000))),

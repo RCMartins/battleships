@@ -574,8 +574,9 @@ class GamePresenter(
 
   def resetPlacedShips(): Unit =
     gameStateProperty.get match {
-      case Some(gameState @ GameState(_, Rules(shipsInThisGame, _, _, _), me, _, PreGameMode(_, _)))
-          if me.myBoard.ships.nonEmpty =>
+      case Some(
+            gameState @ GameState(_, Rules(Fleet(shipsInThisGame), _, _, _), me, _, _: PreGameMode)
+          ) if me.myBoard.ships.nonEmpty =>
         val meUpdated: Player =
           me.modify(_.shipsLeftToPlace)
             .setTo(shipsInThisGame)

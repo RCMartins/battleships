@@ -75,7 +75,7 @@ class GameService(rpcClientsService: RpcClientsService) {
                 //  Also needs board size + any specific data
                 BotHelpers.placeShipsAtRandom(
                   player.myBoard.boardSize,
-                  game.rules.shipsInThisGame
+                  game.rules.gameFleet.ships
                 ) match {
                   case Left(_) =>
                     // Try placing ships in the next botUpdater loop ...
@@ -268,7 +268,7 @@ class GameService(rpcClientsService: RpcClientsService) {
         Player(
           clientId.id,
           username,
-          game.rules.shipsInThisGame,
+          game.rules.gameFleet.ships,
           Board(myBoard.boardSize, myBoard.ships),
           Vector.empty,
           Nil
@@ -435,20 +435,22 @@ class GameService(rpcClientsService: RpcClientsService) {
       player1Data: (ClientId, Username),
       player2DataOpt: Option[(ClientId, Username)]
   ): Game = {
-    val shipsThisGame: List[Ship] =
-      (
-        List.fill(4)(Ship.Submarine) ++
-          List.fill(3)(Ship.PatrolBoat2) ++
-          List.fill(2)(Ship.PatrolBoat3) ++
-          List.fill(1)(Ship.PatrolBoat4) ++
-          List.fill(1)(Ship.Carrier)
+    val gameFleet: Fleet =
+      Fleet(
+        (
+          List.fill(4)(Ship.Submarine) ++
+            List.fill(3)(Ship.PatrolBoat2) ++
+            List.fill(2)(Ship.PatrolBoat3) ++
+            List.fill(1)(Ship.PatrolBoat4) ++
+            List.fill(1)(Ship.Carrier)
+        )
+          .groupBy(_.shipId)
+          .toList
+          .sortBy { case (id, list) =>
+            (-list.head.piecesSize, id)
+          }
+          .flatMap(_._2)
       )
-        .groupBy(_.shipId)
-        .toList
-        .sortBy { case (id, list) =>
-          (-list.head.piecesSize, id)
-        }
-        .flatMap(_._2)
 
     val defaultTurnAttackTypes = List.fill(3)(AttackType.Simple)
     val turnBonuses: List[TurnBonus] =
@@ -468,7 +470,7 @@ class GameService(rpcClientsService: RpcClientsService) {
 
     val rules: Rules =
       Rules(
-        shipsInThisGame = shipsThisGame,
+        gameFleet = gameFleet,
         defaultTurnAttackTypes = defaultTurnAttackTypes,
         turnBonuses = turnBonuses,
         timeLimit = timeLimit
@@ -481,8 +483,8 @@ class GameService(rpcClientsService: RpcClientsService) {
       ServerEnemyBoard(
         boardSize,
         Vector.fill(10)(Vector.fill(10)((None, BoardMark.Empty))),
-        shipsThisGame.size,
-        shipsThisGame.size
+        gameFleet.shipAmount,
+        gameFleet.shipAmount
       )
 
     val player1First: Boolean = Random.nextBoolean()

@@ -31,6 +31,8 @@ case class Coordinate(x: Int, y: Int) {
 
   def distance(other: Coordinate): Int = Math.max(Math.abs(x - other.x), Math.abs(y - other.y))
 
+  def flipCoor: Coordinate = Coordinate(y, x)
+
   override def toString: String = s"Coor($x,$y)"
 
 }

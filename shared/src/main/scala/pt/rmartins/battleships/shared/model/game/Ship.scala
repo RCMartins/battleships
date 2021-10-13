@@ -18,14 +18,12 @@ case class Ship(shipId: Int, pieces: List[Coordinate], rotation: Rotation) {
 
   val size: Coordinate = Coordinate(pieces.maxBy(_.x).x + 1, pieces.maxBy(_.y).y + 1)
 
+  @inline
   def rotateBy(delta: Int): Ship =
     rotateTo(rotation.rotateBy(delta))
 
   def rotateTo(rotation: Rotation): Ship =
-    Ship.cacheRotations.getOrElseUpdate(
-      (shipId, rotation.rIndex),
-      Ship.createRotatedShip(shipId, rotation)
-    )
+    Ship.getShip(shipId, rotation)
 
   private[Ship] def mapPieces(f: Coordinate => Coordinate): Ship =
     Ship(shipId, pieces.map(f), rotation)
@@ -48,6 +46,22 @@ object Ship extends HasGenCodec[Ship] {
   val PatrolBoat4: Ship = List((0, 0), (0, 1), (0, 2), (0, 3)).pipe(toShip)
   val Carrier: Ship = List((0, 0), (1, 0), (2, 0), (1, 1), (1, 2)).pipe(toShip)
 
+  private val cacheRotations: mutable.Map[(Int, Int), Ship] =
+    mutable.Map.empty[(Int, Int), Ship] ++
+      List[Ship](
+        Submarine,
+        PatrolBoat2,
+        PatrolBoat3,
+        PatrolBoat4,
+        Carrier
+      ).map(ship => (ship.shipId, Rotation0.rIndex) -> ship)
+
+  def getShip(shipId: Int, rotation: Rotation): Ship =
+    cacheRotations.getOrElseUpdate(
+      (shipId, rotation.rIndex),
+      Ship.createRotatedShip(shipId, rotation)
+    )
+
   val allShips: Map[Int, Ship] =
     List(
       Submarine,
@@ -57,24 +71,10 @@ object Ship extends HasGenCodec[Ship] {
       Carrier
     ).map(ship => ship.shipId -> ship).toMap
 
-  val allShipsNames: Map[Int, String] =
-    Map(
-      Submarine -> "Submarine",
-      PatrolBoat2 -> "PatrolBoat2",
-      PatrolBoat3 -> "PatrolBoat3",
-      PatrolBoat4 -> "PatrolBoat4",
-      Carrier -> "Carrier"
-    ).map { case (ship, name) => ship.shipId -> name }
-
-  private[Ship] lazy val cacheRotations: mutable.Map[(Int, Int), Ship] =
-    mutable.Map.empty[(Int, Int), Ship] ++
-      List[Ship](
-        Submarine,
-        PatrolBoat2,
-        PatrolBoat3,
-        PatrolBoat4,
-        Carrier
-      ).map(ship => (ship.shipId, Rotation0.rIndex) -> ship)
+  val shipLongXMap: Map[Int, Ship] =
+    allShips.keys
+      .map(shipId => shipId -> Rotation.all.map(getShip(shipId, _)).maxBy(_.size.x))
+      .toMap
 
   def createRotatedShip(shipId: Int, rotation: Rotation): Ship = {
     def moveNegativeCoor(ship: Ship): Ship = {

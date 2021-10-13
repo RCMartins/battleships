@@ -4,7 +4,6 @@ import pt.rmartins.battleships.shared.model.game._
 
 import scala.annotation.tailrec
 import scala.util.Random
-import scala.util.chaining.scalaUtilChainingOps
 
 object BotHelpers {
 

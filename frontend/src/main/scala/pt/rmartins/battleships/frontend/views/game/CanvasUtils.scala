@@ -25,6 +25,11 @@ object CanvasUtils {
       val lineWidth: Double = 1.0
     }
 
+    case class Red(alpha: Double = 1.0) extends CanvasBorder {
+      val lineColor: String = "255, 0, 0"
+      val lineWidth: Double = 1.0
+    }
+
     case class RedBold(alpha: Double = 1.0) extends CanvasBorder {
       val lineColor: String = "255, 0, 0"
       val lineWidth: Double = 2.0

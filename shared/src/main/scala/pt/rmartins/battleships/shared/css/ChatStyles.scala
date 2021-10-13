@@ -28,4 +28,9 @@ object ChatStyles extends CssBase {
       )
     )
   )
+
+  val turnContainer: CssStyle = style(
+    display.flex,
+    alignItems.center
+  )
 }

@@ -139,7 +139,7 @@ class BoardView(
           }
 
         val shipsListList: List[List[Ship]] =
-          shipsInThisGame
+          shipsInThisGame.ships
             .groupBy(_.shipId)
             .toList
             .sortBy { case (id, list) =>
