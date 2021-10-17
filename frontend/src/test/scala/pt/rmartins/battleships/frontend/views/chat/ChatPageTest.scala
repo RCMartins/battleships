@@ -1,23 +1,23 @@
-package pt.rmartins.battleships.frontend.views.chat
-
-import java.util.Date
-import pt.rmartins.battleships.frontend.routing.RoutingInGameState
-import pt.rmartins.battleships.frontend.services.UserContextService
-import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
-import pt.rmartins.battleships.shared.model.auth.{Permission, UserContext, UserToken}
-import pt.rmartins.battleships.shared.model.chat.ChatMessage
-import pt.rmartins.battleships.shared.model.SharedExceptions
-import pt.rmartins.battleships.shared.rpc.server.secure.chat.ChatRPC
-import io.udash.properties.model.ModelProperty
-import io.udash.utils.Registration
-import org.scalamock.scalatest.AsyncMockFactory
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AsyncWordSpec
-import pt.rmartins.battleships.frontend.views.game.{ChatModel, GamePresenter}
-
-import scala.concurrent.Future
-
-class ChatPageTest extends AsyncWordSpec with Matchers with AsyncMockFactory {
+//package pt.rmartins.battleships.frontend.views.chat
+//
+//import java.util.Date
+//import pt.rmartins.battleships.frontend.routing.RoutingInGameState
+//import pt.rmartins.battleships.frontend.services.UserContextService
+//import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
+//import pt.rmartins.battleships.shared.model.auth.{Permission, UserContext, UserToken}
+//import pt.rmartins.battleships.shared.model.chat.ChatMessage
+//import pt.rmartins.battleships.shared.model.SharedExceptions
+//import pt.rmartins.battleships.shared.rpc.server.secure.chat.ChatRPC
+//import io.udash.properties.model.ModelProperty
+//import io.udash.utils.Registration
+//import org.scalamock.scalatest.AsyncMockFactory
+//import org.scalatest.matchers.should.Matchers
+//import org.scalatest.wordspec.AsyncWordSpec
+//import pt.rmartins.battleships.frontend.views.game.{ChatModel, GamePresenter}
+//
+//import scala.concurrent.Future
+//
+//class ChatPageTest extends AsyncWordSpec with Matchers with AsyncMockFactory {
 //  "ChatPage" should {
 //    "verify user authentication status" in {
 //      val notificationsCenter = mock[NotificationsCenter]
@@ -150,4 +150,4 @@ class ChatPageTest extends AsyncWordSpec with Matchers with AsyncMockFactory {
 //      model.subProp(_.msgInput).get should be("")
 //    }
 //  }
-}
+//}

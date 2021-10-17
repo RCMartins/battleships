@@ -4,8 +4,6 @@ import com.avsystem.commons.serialization.HasGenCodec
 import pt.rmartins.battleships.shared.model.utils.Utils
 
 case class Player(
-    clientId: String, // TODO remove this?
-    username: Username,
     shipsLeftToPlace: List[Ship], // TODO remove this from here to GameModel?
     myBoard: Board,
     enemyBoardMarks: Vector[Vector[(Option[Turn], BoardMark)]],

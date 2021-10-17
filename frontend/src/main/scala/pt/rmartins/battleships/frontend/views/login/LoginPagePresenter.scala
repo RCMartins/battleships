@@ -1,14 +1,13 @@
 package pt.rmartins.battleships.frontend.views.login
 
-import pt.rmartins.battleships.frontend.routing.{
-  RoutingInGameState,
-  RoutingLoginPageState,
-  RoutingState
-}
+import io.udash._
+import pt.rmartins.battleships.frontend.routing._
 import pt.rmartins.battleships.frontend.services.UserContextService
+import pt.rmartins.battleships.frontend.views.game.Cookies
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.SharedExceptions
-import io.udash._
+import pt.rmartins.battleships.shared.model.auth.UserContext
+import pt.rmartins.battleships.shared.model.game.Username
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
@@ -21,29 +20,47 @@ class LoginPagePresenter(
 )(implicit ec: ExecutionContext)
     extends Presenter[RoutingLoginPageState.type] {
 
-  /** We don't need any initialization, so it's empty. */
   override def handleState(state: RoutingLoginPageState.type): Unit = {
-    if (userService.currentContext.isDefined) {
-      application.goTo(RoutingInGameState)
+    Cookies.getCookieData().foreach { case (userToken, username) =>
+      loggingIn(username, userService.loginToken(userToken, username))
     }
   }
 
   def login(): Future[Unit] = {
+    val username = model.subProp(_.username).get
+    loggingIn(username, userService.loginUsername(username))
+  }
+
+  private def loggingIn(username: Username, loginF: Future[UserContext]): Future[Unit] = {
+    model.subProp(_.username).set(username)
     model.subProp(_.waitingForResponse).set(true)
     model.subProp(_.errors).set(Seq.empty)
 
-    val username = model.subProp(_.username).get
-    val password = model.subProp(_.password).get
-    userService.login(username, password).map(_ => ()).andThen {
-      case Success(_) =>
-        model.subProp(_.waitingForResponse).set(false)
-        application.goTo(RoutingInGameState)
-      case Failure(_: SharedExceptions.UserNotFound) =>
-        model.subProp(_.waitingForResponse).set(false)
-        model.subProp(_.errors).set(Seq(Translations.Auth.userNotFound))
-      case Failure(_) =>
-        model.subProp(_.waitingForResponse).set(false)
-        model.subProp(_.errors).set(Seq(Translations.Global.unknownError))
+    def failure(): Unit = {
+      model.subProp(_.waitingForResponse).set(false)
+      Cookies.clearCookies()
     }
+
+    loginF
+      .map { ctx =>
+        Cookies.saveCookieData(ctx.token, ctx.username)
+        ()
+      }
+      .andThen {
+        case Success(_) =>
+          model.subProp(_.waitingForResponse).set(false)
+          application.goTo(RoutingInGameState)
+        case Failure(_: SharedExceptions.UnauthorizedException) =>
+          failure()
+        case Failure(_: SharedExceptions.UserAlreadyExists) =>
+          failure()
+          model.subProp(_.errors).set(Seq(Translations.Auth.userAlreadyExists))
+        case Failure(_: SharedExceptions.UsernameInvalid) =>
+          failure()
+          model.subProp(_.errors).set(Seq(Translations.Auth.userNotFound))
+        case Failure(_) =>
+          failure()
+          model.subProp(_.errors).set(Seq(Translations.Global.unknownError))
+      }
   }
 }

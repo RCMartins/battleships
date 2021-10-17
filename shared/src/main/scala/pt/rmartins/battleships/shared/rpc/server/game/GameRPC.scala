@@ -1,17 +1,24 @@
 package pt.rmartins.battleships.shared.rpc.server.game
 
 import io.udash.rpc.DefaultServerRpcCompanion
+import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game._
 
 import scala.concurrent.Future
 
 trait GameRPC {
 
-  def startGameWith(otherPlayerUsername: Username): Future[Unit]
+  def sendMsg(gameId: GameId, msgText: String): Future[Unit]
 
   def startGameWithBots(): Future[Unit]
 
+  def startGameWith(otherPlayerUsername: Username): Future[Unit]
+
   def quitCurrentGame(gameId: GameId): Future[Unit]
+
+  def logout(): Future[Unit]
+
+  def getAllMessages: Future[Seq[ChatMessage]]
 
   def restartGame(gameId: GameId): Future[Unit]
 

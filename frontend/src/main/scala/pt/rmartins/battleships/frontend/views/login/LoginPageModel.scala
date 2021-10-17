@@ -7,7 +7,6 @@ import pt.rmartins.battleships.shared.model.game.Username
 /** The form's model structure. */
 case class LoginPageModel(
     username: Username,
-    password: String,
     waitingForResponse: Boolean,
     errors: Seq[TranslationKey0]
 )

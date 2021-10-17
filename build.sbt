@@ -4,9 +4,6 @@ import org.openqa.selenium.chrome.ChromeOptions
 import sbt.Keys._
 import sbt._
 
-Global / excludeLintKeys ++= Set(ideBasePackages, ideOutputDirectory, ideSkipProject)
-Global / cancelable := true
-
 name := "battleships"
 
 // We need to generate slightly different structure for IntelliJ in order to better support ScalaJS cross projects.
@@ -244,6 +241,12 @@ lazy val packager = project
     }
   )
 
+Global / excludeLintKeys ++= Set(
+  ideBasePackages,
+  ideOutputDirectory,
+  ideSkipProject,
+  frontend / Compile / packageJSDependencies / artifactPath,
+  frontend / Compile / packageMinifiedJSDependencies / artifactPath
+)
+Global / cancelable := true
 Global / onChangedBuildSource := ReloadOnSourceChanges
-Global / excludeLintKeys += frontend / Compile / packageJSDependencies / artifactPath
-Global / excludeLintKeys += frontend / Compile / packageMinifiedJSDependencies / artifactPath

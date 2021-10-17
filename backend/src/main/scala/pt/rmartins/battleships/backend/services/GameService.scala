@@ -2,6 +2,7 @@ package pt.rmartins.battleships.backend.services
 
 import com.softwaremill.quicklens.ModifyPimp
 import io.udash.rpc.ClientId
+import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game.BonusReward.ExtraTurn
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game.HitHint.{ShipHit, Water}
@@ -9,7 +10,7 @@ import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.Utils.updateVectorUsing
 
 import java.time.{Duration, Instant}
-import java.util.UUID
+import java.util.{Date, UUID}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -164,7 +165,7 @@ class GameService(rpcClientsService: RpcClientsService) {
   }
 
   def setGameOver(game: Game, whoWonUsername: Username): Game = {
-    rpcClientsService.sendMessage(s"Game Over! Player '$whoWonUsername' won!")
+    sendSystemMessage(game, s"Game Over! Player '$whoWonUsername' won!")
     game.modify(_.playerWhoWonOpt).setTo(Some(whoWonUsername))
   }
 
@@ -271,8 +272,6 @@ class GameService(rpcClientsService: RpcClientsService) {
     def toPlayer(game: Game): Player =
       if (game.gameStarted)
         Player(
-          clientId.id,
-          username,
           Nil,
           Board(myBoard.boardSize, myBoard.ships),
           enemyBoard.boardMarks,
@@ -280,8 +279,6 @@ class GameService(rpcClientsService: RpcClientsService) {
         )
       else
         Player(
-          clientId.id,
-          username,
           game.rules.gameFleet.ships,
           Board(myBoard.boardSize, myBoard.ships),
           Vector.empty,
@@ -301,6 +298,7 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   case class Game(
       gameId: GameId,
+      messages: List[ChatMessage],
       boardSize: Coordinate,
       rules: Rules,
       player1: ServerPlayer,
@@ -371,7 +369,6 @@ class GameService(rpcClientsService: RpcClientsService) {
         rules,
         me.toPlayer(this),
         SimplePlayer(
-          enemy.clientId.id,
           enemy.username,
           enemy.enemyBoard.boardSize,
           enemy.turnPlayHistory
@@ -404,6 +401,23 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   }
 
+  def sendMsg(gameId: GameId, playerUsername: Username, msgText: String): Future[Unit] =
+    Future {
+      activeGames.get(gameId) match {
+        case None =>
+          sendSystemMessage(playerUsername, "Error finding game!")
+        case Some(game) =>
+          val msgTrimmed = msgText.trim
+          val msg = ChatMessage(msgTrimmed, playerUsername.username, new Date())
+          val updatedGame =
+            game.modify(_.messages).using(msg :: _)
+
+          updateServerState(updatedGame)
+
+          sendMessage(game, msg)
+      }
+    }
+
   def reload(clientId: ClientId, playerUsername: Username): Future[Unit] = Future {
     activeGamesByPlayer.get(playerUsername).foreach { game =>
       val updatedGame =
@@ -424,11 +438,14 @@ class GameService(rpcClientsService: RpcClientsService) {
         updateServerState(game, None)
         updateBothGameState(game)
       case _ =>
-        rpcClientsService.sendMessage("Error starting game vs bot!")
+        sendSystemMessage(playerUsername, "Error starting game vs bot!")
     }
   }
 
-  def startGame(player1Username: Username, player2Username: Username): Future[Unit] =
+  def startGame(
+      player1Username: Username,
+      player2Username: Username
+  ): Future[Unit] =
     Future {
       (
         rpcClientsService.getClientIdByUsername(player1Username),
@@ -441,7 +458,7 @@ class GameService(rpcClientsService: RpcClientsService) {
           updateServerState(game, None)
           updateBothGameState(game)
         case _ =>
-          rpcClientsService.sendMessage(s"Error starting game vs player '$player2Username'!")
+          sendSystemMessage(player1Username, s"Could not find player '$player2Username'")
       }
     }
 
@@ -535,6 +552,7 @@ class GameService(rpcClientsService: RpcClientsService) {
     val gameId = GameId(UUID.randomUUID().toString)
     Game(
       gameId = gameId,
+      messages = Nil,
       boardSize = boardSize,
       rules = rules,
       player1 = player1,
@@ -549,18 +567,35 @@ class GameService(rpcClientsService: RpcClientsService) {
     Future {
       activeGames.get(gameId) match {
         case None =>
-          rpcClientsService.sendMessage(s"Error finding game!")
+          sendSystemMessage(playerUsername, "Error finding game!")
         case Some(game) =>
           removeServerGame(game)
           updateBothQuitGame(game)
       }
     }
 
-  def restartGame(gameId: GameId): Future[Unit] =
+  def logout(playerUsername: Username): Future[Unit] =
+    Future {
+      rpcClientsService
+        .getClientIdByUsername(playerUsername)
+        .foreach(rpcClientsService.unregisterConnection)
+    }
+
+  def getAllMessages(playerUsername: Username): Future[Seq[ChatMessage]] =
+    Future {
+      activeGamesByPlayer.get(playerUsername) match {
+        case None =>
+          Seq.empty
+        case Some(game) =>
+          game.messages.reverse
+      }
+    }
+
+  def restartGame(gameId: GameId, playerUsername: Username): Future[Unit] =
     Future {
       activeGames.get(gameId).tap {
         case None =>
-          rpcClientsService.sendMessage(s"Error finding game!")
+          sendSystemMessage(playerUsername, "Error finding game!")
         case Some(game) =>
           removeServerGame(game)
           updateBothQuitGame(game)
@@ -579,7 +614,7 @@ class GameService(rpcClientsService: RpcClientsService) {
     Future {
       activeGames.get(gameId) match {
         case None =>
-          rpcClientsService.sendMessage(s"Error finding game!")
+          sendSystemMessage(playerUsername, "Error finding game!")
         case Some(game) if !game.gameStarted =>
           val gameWithShips = game.placeShips(playerUsername, shipPositions)
 
@@ -624,15 +659,18 @@ class GameService(rpcClientsService: RpcClientsService) {
           else
             updateBothGameMode(gameWithUpdatedMode)
         case _ =>
-          rpcClientsService.sendMessage("Invalid request!")
+          sendSystemMessage(playerUsername, "Invalid request!")
       }
     }
 
-  def cancelShipsPlacement(gameId: GameId, playerUsername: Username): Future[Unit] =
+  def cancelShipsPlacement(
+      gameId: GameId,
+      playerUsername: Username
+  ): Future[Unit] =
     Future {
       activeGames.get(gameId).map(game => (game, game.getPlayerSafe(playerUsername))) match {
         case None =>
-          rpcClientsService.sendMessage(s"Error finding game!")
+          sendSystemMessage(playerUsername, "Error finding game!")
         case Some((game, Some(player))) if !game.gameStarted && player.myBoard.ships.nonEmpty =>
           val updatedPlayer = player.modify(_.myBoard.ships).setTo(Nil)
           val updatedGame = game.updatePlayer(updatedPlayer)
@@ -640,7 +678,7 @@ class GameService(rpcClientsService: RpcClientsService) {
           updateServerState(updatedGame)
           updateBothGameMode(updatedGame)
         case _ =>
-          rpcClientsService.sendMessage("Invalid request!")
+          sendSystemMessage(playerUsername, "Invalid request!")
       }
     }
 
@@ -673,7 +711,7 @@ class GameService(rpcClientsService: RpcClientsService) {
     Future {
       activeGames.get(gameId).map(game => (game, game.getPlayerSafe(playerUsername))) match {
         case None =>
-          rpcClientsService.sendMessage(s"Error finding game!")
+          sendSystemMessage(playerUsername, "Error finding game!")
         case Some((game, Some(player))) if {
               game.getCurrentTurnPlayer.exists { currentPlayer =>
                 currentPlayer.currentTurnOpt.contains(currentTurn) &&
@@ -796,7 +834,8 @@ class GameService(rpcClientsService: RpcClientsService) {
           updateServerState(finalGameUpdated)
           updateBothGameState(finalGameUpdated)
         case Some((game, _)) =>
-          rpcClientsService.sendMessage(
+          sendSystemMessage(
+            playerUsername,
             (
               "Invalid request!",
               game,
@@ -835,7 +874,7 @@ class GameService(rpcClientsService: RpcClientsService) {
     Future {
       activeGames.get(gameId).map(game => (game, game.getPlayerSafe(playerUsername))) match {
         case None =>
-          rpcClientsService.sendMessage(s"Error finding game!")
+          sendSystemMessage(playerUsername, "Error finding game!")
         case Some((game, Some(player))) if game.gameStarted =>
           val updatedBoardMarks: Vector[Vector[(Option[Turn], BoardMark)]] =
             updatedBoardMarksList.foldLeft(player.enemyBoard.boardMarks) {
@@ -854,9 +893,35 @@ class GameService(rpcClientsService: RpcClientsService) {
           val updatedGame: Game = game.updatePlayer(updatedPlayer)
           updateServerState(updatedGame)
         case _ =>
-          rpcClientsService.sendMessage("Invalid request!")
+          sendSystemMessage(playerUsername, "Invalid request!")
       }
     }
+
+  private def sendSystemMessage(username: Username, message: String): Unit = {
+    if (username != BotUsername)
+      rpcClientsService
+        .getClientIdByUsername(username)
+        .foreach(sendSystemMessage(_, message))
+  }
+
+  private def sendSystemMessage(clientId: ClientId, message: String): Unit = {
+    if (clientId != BotClientId)
+      rpcClientsService.sendMessage(clientId, message)
+  }
+
+  private def sendSystemMessage(game: Game, message: String): Unit = {
+    if (game.player1.isHuman)
+      sendSystemMessage(game.player1.clientId, message)
+    if (game.player2.isHuman)
+      sendSystemMessage(game.player2.clientId, message)
+  }
+
+  private def sendMessage(game: Game, chatMessage: ChatMessage): Unit = {
+    if (game.player1.isHuman)
+      rpcClientsService.sendMessage(game.player1.clientId, chatMessage)
+    if (game.player2.isHuman)
+      rpcClientsService.sendMessage(game.player2.clientId, chatMessage)
+  }
 
   private def updateBothGameState(game: Game): Unit = {
     if (game.player1.isHuman)

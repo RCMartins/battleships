@@ -16,7 +16,7 @@ class LoginPageViewFactory(
   override def create(): (View, Presenter[RoutingLoginPageState.type]) = {
     // Main model of the view
     val model = ModelProperty(
-      LoginPageModel(Username(""), "", waitingForResponse = false, Seq.empty)
+      LoginPageModel(Username(""), waitingForResponse = false, Seq.empty)
     )
     val presenter = new LoginPagePresenter(model, userService, application)
     val view = new LoginPageView(model, presenter, translationsService)

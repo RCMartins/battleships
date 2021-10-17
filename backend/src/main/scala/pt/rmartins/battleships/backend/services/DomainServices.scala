@@ -4,6 +4,5 @@ package pt.rmartins.battleships.backend.services
 class DomainServices(implicit
     val authService: AuthService,
     val gameService: GameService,
-    val chatService: ChatService,
     val rpcClientsService: RpcClientsService
 )

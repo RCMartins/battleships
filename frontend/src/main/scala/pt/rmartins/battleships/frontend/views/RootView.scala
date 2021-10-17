@@ -1,9 +1,5 @@
 package pt.rmartins.battleships.frontend.views
 
-import pt.rmartins.battleships.frontend.routing.RoutingRootState
-import pt.rmartins.battleships.frontend.services.TranslationsService
-import pt.rmartins.battleships.shared.css.GlobalStyles
-import pt.rmartins.battleships.shared.i18n.Translations
 import io.udash._
 import io.udash.bootstrap.button.UdashButton
 import io.udash.bootstrap.utils.BootstrapStyles.Color
@@ -11,13 +7,16 @@ import io.udash.bootstrap.{BootstrapStyles, UdashBootstrap}
 import io.udash.component.ComponentId
 import io.udash.css.CssView
 import io.udash.i18n.Lang
+import pt.rmartins.battleships.frontend.routing.RoutingRootState
+import pt.rmartins.battleships.frontend.services.TranslationsService
+import pt.rmartins.battleships.shared.css.GlobalStyles
+import pt.rmartins.battleships.shared.i18n.Translations
+import scalatags.JsDom.all._
 
 class RootViewFactory(translationsService: TranslationsService)
     extends StaticViewFactory[RoutingRootState.type](() => new RootView(translationsService))
 
 class RootView(translationsService: TranslationsService) extends ContainerView with CssView {
-
-  import scalatags.JsDom.all._
 
   private def langChangeButton(lang: Lang): Modifier = {
     val btn = UdashButton(

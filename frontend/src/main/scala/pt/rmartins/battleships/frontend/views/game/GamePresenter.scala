@@ -5,18 +5,15 @@ import io.udash._
 import io.udash.auth.AuthRequires
 import org.scalajs.dom.html.Div
 import org.scalajs.dom.window
-import pt.rmartins.battleships.frontend.routing.RoutingInGameState
+import pt.rmartins.battleships.frontend.ApplicationContext.application
+import pt.rmartins.battleships.frontend.routing.{RoutingInGameState, RoutingLoginPageState}
 import pt.rmartins.battleships.frontend.services.UserContextService
 import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
-import pt.rmartins.battleships.shared.model.auth.Permission
-import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.Utils.canPlaceInBoard
 import pt.rmartins.battleships.shared.rpc.server.game.GameRPC
-import pt.rmartins.battleships.shared.rpc.server.secure.chat.ChatRPC
 
-import java.util.Date
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Random, Success}
 
@@ -26,15 +23,12 @@ class GamePresenter(
     chatModel: ModelProperty[ChatModel],
     screenModel: ModelProperty[ScreenModel],
     gameRpc: GameRPC,
-    chatRpc: ChatRPC,
     userService: UserContextService,
     notificationsCenter: NotificationsCenter
 )(implicit
     ec: ExecutionContext
 ) extends Presenter[RoutingInGameState.type]
     with AuthRequires {
-
-  requireAuthenticated()(userService.getCurrentContext)
 
   val gameStateProperty: Property[Option[GameState]] =
     gameStateModel.bitransform(_.gameState)(GameStateModel(_))
@@ -73,10 +67,6 @@ class GamePresenter(
 
   private val msgCallback = notificationsCenter.onNewMsg { case msg =>
     chatModel.subSeq(_.msgs).append(msg)
-  }
-
-  private val connectionsCallback = notificationsCenter.onConnectionsCountChange { case count =>
-    chatModel.subProp(_.connectionsCount).set(count)
   }
 
   private val onQuitGameCallback = notificationsCenter.onQuitGame { case _ =>
@@ -223,31 +213,12 @@ class GamePresenter(
     }
 
   override def handleState(state: RoutingInGameState.type): Unit = {
-    if (hasReadAccess) {
-      chatRpc.latestMessages().onComplete {
-        case Success(msgs) =>
-          chatModel.subSeq(_.msgs).prepend(msgs: _*)
-        case Failure(ex) =>
-          chatModel
-            .subSeq(_.msgs)
-            .set(Seq(ChatMessage(s"ERROR: ${ex.getMessage}", "System", new Date)))
-      }
-    } else {
-      chatModel
-        .subSeq(_.msgs)
-        .set(Seq(ChatMessage(s"You don't have access to read the messages.", "System", new Date)))
-    }
-
     chatModel.subProp(_.username).set(userService.getCurrentContext.username)
 
-    chatRpc.connectedClientsCount().onComplete {
-      case Success(count) =>
-        chatModel.subProp(_.connectionsCount).set(count)
-      case Failure(ex) =>
-        chatModel.subProp(_.connectionsCount).set(-1)
-        chatModel
-          .subSeq(_.msgs)
-          .set(Seq(ChatMessage(s"ERROR: ${ex.getMessage}", "System", new Date)))
+    gameRpc.getAllMessages.onComplete {
+      case Failure(_) =>
+      case Success(chatMessages) =>
+        chatModel.subProp(_.msgs).set(chatMessages)
     }
   }
 
@@ -260,7 +231,6 @@ class GamePresenter(
   override def onClose(): Unit = {
     // remove callbacks from NotificationsCenter before exit
     msgCallback.cancel()
-    connectionsCallback.cancel()
 
     onQuitGameCallback.cancel()
     onGameStateCallback.cancel()
@@ -268,26 +238,38 @@ class GamePresenter(
   }
 
   def sendMsg(): Unit = {
-    val msgProperty = chatModel.subProp(_.msgInput)
-    val msg = msgProperty.get.trim
-    msgProperty.set("")
-    if (msg.nonEmpty) {
-      chatRpc.sendMsg(msg)
+    gameStateProperty.get match {
+      case Some(GameState(gameId, _, _, _, _)) =>
+        val msgProperty = chatModel.subProp(_.msgInput)
+        val msg = msgProperty.get.trim
+        msgProperty.set("")
+        if (msg.nonEmpty)
+          gameRpc.sendMsg(gameId, msg)
+      case _ =>
     }
   }
 
   def startGameWithBots(): Unit =
     gameRpc.startGameWithBots()
 
-  def startGameWith(): Unit =
-    gameRpc.startGameWith(
-      Username(if (chatModel.get.username.username == "player1") "player2" else "player1")
-    )
+  def startGameWith(otherPlayerUsername: Username): Unit = {
+    if (otherPlayerUsername.username.nonEmpty)
+      gameRpc.startGameWith(otherPlayerUsername)
+  }
 
   def restartGame(): Unit =
     gameStateProperty.get match {
       case Some(GameState(gameId, _, _, _, _)) =>
         gameRpc.restartGame(gameId)
+      case _ =>
+    }
+
+  def logout(): Unit =
+    gameStateProperty.get match {
+      case None =>
+        gameRpc.logout()
+        Cookies.clearCookies()
+        application.goTo(RoutingLoginPageState)
       case _ =>
     }
 
@@ -297,12 +279,6 @@ class GamePresenter(
         gameRpc.quitCurrentGame(gameId)
       case _ =>
     }
-
-  def hasReadAccess: Boolean =
-    userService.currentContext.exists(_.has(Permission.ChatRead))
-
-  def hasWriteAccess: Boolean =
-    userService.currentContext.exists(_.has(Permission.ChatWrite))
 
   def mouseMove(boardView: BoardView, mouseX: Int, mouseY: Int): Unit = {
     gameModel.subProp(_.mousePosition).set(Some(Coordinate(mouseX, mouseY) - boardView.AbsMargin))

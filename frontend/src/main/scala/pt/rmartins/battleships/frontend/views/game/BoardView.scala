@@ -22,14 +22,18 @@ class BoardView(
 
   // TODO * 10 hardcoded everywhere... instead of a real (Max Board Width/Height) / boardSize
 
-  val AbsMargin: Coordinate = Coordinate(1, 1)
+  val AbsMargin: Coordinate = Coordinate(0, 0)
+
+  private val sizes = IndexedSeq(10, 12, 15, 20, 30)
+  private def checkSize(screenSize: Int, defaultSizeIndex: Int): Int =
+    sizes((if (screenSize < 500) 0 else if (screenSize < 680) 1 else 2) + defaultSizeIndex)
 
   private val SquareSizeBig: ReadableProperty[Int] =
-    screenModel.subProp(_.canvasSize).transform(size => if (size.x < 680) 20 else 30)
+    screenModel.subProp(_.canvasSize).transform(size => checkSize(size.x, 2))
   private val SquareSizeMedium: ReadableProperty[Int] =
-    screenModel.subProp(_.canvasSize).transform(size => if (size.x < 680) 15 else 20)
+    screenModel.subProp(_.canvasSize).transform(size => checkSize(size.x, 1))
   private val SquareSizeSmall: ReadableProperty[Int] =
-    screenModel.subProp(_.canvasSize).transform(size => if (size.x < 680) 12 else 15)
+    screenModel.subProp(_.canvasSize).transform(size => checkSize(size.x, 0))
 
   private val MyBoardPreGameSqSize = SquareSizeBig
   private val MyBoardInGameSqSize = SquareSizeMedium
@@ -352,7 +356,7 @@ class BoardView(
     renderingCtx.clearRect(0, 0, myBoardCanvas.width, myBoardCanvas.height)
 
     gamePresenter.gameStateProperty.get match {
-      case Some(GameState(_, _, me, enemy, PreGameMode(_, _))) =>
+      case Some(GameState(_, _, me, enemy, _: PreGameMode)) =>
         drawMyBoard(
           renderingCtx,
           me,

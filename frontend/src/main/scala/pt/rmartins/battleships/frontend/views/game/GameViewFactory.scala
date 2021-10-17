@@ -15,6 +15,7 @@ class GameViewFactory(
   import scala.concurrent.ExecutionContext.Implicits.global
 
   override def create(): (View, Presenter[RoutingInGameState.type]) = {
+    val preGameModel = ModelProperty[PreGameModel](PreGameModel.default)
     val gameModel = ModelProperty[GameModel](GameModel.default)
     val gameStateModel = ModelProperty[GameStateModel](GameStateModel(None))
     val chatModel = ModelProperty[ChatModel](ChatModel.default)
@@ -30,12 +31,12 @@ class GameViewFactory(
         chatModel,
         screenModel,
         rpc.get.game(),
-        rpc.get.chat(),
         userService,
         notificationsCenter
       )
     val gameView: GameView =
       new GameView(
+        preGameModel,
         gameModel,
         gameStateModel,
         chatModel,

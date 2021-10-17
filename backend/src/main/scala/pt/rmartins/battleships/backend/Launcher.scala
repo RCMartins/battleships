@@ -3,13 +3,7 @@ package pt.rmartins.battleships.backend
 import java.util.concurrent.TimeUnit
 import com.typesafe.config.{Config, ConfigFactory}
 import pt.rmartins.battleships.backend.server.ApplicationServer
-import pt.rmartins.battleships.backend.services.{
-  AuthService,
-  ChatService,
-  DomainServices,
-  GameService,
-  RpcClientsService
-}
+import pt.rmartins.battleships.backend.services._
 import io.udash.logging.CrossLogging
 
 import scala.io.StdIn
@@ -22,9 +16,8 @@ object Launcher extends CrossLogging {
     implicit val rpcClientsService: RpcClientsService = new RpcClientsService(
       RpcClientsService.defaultSendToClientFactory
     )
-    implicit val authService: AuthService = new AuthService(config.getStringList("auth.users"))
+    implicit val authService: AuthService = new AuthService()
     implicit val gameService: GameService = new GameService(rpcClientsService)
-    implicit val chatService: ChatService = new ChatService(rpcClientsService)
     val server = new ApplicationServer(
       config.getInt("server.port"),
       config.getString("server.statics"),

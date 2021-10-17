@@ -1,14 +1,15 @@
 package pt.rmartins.battleships.backend.rpc.secure.game
 
 import io.udash.auth._
+import io.udash.rpc.ClientId
 import pt.rmartins.battleships.backend.services.{GameService, RpcClientsService}
 import pt.rmartins.battleships.shared.model.auth.UserContext
+import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.rpc.server.game.GameRPC
 
 import scala.concurrent.Future
 
-/** Verifies user's permissions and passes valid requests to the services. */
 class GameEndpoint(implicit
     gameService: GameService,
     rpcClientsService: RpcClientsService,
@@ -16,17 +17,26 @@ class GameEndpoint(implicit
 ) extends GameRPC
     with AuthRequires {
 
-  override def startGameWith(otherPlayerUsername: Username): Future[Unit] =
-    gameService.startGame(ctx.username, otherPlayerUsername)
+  override def sendMsg(gameId: GameId, msgText: String): Future[Unit] =
+    gameService.sendMsg(gameId, ctx.username, msgText)
 
   override def startGameWithBots(): Future[Unit] =
     gameService.startGameWithBots(ctx.username)
 
+  override def startGameWith(otherPlayerUsername: Username): Future[Unit] =
+    gameService.startGame(ctx.username, otherPlayerUsername)
+
   override def quitCurrentGame(gameId: GameId): Future[Unit] =
     gameService.quitCurrentGame(gameId, ctx.username)
 
+  override def logout(): Future[Unit] =
+    gameService.logout(ctx.username)
+
+  override def getAllMessages: Future[Seq[ChatMessage]] =
+    gameService.getAllMessages(ctx.username)
+
   override def restartGame(gameId: GameId): Future[Unit] =
-    gameService.restartGame(gameId)
+    gameService.restartGame(gameId, ctx.username)
 
   override def confirmShips(
       gameId: GameId,
@@ -37,10 +47,19 @@ class GameEndpoint(implicit
   override def cancelShipsPlacement(gameId: GameId): Future[Unit] =
     gameService.cancelShipsPlacement(gameId, ctx.username)
 
-  def sendTurnAttacks(gameId: GameId, currentTurn: Turn, turnAttacks: List[Attack]): Future[Unit] =
-    gameService.sendTurnAttacks(gameId, ctx.username, currentTurn, turnAttacks)
+  override def sendTurnAttacks(
+      gameId: GameId,
+      currentTurn: Turn,
+      turnAttacks: List[Attack]
+  ): Future[Unit] =
+    gameService.sendTurnAttacks(
+      gameId,
+      ctx.username,
+      currentTurn,
+      turnAttacks
+    )
 
-  def sendBoardMarks(
+  override def sendBoardMarks(
       gameId: GameId,
       updatedBoardMarksList: List[(Coordinate, BoardMark)]
   ): Future[Unit] =

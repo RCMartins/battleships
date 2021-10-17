@@ -1,5 +1,6 @@
 package pt.rmartins.battleships.backend.services
 
+import com.softwaremill.quicklens.ModifyPimp
 import io.udash.rpc.{ClientId, ClientRPCTarget, DefaultClientRPC}
 import pt.rmartins.battleships.shared.model.auth.UserContext
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
@@ -23,7 +24,8 @@ class RpcClientsService(sendToClientFactory: ClientRPCTarget => MainClientRPC) {
   /** Returns active client ids. */
   def activeClients: Set[ClientId] = clients.toSet
 
-  def getClientIdByUsername(username: Username): Option[ClientId] = clientUsernames.get(username)
+  def getClientIdByUsername(username: Username): Option[ClientId] =
+    clientUsernames.get(username.toLowerCase)
 
   /** Returns authenticated client ids. */
   def authenticatedClients: Map[ClientId, UserContext] = authClients.toMap
@@ -39,30 +41,23 @@ class RpcClientsService(sendToClientFactory: ClientRPCTarget => MainClientRPC) {
       username: Username,
       userContext: UserContext
   ): Unit = {
-    clientUsernames.get(username) match {
+    val lowercaseName = username.toLowerCase
+    clientUsernames.get(lowercaseName) match {
       case Some(oldClientId) =>
-        clientUsernames.remove(username)
+        clientUsernames.remove(lowercaseName)
         unregisterConnection(oldClientId)
       case None =>
     }
-    clientUsernames += username -> clientId
+    clientUsernames += lowercaseName -> clientId
 
     authClients(clientId) = userContext
-    broadcastAuthConnectionsCount()
   }
 
   /** Removes connection ID from the list. */
   def unregisterConnection(clientId: ClientId): Unit = {
     clients -= clientId
-    authClients.remove(clientId)
-    broadcastAuthConnectionsCount()
-    clientUsernames.toList.find(_._2 == clientId).foreach(pair => clientUsernames.remove(pair._1))
+    authClients.remove(clientId).foreach(ctx => clientUsernames.remove(ctx.username.toLowerCase))
   }
-
-  private def broadcastAuthConnectionsCount(): Unit =
-    authClients.foreach { case (id, _) =>
-      sendToClient(id).chat().connectionsCountUpdate(authClients.size)
-    }
 
   def sendGameState(clientId: ClientId, gameState: GameState): Unit =
     authClients.get(clientId) match {
@@ -85,10 +80,12 @@ class RpcClientsService(sendToClientFactory: ClientRPCTarget => MainClientRPC) {
       case _ =>
     }
 
-  def sendMessage(message: String): Unit = {
-    authClients.foreach { case (id, _) =>
-      sendToClient(id).chat().newMessage(ChatMessage(message, "System", new Date()))
-    }
+  def sendMessage(clientId: ClientId, message: String): Unit = {
+    sendToClient(clientId).chat().newMessage(ChatMessage(message, "System", new Date()))
+  }
+
+  def sendMessage(clientId: ClientId, chatMessage: ChatMessage): Unit = {
+    sendToClient(clientId).chat().newMessage(chatMessage)
   }
 
 }

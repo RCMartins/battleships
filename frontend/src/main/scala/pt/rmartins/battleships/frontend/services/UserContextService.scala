@@ -1,6 +1,6 @@
 package pt.rmartins.battleships.frontend.services
 
-import pt.rmartins.battleships.shared.model.auth.UserContext
+import pt.rmartins.battleships.shared.model.auth.{UserContext, UserToken}
 import pt.rmartins.battleships.shared.model.SharedExceptions
 import pt.rmartins.battleships.shared.model.game.Username
 import pt.rmartins.battleships.shared.rpc.server.MainServerRPC
@@ -18,10 +18,22 @@ class UserContextService(rpc: MainServerRPC)(implicit ec: ExecutionContext) {
     userContext.getOrElse(throw new SharedExceptions.UnauthorizedException)
 
   /** Sends login request and saves returned context. */
-  def login(username: Username, password: String): Future[UserContext] = {
-    if (userContext.isDefined) Future.successful(userContext.get)
+  def loginUsername(username: Username): Future[UserContext] = {
+    if (userContext.isDefined)
+      Future.successful(userContext.get)
     else {
-      rpc.auth().login(username, password).map { ctx =>
+      rpc.auth().loginUsername(username).map { ctx =>
+        userContext = Some(ctx)
+        ctx
+      }
+    }
+  }
+
+  def loginToken(userToken: UserToken, username: Username): Future[UserContext] = {
+    if (userContext.isDefined)
+      Future.successful(userContext.get)
+    else {
+      rpc.auth().loginToken(userToken, username).map { ctx =>
         userContext = Some(ctx)
         ctx
       }

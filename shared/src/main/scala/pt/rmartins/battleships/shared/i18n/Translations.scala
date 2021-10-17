@@ -9,7 +9,7 @@ object Translations {
   val langs = Seq("en")
 
   /** The list of translation bundles available in the `backend` resources. */
-  val bundlesNames = Seq("auth", "game", "chat", "global")
+  val bundlesNames = Seq("auth", "chat", "game", "global")
 
   object Global {
     val unknownError = key("global.unknownError")
@@ -18,23 +18,18 @@ object Translations {
   object Auth {
     val usernameFieldLabel = key("auth.username.label")
     val usernameFieldPlaceholder = key("auth.username.placeholder")
-    val passwordFieldLabel = key("auth.password.label")
-    val passwordFieldPlaceholder = key("auth.password.placeholder")
     val submitButton = key("auth.submit.label")
 
     val userNotFound = key("auth.user_not_found")
-    val info = key("auth.info")
-
-    val randomPermissionsInfo = key("auth.random_permissions")
+    val userAlreadyExists = key("auth.user_already_exists")
   }
 
   object Chat {
-    // notice that this translation takes a single Int argument
-    val connections = key1[Int]("chat.connections")
     val inputPlaceholder = key("chat.input.placeholder")
   }
 
   object Game {
+    val chooseEnemyPlaceholder = key("game.pregame.choose_enemy_placeholder")
     val placeShips = key("game.header.place_ships")
     val placeShipsWaitEnemy = key("game.header.place_ships_wait_enemy")
     val placeShipsEnemyReady = key("game.header.place_ships_enemy_ready")
@@ -47,6 +42,8 @@ object Translations {
     val startGameVsBot = key("game.buttons.start_game_bot")
     val startGameVsPlayer = key("game.buttons.start_game_player")
     val restartButton = key("game.buttons.restart")
+    val quitGameButton = key("game.buttons.quitGame")
+    val logoutButton = key("game.buttons.logout")
 
     val extraTurnPopup = key("game.popup.extra_turn")
   }

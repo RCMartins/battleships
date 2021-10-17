@@ -10,8 +10,6 @@ class NotificationsCenter {
     new CallbacksHandler[String]
   private[rpc] val msgListeners: CallbacksHandler[ChatMessage] =
     new CallbacksHandler[ChatMessage]
-  private[rpc] val connectionsListeners: CallbacksHandler[Int] =
-    new CallbacksHandler[Int]
   private[rpc] val quitGameListeners: CallbacksHandler[Unit] =
     new CallbacksHandler[Unit]
   private[rpc] val gameStateListeners: CallbacksHandler[GameState] =
@@ -28,11 +26,6 @@ class NotificationsCenter {
 
   def onNewMsg(callback: msgListeners.CallbackType): Registration =
     msgListeners.register(callback)
-
-  def onConnectionsCountChange(
-      callback: connectionsListeners.CallbackType
-  ): Registration =
-    connectionsListeners.register(callback)
 
   def onQuitGame(
       callback: quitGameListeners.CallbackType

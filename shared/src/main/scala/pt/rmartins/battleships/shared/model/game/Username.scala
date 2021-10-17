@@ -4,6 +4,8 @@ import com.avsystem.commons.serialization.HasGenCodec
 
 case class Username(username: String) {
 
+  def toLowerCase: Username = Username(username.toLowerCase)
+
   override def toString: String = username
 
 }

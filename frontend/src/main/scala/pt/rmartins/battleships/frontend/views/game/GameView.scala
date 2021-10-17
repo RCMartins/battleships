@@ -1,11 +1,12 @@
 package pt.rmartins.battleships.frontend.views.game
 
+import com.avsystem.commons.universalOps
 import io.udash._
 import io.udash.bindings.modifiers.Binding
 import io.udash.bootstrap.button.UdashButton
 import io.udash.bootstrap.card.UdashCard
 import io.udash.bootstrap.form.UdashForm.FormEvent
-import io.udash.bootstrap.form.{UdashForm, UdashInputGroup}
+import io.udash.bootstrap.form.{FormElementsFactory, UdashForm, UdashInputGroup}
 import io.udash.bootstrap.utils.BootstrapStyles.Color
 import io.udash.bootstrap.utils.UdashIcons.FontAwesome
 import io.udash.component.ComponentId
@@ -28,6 +29,7 @@ import scalatags.JsDom.all._
 import scala.util.chaining.scalaUtilChainingOps
 
 class GameView(
+    preGameModel: ModelProperty[PreGameModel],
     gameModel: ModelProperty[GameModel],
     gameStateModel: ModelProperty[GameStateModel],
     chatModel: ModelProperty[ChatModel],
@@ -73,7 +75,10 @@ class GameView(
         .subProp(_.extraTurnText)
         .set(Some(span(translatedDynamic(Translations.Game.extraTurnPopup)(_.apply())).render))
 
-    boardView.paint()
+    window.setTimeout(
+      () => boardView.paint(),
+      1
+    )
   }
 
   // TODO This is marking the screen refresh every time the one of the 'timeRemaining' values changes
@@ -126,6 +131,25 @@ class GameView(
   )(nested =>
     Seq[Modifier](span(nested(translatedDynamic(Translations.Game.startGameVsPlayer)(_.apply()))))
   )
+
+  private def usernameInput(factory: FormElementsFactory) =
+    factory.input
+      .formGroup(groupId = ComponentId("username")) { nested =>
+        factory.input
+          .textInput(preGameModel.subProp(_.username).bitransform(_.username)(Username(_)))(
+            Some(nested =>
+              nested(
+                translatedAttrDynamic(Translations.Game.chooseEnemyPlaceholder, "placeholder")(
+                  _.apply()
+                )
+              )
+            )
+          )
+          .setup(nested)
+          .render
+      }
+      .render
+      .tap(_.classList.add("my-0"))
 
   private val confirmShipsButton = UdashButton(
     buttonStyle = Color.Primary.toProperty,
@@ -191,7 +215,7 @@ class GameView(
   private val mainGameForm = UdashForm(
     componentId = ComponentId("main-game-from")
   )(factory =>
-    factory.disabled(presenter.hasWriteAccess.toProperty.transform(!_))(nested =>
+    factory.disabled(Property(false))(nested =>
       nested(produce(presenter.gameModeProperty.transform(_.map {
         case PreGameMode(iPlacedShips, _) => (iPlacedShips, false, false)
         case InGameMode(_, _, _, _, _)    => (false, true, false)
@@ -202,7 +226,8 @@ class GameView(
             `class` := "row",
             div(`class` := "mx-2"),
             div(`class` := "mx-1", startGameVsBotButton),
-            div(`class` := "mx-1", startGameVsPlayerButton)
+            div(`class` := "ml-3", startGameVsPlayerButton),
+            usernameInput(factory)
           ).render
         case Some((false, false, false)) =>
           div(
@@ -243,7 +268,7 @@ class GameView(
   }
 
   startGameVsPlayerButton.listen { _ =>
-    presenter.startGameWith()
+    presenter.startGameWith(preGameModel.subProp(_.username).get)
   }
 
   confirmShipsButton.listen { _ =>
@@ -553,7 +578,7 @@ class GameView(
   private val msgForm = UdashForm(
     componentId = ComponentId("msg-from")
   )(factory =>
-    factory.disabled(presenter.hasWriteAccess.toProperty.transform(!_))(nested =>
+    factory.disabled(presenter.gameModeProperty.transform(_.isEmpty))(nested =>
       nested(
         UdashInputGroup()(
           UdashInputGroup.input(msgInput.render),
@@ -571,10 +596,29 @@ class GameView(
   private val quitGameButton = UdashButton(
     buttonStyle = Color.Danger.toProperty,
     componentId = ComponentId("quit-game-button")
-  )(_ => Seq(span("Quit Game")))
+  )(nested =>
+    Seq[Modifier](
+      nested(
+        produce(presenter.gameStateProperty.transform(_.isEmpty))(emptyGameState =>
+          span(
+            translatedDynamic(
+              if (emptyGameState) Translations.Game.logoutButton
+              else Translations.Game.quitGameButton
+            )(_.apply())
+          ).render
+        )
+      ),
+      FontAwesome.Solid.signOutAlt
+    )
+  )
 
   quitGameButton.listen { _ =>
-    presenter.quitCurrentGame()
+    presenter.gameStateProperty.get match {
+      case None =>
+        presenter.logout()
+      case Some(_) =>
+        presenter.quitCurrentGame()
+    }
   }
 
   override def getTemplate: Modifier = div {
@@ -707,7 +751,7 @@ class GameView(
                             ) =>
                           showTime(myTimeRemaining, enemyTimeRemaining)
                         case _ =>
-                          div.render
+                          div(`class` := "col-3 row").render
                       }
                   }
                 ),
@@ -715,9 +759,7 @@ class GameView(
                   `class` := "col-2 container",
                   div(
                     `class` := "row justify-content-end",
-                    showIf(presenter.gameStateProperty.transform(_.nonEmpty))(
-                      span(quitGameButton).render
-                    )
+                    span(quitGameButton).render
                   )
                 )
               ).render
