@@ -8,7 +8,7 @@ import org.scalajs.dom.{CanvasRenderingContext2D, html}
 import pt.rmartins.battleships.frontend.views.game.BoardView._
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
-import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
+import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.Utils.canPlaceInBoard
@@ -227,7 +227,7 @@ class BoardView(
       case (
             shipsSummary,
             Some(turnPlayHistory),
-            Some(InGameMode(_, _, _, _, _) | GameOverMode(_, _, _, _)),
+            Some(PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _)),
             destructionSummaryPos,
             destructionSummarySqSize
           ) =>
@@ -288,7 +288,7 @@ class BoardView(
     ).transform {
       case (
             Some(mousePosition),
-            Some(GameState(_, _, _, enemy, InGameMode(_, _, _, _, _) | GameOverMode(_, _, _, _))),
+            Some(GameState(_, _, _, enemy, PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _))),
             enemyBoardPos,
             defaultSquareSize
           ) =>
@@ -310,7 +310,7 @@ class BoardView(
       BoardMarksSelectorCombined
     ).transform {
       case (
-            Some(InGameMode(_, _, _, _, _) | GameOverMode(_, _, _, _)),
+            Some(PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _)),
             (boardMarksSelectorPos, boardMarksSelectorSize, boardMarksSelectorMargin)
           ) =>
         BoardMarksSelectorOrder.zipWithIndex.map { case (boardMark, index) =>
@@ -333,7 +333,7 @@ class BoardView(
     ).transform {
       case (
             Some(mousePosition),
-            Some(InGameMode(_, _, _, _, _) | GameOverMode(_, _, _, _)),
+            Some(PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _)),
             boardMarksSelectorAllPositions,
             boardMarksSelectorSize
           ) =>
@@ -348,7 +348,7 @@ class BoardView(
     }
 
   def paint(): Unit = {
-    val GameModel(mousePositionOpt, _, selectedShipOpt, turnAttacks, _, selectedBoardMarkOpt) =
+    val GameModel(mousePositionOpt, _, selectedShipOpt, turnAttacks, _, selectedBoardMarkOpt, _) =
       gameModel.get
 
     val renderingCtx = myBoardCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
@@ -367,7 +367,7 @@ class BoardView(
           SquareSizeBig.get,
           fillEmptySquares = false
         )
-      case Some(GameState(_, _, me, enemy, _: InGameMode)) =>
+      case Some(GameState(_, _, me, enemy, _: PlayingMode)) =>
         drawMyBoard(
           renderingCtx,
           me,

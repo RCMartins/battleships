@@ -9,7 +9,7 @@ import pt.rmartins.battleships.frontend.ApplicationContext.application
 import pt.rmartins.battleships.frontend.routing.{RoutingInGameState, RoutingLoginPageState}
 import pt.rmartins.battleships.frontend.services.UserContextService
 import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
-import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
+import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.Utils.canPlaceInBoard
 import pt.rmartins.battleships.shared.rpc.server.game.GameRPC
@@ -41,28 +41,34 @@ class GamePresenter(
         gameStateModel.get.gameState.map(_.copy(gameMode = gameMode))
     }
 
-  val inGameModeProperty: Property[Option[InGameMode]] =
-    gameModeProperty.bitransform[Option[InGameMode]] {
-      case Some(mode: InGameMode) => Some(mode)
-      case _                      => None
+  val playingModeProperty: Property[Option[PlayingMode]] =
+    gameModeProperty.bitransform[Option[PlayingMode]] {
+      case Some(playingMode: PlayingMode) => Some(playingMode)
+      case _                              => None
     }(identity)
 
   val rulesProperty: ReadableProperty[Option[Rules]] =
     gameStateProperty.transform(_.map(_.rules))
 
   val inPreGameMode: ReadableProperty[Boolean] =
-    inGameModeProperty.transform(_.exists(_.isPreGame))
+    gameModeProperty.transform(_.exists(_.isPreGame))
+
+  val playingMode: ReadableProperty[Boolean] =
+    gameModeProperty.transform(_.exists(_.isPlaying))
+
+  val inGameOverMode: ReadableProperty[Boolean] =
+    gameModeProperty.transform(_.exists(_.isEndGame))
 
   val isMyTurnProperty: ReadableProperty[Boolean] =
-    inGameModeProperty.transform(_.exists(_.isMyTurn))
+    playingModeProperty.transform(_.exists(_.isMyTurn))
 
   val meProperty: ReadableProperty[Option[Player]] =
     gameStateProperty.transform(_.map(_.me))
 
-  val selectedTabProperty: ReadableProperty[String] =
+  val selectedTabProperty: Property[String] =
     screenModel.subProp(_.selectedTab)
 
-  val mousePositionProperty: ReadableProperty[Option[Coordinate]] =
+  val mousePositionProperty: Property[Option[Coordinate]] =
     gameModel.subProp(_.mousePosition)
 
   private val msgCallback = notificationsCenter.onNewMsg { case msg =>
@@ -89,7 +95,7 @@ class GamePresenter(
   private var timeRemainingIntervalHandle: Option[Int] = None
   private val timeRemainingIntervalMillis: Int = 100
 
-  def updateGameMode(fromGameMode: Option[GameMode], to: Option[GameState]): Unit =
+  def updateGameMode(fromGameMode: Option[GameMode], to: Option[GameState]): Unit = {
     (fromGameMode, to) match {
       case (None, Some(GameState(_, _, me, _, _: PreGameMode))) =>
         me.shipsLeftToPlace.headOption.foreach { headShip =>
@@ -99,9 +105,9 @@ class GamePresenter(
         timeRemainingIntervalHandle = None
       case (
             None | Some(_: PreGameMode),
-            Some(GameState(_, _, _, _, InGameMode(_, _, turnAttackTypes, _, _)))
+            Some(GameState(_, _, _, _, PlayingMode(_, _, turnAttackTypes, _, _)))
           ) =>
-        screenModel.subProp(_.selectedTab).set(ScreenModel.myMovesTab)
+        selectedTabProperty.set(ScreenModel.myMovesTab)
         gameModel.subProp(_.turnAttacks).set(turnAttackTypes.map(Attack(_, None)))
 
         timeRemainingIntervalHandle.foreach(window.clearTimeout)
@@ -130,24 +136,17 @@ class GamePresenter(
                 }
               }
 
-              inGameModeProperty.get.foreach {
-                case inGameMode @ InGameMode(
-                      isMyTurn,
-                      _,
-                      _,
-                      Some(myTimeRemaining),
-                      Some(enemyTimeRemaining)
-                    ) =>
-                  inGameModeProperty.set(
+              val timeRemainingPropertyOpt: Property[Option[(TimeRemaining, TimeRemaining)]] =
+                gameModel.subProp(_.timeRemaining)
+
+              (playingModeProperty.get.map(_.isMyTurn), timeRemainingPropertyOpt.get) match {
+                case (Some(isMyTurn), Some((myTimeRemaining, enemyTimeRemaining))) =>
+                  timeRemainingPropertyOpt.set(
                     Some(
                       if (isMyTurn)
-                        inGameMode
-                          .modify(_.myTimeRemaining)
-                          .setTo(Some(reduceTime(myTimeRemaining)))
+                        (reduceTime(myTimeRemaining), enemyTimeRemaining)
                       else
-                        inGameMode
-                          .modify(_.enemyTimeRemaining)
-                          .setTo(Some(reduceTime(enemyTimeRemaining)))
+                        (myTimeRemaining, reduceTime(enemyTimeRemaining))
                     )
                   )
                 case _ =>
@@ -161,6 +160,15 @@ class GamePresenter(
         timeRemainingIntervalHandle = None
       case _ =>
     }
+    to.map(_.gameMode) match {
+      case Some(PlayingMode(_, _, _, Some(myTimeRemaining), Some(enemyTimeRemaining))) =>
+        gameModel.subProp(_.timeRemaining).set(Some((myTimeRemaining, enemyTimeRemaining)))
+      case Some(GameOverMode(_, _, Some(myTimeRemaining), Some(enemyTimeRemaining))) =>
+        gameModel.subProp(_.timeRemaining).set(Some((myTimeRemaining, enemyTimeRemaining)))
+      case _ =>
+        gameModel.subProp(_.timeRemaining).set(None)
+    }
+  }
 
   private var newTurnAnimationHandle: Option[Int] = None
   private val newTurnAnimationMillis: Int = 50
@@ -170,7 +178,7 @@ class GamePresenter(
     newTurnAnimationHandle = None
   }
 
-  inGameModeProperty
+  playingModeProperty
     .transform(_.map(inGameMode => (inGameMode.turn, inGameMode.turnAttackTypes)))
     .listen {
       case Some((Turn(_, extraTurn), turnAttackTypes)) if gameModel.get.turnAttacksSent =>
@@ -285,14 +293,14 @@ class GamePresenter(
 
     (gameModel.get, gameStateProperty.get) match {
       case (
-            GameModel(Some(_), Some(button @ (0 | 2)), _, _, _, selectedBoardMarkOpt),
+            GameModel(Some(_), Some(button @ (0 | 2)), _, _, _, selectedBoardMarkOpt, _),
             Some(
               gameState @ GameState(
                 gameId,
                 _,
                 me,
                 _,
-                InGameMode(_, _, _, _, _) | GameOverMode(_, _, _, _)
+                PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _)
               )
             )
           ) =>
@@ -332,7 +340,7 @@ class GamePresenter(
 
     (gameModel.get, gameStateProperty.get) match {
       case (
-            GameModel(Some(_), Some(0), selectedShipOpt, _, _, _),
+            GameModel(Some(_), Some(0), selectedShipOpt, _, _, _, _),
             Some(gameState @ GameState(_, _, me, _, _: PreGameMode))
           ) =>
         boardView.shipToPlaceHover.get.map(_.ship) match {
@@ -351,14 +359,14 @@ class GamePresenter(
             }
         }
       case (
-            GameModel(Some(_), Some(2), _, _, _, _),
+            GameModel(Some(_), Some(2), _, _, _, _, _),
             Some(
               gameState @ GameState(
                 gameId,
                 _,
                 me,
                 _,
-                InGameMode(_, _, _, _, _) | GameOverMode(_, _, _, _)
+                PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _)
               )
             )
           ) =>
@@ -375,14 +383,14 @@ class GamePresenter(
           case _ =>
         }
       case (
-            GameModel(Some(_), Some(0), _, turnAttacks, turnAttacksSent, selectedBoardMarkOpt),
+            GameModel(Some(_), Some(0), _, turnAttacks, turnAttacksSent, selectedBoardMarkOpt, _),
             Some(
               gameState @ GameState(
                 gameId,
                 _,
                 me,
                 _,
-                InGameMode(_, _, _, _, _) | GameOverMode(_, _, _, _)
+                PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _)
               )
             )
           ) =>
@@ -407,7 +415,7 @@ class GamePresenter(
               gameRpc.sendBoardMarks(gameId, List((enemyBoardCoor, updatedBoardMark)))
             }
           case (Some(enemyBoardCoor), None, None)
-              if gameState.gameMode.isInGame &&
+              if gameState.gameMode.isPlaying &&
                 !turnAttacksSent && isValidCoordinateTarget(enemyBoardCoor) =>
             def setFirstMissile(turnAttacks: List[Attack]): List[Attack] =
               turnAttacks match {
@@ -599,7 +607,7 @@ class GamePresenter(
     (gameModel.get.turnAttacks, gameStateProperty.get) match {
       case (
             turnAttacks,
-            Some(GameState(gameId, _, _, _, InGameMode(_, turn, _, _, _)))
+            Some(GameState(gameId, _, _, _, PlayingMode(_, turn, _, _, _)))
           ) if turnAttacks.forall(_.isPlaced) =>
         gameModel.subProp(_.turnAttacksSent).set(true)
         gameRpc.sendTurnAttacks(gameId, turn, turnAttacks)
@@ -610,7 +618,7 @@ class GamePresenter(
 
   def isValidCoordinateTarget(enemyBoardCoor: Coordinate): Boolean =
     gameStateProperty.get match {
-      case Some(GameState(_, _, me, _, _: InGameMode)) =>
+      case Some(GameState(_, _, me, _, _: PlayingMode)) =>
         val Coordinate(x, y) = enemyBoardCoor
         val (turnNumberOpt, boardMark) = me.enemyBoardMarks(x)(y)
         turnNumberOpt.isEmpty && !boardMark.isPermanent
@@ -619,7 +627,7 @@ class GamePresenter(
     }
 
   def setSelectedTab(selectedTab: String): Unit = {
-    screenModel.subProp(_.selectedTab).set(selectedTab)
+    selectedTabProperty.set(selectedTab)
   }
 
 }

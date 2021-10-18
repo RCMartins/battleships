@@ -4,7 +4,7 @@ import com.softwaremill.quicklens.ModifyPimp
 import io.udash.rpc.ClientId
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game.BonusReward.ExtraTurn
-import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
+import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game.HitHint.{ShipHit, Water}
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.Utils.updateVectorUsing
@@ -348,7 +348,7 @@ class GameService(rpcClientsService: RpcClientsService) {
           case (None, _) =>
             PreGameMode(me.myBoard.ships.nonEmpty, enemy.myBoard.ships.nonEmpty)
           case (Some((turn, currentPlayerUsername)), None) =>
-            InGameMode(
+            PlayingMode(
               currentPlayerUsername == me.username,
               turn = turn,
               turnAttackTypes = me.currentTurnAttackTypes,

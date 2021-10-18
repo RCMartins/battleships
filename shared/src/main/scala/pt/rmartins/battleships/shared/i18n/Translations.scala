@@ -38,13 +38,29 @@ object Translations {
     val enemyTurn = key("game.header.enemy_turn")
     val youWon = key("game.header.you_won")
     val enemyWon = key("game.header.enemy_won")
+    val loggedInAs = key("game.header.logged_in_as")
+    val playingAgainst = key("game.header.playing_against")
+    val turn = key("game.header.turn")
+    val myTime = key("game.header.my_time")
+    val enemyTime = key("game.header.enemy_time")
 
     val startGameVsBot = key("game.buttons.start_game_bot")
     val startGameVsPlayer = key("game.buttons.start_game_player")
-    val restartButton = key("game.buttons.restart")
+    val rematchButton = key("game.buttons.rematch")
     val quitGameButton = key("game.buttons.quitGame")
     val logoutButton = key("game.buttons.logout")
 
+    val confirmButton = key("game.buttons.confirm")
+    val undoButton = key("game.buttons.undo")
+    val resetButton = key("game.buttons.reset")
+    val randomButton = key("game.buttons.random")
+    val launchAttackButton = key("game.buttons.launch_attack")
+    val waitForTurnButton = key("game.buttons.wait_for_turn")
+
     val extraTurnPopup = key("game.popup.extra_turn")
+
+    val chatTab = key("game.tab.chat")
+    val myMovesTab = key("game.tab.my_moves")
+    val enemyMovesTab = key("game.tab.enemy_moves")
   }
 }

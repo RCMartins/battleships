@@ -3,6 +3,7 @@ package pt.rmartins.battleships.frontend.views.game
 import com.avsystem.commons.universalOps
 import io.udash._
 import io.udash.bindings.modifiers.Binding
+import io.udash.bindings.modifiers.Binding.NestedInterceptor
 import io.udash.bootstrap.button.UdashButton
 import io.udash.bootstrap.card.UdashCard
 import io.udash.bootstrap.form.UdashForm.FormEvent
@@ -14,14 +15,14 @@ import io.udash.css._
 import io.udash.i18n._
 import org.scalajs.dom
 import org.scalajs.dom._
-import org.scalajs.dom.html.{Canvas, Div, LI}
+import org.scalajs.dom.html.{Canvas, Div, LI, Span}
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasColor
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.css.ChatStyles
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
-import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, InGameMode, PreGameMode}
+import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game._
 import scalatags.JsDom
 import scalatags.JsDom.all._
@@ -41,11 +42,9 @@ class GameView(
 
   import translationsService._
 
-  private val MainGameCanvasId = "mainGameCanvas"
-
   private val myBoardCanvas: Canvas =
     canvas(
-      id := MainGameCanvasId
+      id := "mainGameCanvas"
     ).render
 
   screenModel.get.canvasSize.pipe { canvasSize =>
@@ -151,41 +150,41 @@ class GameView(
       .render
       .tap(_.classList.add("my-0"))
 
-  private val confirmShipsButton = UdashButton(
-    buttonStyle = Color.Primary.toProperty,
-    block = true.toProperty,
-    componentId = ComponentId("confirm-button"),
-    disabled = presenter.gameStateProperty.transform(!_.exists(_.me.shipsLeftToPlace.isEmpty))
-  )(_ => Seq[Modifier](span("Confirm")))
+  private val confirmShipsButton =
+    UdashButton(
+      buttonStyle = Color.Primary.toProperty,
+      block = true.toProperty,
+      componentId = ComponentId("confirm-button"),
+      disabled = presenter.gameStateProperty.transform(!_.exists(_.me.shipsLeftToPlace.isEmpty))
+    )(nested => Seq(nested(translatedDynamic(Translations.Game.confirmButton)(_.apply()))))
 
-  private val undoButton = UdashButton(
-    buttonStyle = Color.Secondary.toProperty,
-    block = true.toProperty,
-    componentId = ComponentId("undo-button"),
-    disabled = presenter.gameStateProperty.transform(!_.exists(_.me.myBoard.ships.nonEmpty))
-  )(_ =>
-    Seq[Modifier](
-      span("Undo")
-    ) //, `class` := "bi bi-arrow-counterclockwise")
-  )
+  private val undoButton =
+    UdashButton(
+      buttonStyle = Color.Secondary.toProperty,
+      block = true.toProperty,
+      componentId = ComponentId("undo-button"),
+      disabled = presenter.gameStateProperty.transform(!_.exists(_.me.myBoard.ships.nonEmpty))
+    )(nested => Seq(nested(translatedDynamic(Translations.Game.undoButton)(_.apply()))))
 
-  private val resetButton = UdashButton(
-    buttonStyle = Color.Danger.toProperty,
-    block = true.toProperty,
-    componentId = ComponentId("reset-button"),
-    disabled = presenter.gameStateProperty.transform(!_.exists(_.me.myBoard.ships.nonEmpty))
-  )(_ => Seq[Modifier](span("Reset")))
+  private val resetButton =
+    UdashButton(
+      buttonStyle = Color.Danger.toProperty,
+      block = true.toProperty,
+      componentId = ComponentId("reset-button"),
+      disabled = presenter.gameStateProperty.transform(!_.exists(_.me.myBoard.ships.nonEmpty))
+    )(nested => Seq(nested(translatedDynamic(Translations.Game.resetButton)(_.apply()))))
 
-  private val randomPlacementButton = UdashButton(
-    buttonStyle = Color.Secondary.toProperty,
-    block = true.toProperty,
-    componentId = ComponentId("random-button"),
-    disabled = presenter.gameStateProperty.transform(!_.exists(_.me.shipsLeftToPlace.nonEmpty))
-  )(_ => Seq[Modifier](span("Random")))
+  private val randomPlacementButton =
+    UdashButton(
+      buttonStyle = Color.Secondary.toProperty,
+      block = true.toProperty,
+      componentId = ComponentId("random-button"),
+      disabled = presenter.gameStateProperty.transform(!_.exists(_.me.shipsLeftToPlace.nonEmpty))
+    )(nested => Seq(nested(translatedDynamic(Translations.Game.randomButton)(_.apply()))))
 
   private val launchAttackButton = {
     val launchAttackIsDisabledProperty =
-      presenter.inGameModeProperty
+      presenter.playingModeProperty
         .transform(_.map(_.isMyTurn))
         .combine(gameModel.subProp(_.turnAttacks)) { case (isMyTurnOpt, turnAttacks) =>
           !isMyTurnOpt.exists(isMyTurn => isMyTurn && turnAttacks.forall(_.isPlaced))
@@ -197,20 +196,21 @@ class GameView(
       componentId = ComponentId("launch-attack-button"),
       disabled = launchAttackIsDisabledProperty
     )(nested =>
-      Seq(nested(produce(presenter.isMyTurnProperty) {
-        case true  => span("Launch Attack!").render
-        case false => span("Wait for your turn").render
+      Seq(nested(produceWithNested(presenter.isMyTurnProperty) {
+        case (true, nested) =>
+          span(nested(translatedDynamic(Translations.Game.launchAttackButton)(_.apply()))).render
+        case (false, nested) =>
+          span(nested(translatedDynamic(Translations.Game.waitForTurnButton)(_.apply()))).render
       }))
     )
   }
 
-  private val restartButton = {
+  private val rematchButton =
     UdashButton(
       buttonStyle = Color.Primary.toProperty,
       block = true.toProperty,
-      componentId = ComponentId("restart-button")
-    )(nested => Seq(nested(translatedDynamic(Translations.Game.restartButton)(_.apply()))))
-  }
+      componentId = ComponentId("rematch-button")
+    )(nested => Seq(nested(translatedDynamic(Translations.Game.rematchButton)(_.apply()))))
 
   private val mainGameForm = UdashForm(
     componentId = ComponentId("main-game-from")
@@ -218,7 +218,7 @@ class GameView(
     factory.disabled(Property(false))(nested =>
       nested(produce(presenter.gameModeProperty.transform(_.map {
         case PreGameMode(iPlacedShips, _) => (iPlacedShips, false, false)
-        case InGameMode(_, _, _, _, _)    => (false, true, false)
+        case PlayingMode(_, _, _, _, _)   => (false, true, false)
         case GameOverMode(_, _, _, _)     => (false, false, true)
       })) {
         case None =>
@@ -255,7 +255,7 @@ class GameView(
           div(
             `class` := "row",
             div(`class` := "mx-2"),
-            div(`class` := "mx-1", restartButton)
+            div(`class` := "mx-1", rematchButton)
           ).render
         case _ =>
           span.render
@@ -291,7 +291,7 @@ class GameView(
     presenter.launchAttack()
   }
 
-  restartButton.listen { _ =>
+  rematchButton.listen { _ =>
     presenter.restartGame()
   }
 
@@ -303,7 +303,7 @@ class GameView(
     combine(
       chatMessagesSizeProperty,
       screenModel.subProp(_.lastSeenMessagesChat),
-      screenModel.subProp(_.selectedTab)
+      presenter.selectedTabProperty
     ).transform { case (totalSize, lastSeenMessageCount, selectedTab) =>
       Some(totalSize - lastSeenMessageCount).filter(_ > 0 && selectedTab != ScreenModel.chatTab)
     }
@@ -317,7 +317,7 @@ class GameView(
     combine(
       myMovesHistorySizeProperty,
       screenModel.subProp(_.lastSeenMessagesMyMoves),
-      screenModel.subProp(_.selectedTab)
+      presenter.selectedTabProperty
     ).transform { case (totalSize, lastSeenMessageCount, selectedTab) =>
       Some(totalSize - lastSeenMessageCount).filter(_ > 0 && selectedTab != ScreenModel.myMovesTab)
     }
@@ -331,14 +331,14 @@ class GameView(
     combine(
       enemyMovesHistorySizeProperty,
       screenModel.subProp(_.lastSeenMessagesEnemyMoves),
-      screenModel.subProp(_.selectedTab)
+      presenter.selectedTabProperty
     ).transform { case (totalSize, lastSeenMessageCount, selectedTab) =>
       Some(totalSize - lastSeenMessageCount)
         .filter(_ > 0 && selectedTab != ScreenModel.enemyMovesTab)
     }
 
   combine(
-    screenModel.subProp(_.selectedTab),
+    presenter.selectedTabProperty,
     chatMessagesSizeProperty,
     myMovesHistorySizeProperty,
     enemyMovesHistorySizeProperty
@@ -357,8 +357,7 @@ class GameView(
         `class` := "nav-link btn-outline-primary" +
           (if (presenter.selectedTabProperty.get == ScreenModel.chatTab) " active" else ""),
         data("bs-toggle") := "tab",
-//        data("bs-target") := "#" + ScreenModel.chatTab,
-        "Chat",
+        nested(translatedDynamic(Translations.Game.chatTab)(_.apply())),
         nested(produce(chatMessagesShowNotification) {
           case None         => span.render
           case Some(number) => span(`class` := "badge badge-light ml-1", number).render
@@ -374,8 +373,7 @@ class GameView(
         `class` := "nav-link btn-outline-primary" +
           (if (presenter.selectedTabProperty.get == ScreenModel.myMovesTab) " active" else ""),
         data("bs-toggle") := "tab",
-//        data("bs-target") := "#" + ScreenModel.myMovesTab,
-        "My Moves",
+        nested(translatedDynamic(Translations.Game.myMovesTab)(_.apply())),
         nested(produce(myMovesHistoryShowNotification) {
           case None         => span.render
           case Some(number) => span(`class` := "badge badge-light ml-1", number).render
@@ -391,8 +389,7 @@ class GameView(
         `class` := "nav-link btn-outline-primary" +
           (if (presenter.selectedTabProperty.get == ScreenModel.enemyMovesTab) " active" else ""),
         data("bs-toggle") := "tab",
-//        data("bs-target") := "#" + ScreenModel.enemyMovesTab,
-        "Enemy Moves",
+        nested(translatedDynamic(Translations.Game.enemyMovesTab)(_.apply())),
         nested(produce(enemyMovesHistoryShowNotification) {
           case None         => span.render
           case Some(number) => span(`class` := "badge badge-light ml-1", number).render
@@ -414,7 +411,7 @@ class GameView(
 
   private def messagesTab(nested: Binding.NestedInterceptor) = {
     val navTabs =
-      nested(produce(screenModel.subProp(_.selectedTab)) { _ =>
+      nested(produceWithNested(presenter.selectedTabProperty) { case (_, nested) =>
         def makeNavItem(button: UdashButton): JsDom.TypedTag[LI] =
           li(
             `class` := "nav-item",
@@ -443,14 +440,14 @@ class GameView(
   }
 
   private def messagesTabItem(nested: Binding.NestedInterceptor): Binding =
-    nested(produceWithNested(presenter.selectedTabProperty) { case (selectedTab, nested2) =>
+    nested(produceWithNested(presenter.selectedTabProperty) { case (selectedTab, nested) =>
       div(
         `class` := "tab-pane fade" + (if (selectedTab == ScreenModel.chatTab) " show active"
                                       else ""),
         id := ScreenModel.chatTab,
         role := "tabpanel",
         ChatStyles.messagesWindow,
-        nested2(repeat(chatMessagesProperty) { msgProperty =>
+        nested(repeat(chatMessagesProperty) { msgProperty =>
           val msg = msgProperty.get
           div(
             ChatStyles.msgContainer,
@@ -536,28 +533,28 @@ class GameView(
   }
 
   private def myMovesTabItem(nested: Binding.NestedInterceptor): Binding =
-    nested(produceWithNested(presenter.selectedTabProperty) { case (selectedTab, nested2) =>
+    nested(produceWithNested(presenter.selectedTabProperty) { case (selectedTab, nested) =>
       div(
         `class` := "tab-pane fade" + (if (selectedTab == ScreenModel.myMovesTab) " show active"
                                       else ""),
         id := ScreenModel.myMovesTab,
         role := "tabpanel",
         ChatStyles.messagesWindow,
-        nested2(
+        nested(
           repeat(myMovesHistoryProperty)(turnPlayProperty => turnPlaysToHtml(turnPlayProperty.get))
         )
       ).render
     })
 
   private def enemyMovesTabItem(nested: Binding.NestedInterceptor): Binding =
-    nested(produceWithNested(presenter.selectedTabProperty) { case (selectedTab, nested2) =>
+    nested(produceWithNested(presenter.selectedTabProperty) { case (selectedTab, nested) =>
       div(
         `class` := "tab-pane fade" + (if (selectedTab == ScreenModel.enemyMovesTab) " show active"
                                       else ""),
         id := ScreenModel.enemyMovesTab,
         role := "tabpanel",
         ChatStyles.messagesWindow,
-        nested2(
+        nested(
           repeat(enemyMovesHistoryProperty)(turnPlayProperty =>
             turnPlaysToHtml(turnPlayProperty.get)
           )
@@ -598,16 +595,17 @@ class GameView(
     componentId = ComponentId("quit-game-button")
   )(nested =>
     Seq[Modifier](
-      nested(
-        produce(presenter.gameStateProperty.transform(_.isEmpty))(emptyGameState =>
+      nested(produceWithNested(presenter.gameStateProperty.transform(_.isEmpty)) {
+        case (emptyGameState, nested) =>
           span(
-            translatedDynamic(
-              if (emptyGameState) Translations.Game.logoutButton
-              else Translations.Game.quitGameButton
-            )(_.apply())
+            nested(
+              translatedDynamic(
+                if (emptyGameState) Translations.Game.logoutButton
+                else Translations.Game.quitGameButton
+              )(_.apply())
+            )
           ).render
-        )
-      ),
+      }),
       FontAwesome.Solid.signOutAlt
     )
   )
@@ -625,145 +623,146 @@ class GameView(
     UdashCard(componentId = ComponentId("game-panel"))(factory =>
       Seq(
         factory.header(nested =>
-          nested(produceWithNested(chatModel.subProp(_.username)) {
-            case (Username(username), nested) =>
+          div(
+            `class` := "row justify-content-between",
+            div(
+              `class` := "col-7",
+              span(
+                nested(translatedDynamic(Translations.Game.loggedInAs)(_.apply())),
+                " ",
+                b(bind(chatModel.subProp(_.username)))
+              ),
+              nested(
+                produceWithNested(presenter.gameStateProperty.transform(_.map(_.enemy.username))) {
+                  case (Some(Username(enemyUsername)), nested) =>
+                    span(
+                      " - ",
+                      nested(translatedDynamic(Translations.Game.playingAgainst)(_.apply())),
+                      " ",
+                      b(enemyUsername)
+                    ).render
+                  case _ =>
+                    span.render
+                }
+              ),
+              br,
+              nested(produceWithNested(presenter.gameModeProperty) {
+                case (Some(PreGameMode(iPlacedShips, enemyPlacedShips)), nested) =>
+                  val placeShipsBinding =
+                    nested(
+                      translatedDynamic(
+                        if (iPlacedShips)
+                          Translations.Game.placeShipsWaitEnemy
+                        else if (enemyPlacedShips)
+                          Translations.Game.placeShipsEnemyReady
+                        else
+                          Translations.Game.placeShips
+                      )(_.apply())
+                    )
+                  span(color := "#FF0000", b(placeShipsBinding)).render
+                case (Some(PlayingMode(isMyTurn, turn, _, _, _)), nested) =>
+                  val turnStrBinding: Binding =
+                    nested(
+                      translatedDynamic(
+                        if (isMyTurn)
+                          Translations.Game.yourTurn
+                        else
+                          Translations.Game.enemyTurn
+                      )(_.apply())
+                    )
+
+                  span(
+                    nested(translatedDynamic(Translations.Game.turn)(_.apply())),
+                    " ",
+                    turn.toTurnString,
+                    ": ",
+                    span(color := "#FF0000", b(turnStrBinding))
+                  ).render
+                case (Some(GameOverMode(turn, youWon, _, _)), nested) =>
+                  val turnStrBinding: Binding =
+                    nested(
+                      translatedDynamic(
+                        if (youWon)
+                          Translations.Game.youWon
+                        else
+                          Translations.Game.enemyWon
+                      )(_.apply())
+                    )
+
+                  span(
+                    nested(translatedDynamic(Translations.Game.turn)(_.apply())),
+                    " ",
+                    turn.toTurnString,
+                    ": ",
+                    span(color := "#FF0000", b(turnStrBinding))
+                  ).render
+                case _ =>
+                  span.render
+              })
+            ), {
+              def toTimeStr(seconds: Int): String =
+                "%02d:%02d".format(seconds / 60, seconds % 60)
+
+              def toShortTimeStr(secondsOpt: Option[Int]): String =
+                secondsOpt
+                  .map { seconds =>
+                    if (seconds >= 60)
+                      " + %02d:%02d".format(seconds / 60, seconds % 60)
+                    else
+                      " + %02d".format(seconds)
+                  }
+                  .getOrElse("")
+
+              def showTimeStr(nested: NestedInterceptor, key: TranslationKey0): Binding =
+                nested(
+                  produceWithNested(combine(presenter.playingMode, presenter.inGameOverMode)) {
+                    case ((true, _) | (_, true), nested) =>
+                      span(nested(translatedDynamic(key)(_.apply())), ":").render
+                    case _ =>
+                      div.render
+                  }
+                )
+
+              def showTime(timeRemaining: TimeRemaining): Span =
+                span(
+                  span(b(toTimeStr(timeRemaining.totalTimeRemainingMillis / 1000))),
+                  span(b(toShortTimeStr(timeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000))))
+                ).render
+
               div(
-                `class` := "row justify-content-between",
+                `class` := "col-3 row",
                 div(
-                  `class` := "col-7",
-                  if (username.nonEmpty)
-                    span(s"Logged in as ", b(username)).render
-                  else
-                    span("").render,
-                  nested(
-                    produce(presenter.gameStateProperty.transform(_.map(_.enemy.username))) {
-                      case Some(Username(enemyUsername)) if enemyUsername.nonEmpty =>
-                        span(" - playing against ", b(enemyUsername)).render
-                      case _ =>
-                        span.render
-                    }
-                  ),
+                  `class` := "col px-0",
+                  showTimeStr(nested, Translations.Game.myTime),
                   br,
-                  nested(produce(presenter.gameModeProperty) {
-                    case Some(PreGameMode(iPlacedShips, enemyPlacedShips)) =>
-                      val placeShipsBinding =
-                        translatedDynamic(
-                          if (iPlacedShips)
-                            Translations.Game.placeShipsWaitEnemy
-                          else if (enemyPlacedShips)
-                            Translations.Game.placeShipsEnemyReady
-                          else
-                            Translations.Game.placeShips
-                        )(_.apply())
-                      span(color := "#FF0000", b(placeShipsBinding)).render
-                    case Some(InGameMode(isMyTurn, turn, _, _, _)) =>
-                      val turnStrBinding: Binding =
-                        translatedDynamic(
-                          if (isMyTurn)
-                            Translations.Game.yourTurn
-                          else
-                            Translations.Game.enemyTurn
-                        )(_.apply())
-
-                      span(
-                        "Turn ",
-                        turn.toTurnString,
-                        ": ",
-                        span(color := "#FF0000", b(turnStrBinding))
-                      ).render
-                    case Some(GameOverMode(turn, youWon, _, _)) =>
-                      val turnStrBinding: Binding =
-                        translatedDynamic(
-                          if (youWon)
-                            Translations.Game.youWon
-                          else
-                            Translations.Game.enemyWon
-                        )(_.apply())
-
-                      span(
-                        "Turn ",
-                        turn.toTurnString,
-                        ": ",
-                        span(color := "#FF0000", b(turnStrBinding))
-                      ).render
+                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.map(_._1))) {
+                    case Some(myTimeRemaining) =>
+                      showTime(myTimeRemaining)
+                    case _ =>
+                      div.render
+                  })
+                ),
+                div(
+                  `class` := "col px-0",
+                  showTimeStr(nested, Translations.Game.enemyTime),
+                  br,
+                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.map(_._2))) {
+                    case Some(enemyTimeRemaining) =>
+                      showTime(enemyTimeRemaining)
                     case _ =>
                       span.render
                   })
-                ),
-                nested(
-                  produce(presenter.gameModeProperty) {
-                    gameModeOpt =>
-                      def toTimeStr(seconds: Int): String =
-                        "%02d:%02d".format(seconds / 60, seconds % 60)
-
-                      def toShortTimeStr(secondsOpt: Option[Int]): String =
-                        secondsOpt
-                          .map { seconds =>
-                            if (seconds >= 60)
-                              " + %02d:%02d".format(seconds / 60, seconds % 60)
-                            else
-                              " + %02d".format(seconds)
-                          }
-                          .getOrElse("")
-
-                      def showTime(
-                          myTimeRemaining: TimeRemaining,
-                          enemyTimeRemaining: TimeRemaining
-                      ): Div = {
-                        div(
-                          `class` := "col-3 row",
-                          div(
-                            `class` := "col px-0",
-                            span("My Time:"),
-                            br,
-                            span(b(toTimeStr(myTimeRemaining.totalTimeRemainingMillis / 1000))),
-                            span(
-                              b(
-                                toShortTimeStr(
-                                  myTimeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000)
-                                )
-                              )
-                            )
-                          ),
-                          div(
-                            `class` := "col px-0",
-                            span("Enemy Time:"),
-                            br,
-                            span(b(toTimeStr(enemyTimeRemaining.totalTimeRemainingMillis / 1000))),
-                            span(
-                              b(
-                                toShortTimeStr(
-                                  enemyTimeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000)
-                                )
-                              )
-                            )
-                          )
-                        ).render
-                      }
-
-                      gameModeOpt match {
-                        case Some(
-                              InGameMode(_, _, _, Some(myTimeRemaining), Some(enemyTimeRemaining))
-                            ) =>
-                          showTime(myTimeRemaining, enemyTimeRemaining)
-                        case Some(
-                              GameOverMode(_, _, Some(myTimeRemaining), Some(enemyTimeRemaining))
-                            ) =>
-                          showTime(myTimeRemaining, enemyTimeRemaining)
-                        case _ =>
-                          div(`class` := "col-3 row").render
-                      }
-                  }
-                ),
-                div(
-                  `class` := "col-2 container",
-                  div(
-                    `class` := "row justify-content-end",
-                    span(quitGameButton).render
-                  )
                 )
-              ).render
-          })
+              )
+            },
+            div(
+              `class` := "col-2 container",
+              div(
+                `class` := "row justify-content-end",
+                span(quitGameButton).render
+              )
+            )
+          ).render
         ),
         factory.body(_ =>
           Seq[Modifier](

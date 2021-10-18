@@ -6,7 +6,7 @@ sealed trait GameMode {
 
   def isPreGame: Boolean = false
 
-  def isInGame: Boolean = false
+  def isPlaying: Boolean = false
 
   def isEndGame: Boolean = false
 
@@ -23,7 +23,7 @@ object GameMode extends HasGenCodec[GameMode] {
 
   }
 
-  case class InGameMode(
+  case class PlayingMode(
       isMyTurn: Boolean,
       turn: Turn,
       turnAttackTypes: List[AttackType],
@@ -31,7 +31,7 @@ object GameMode extends HasGenCodec[GameMode] {
       enemyTimeRemaining: Option[TimeRemaining]
   ) extends GameMode {
 
-    override def isInGame: Boolean = true
+    override def isPlaying: Boolean = true
 
   }
 

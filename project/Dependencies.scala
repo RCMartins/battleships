@@ -90,7 +90,6 @@ object Dependencies {
       "com.typesafe" % "config" % typesafeConfigVersion,
       // server logging backend
       "ch.qos.logback" % "logback-classic" % logbackVersion
-//      "com.softwaremill.quicklens" %% "quicklens" % "1.7.4"
     )
   )
 
