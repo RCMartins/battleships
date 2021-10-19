@@ -51,7 +51,7 @@ object CanvasUtils {
   object CanvasColor {
 
     case class White(border: CanvasBorder = Standard(), alpha: Double = 0.0) extends CanvasColor {
-      val fillColor: String = "0, 0, 0"
+      val fillColor: String = "255, 255, 255"
     }
 
     case class Ship(border: CanvasBorder = Standard(), alpha: Double = 1.0) extends CanvasColor {

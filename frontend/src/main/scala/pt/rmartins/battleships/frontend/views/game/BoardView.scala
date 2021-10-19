@@ -58,17 +58,21 @@ class BoardView(
   private val EnemyBoardPos: ReadableProperty[Coordinate] =
     EnemyBoardMargin.transform(size => AbsMargin + Coordinate(size, size))
 
-  private val BoardMarksSelectorPos: ReadableProperty[Coordinate] =
-    combine(EnemyBoardPos, EnemyBoardSqSize).transform { case (enemyBoardPos, enemyBoardSize) =>
-      enemyBoardPos + Coordinate(0, enemyBoardSize * 10 + enemyBoardSize)
-    }
   private val BoardMarksSelectorSize = SquareSizeBig
   private val BoardMarksSelectorMargin = SquareSizeBig.transform(_ / 2)
+  private val BoardMarksSelectorPos: ReadableProperty[Coordinate] =
+    combine(EnemyBoardPos, EnemyBoardSqSize, BoardMarksSelectorSize, BoardMarksSelectorMargin)
+      .transform {
+        case (enemyBoardPos, enemyBoardSize, boardMarksSelectorSize, boardMarksSelectorMargin) =>
+          enemyBoardPos + Coordinate(
+            enemyBoardSize * 10 / 2 -
+              (BoardMarksSelectorOrder.size * boardMarksSelectorSize +
+                (BoardMarksSelectorOrder.size - 1) * boardMarksSelectorMargin) / 2,
+            enemyBoardSize * 10 + enemyBoardSize
+          )
+      }
   private val BoardMarksSelectorCombined: ReadableProperty[(Coordinate, Int, Int)] =
     combine(BoardMarksSelectorPos, BoardMarksSelectorSize, BoardMarksSelectorMargin)
-
-  private val BoardMarksSelectorOrder: List[BoardMark] =
-    List(BoardMark.Empty, BoardMark.ManualShip, BoardMark.ManualWater)
 
   private val MissilesInicialPos: ReadableProperty[Coordinate] =
     combine(EnemyBoardPos, SquareSizeBig).transform { case (enemyBoardPos, squareSizeBig) =>
@@ -657,7 +661,6 @@ class BoardView(
             } =>
           val canvasColor: CanvasColor =
             boardMark match {
-              case BoardMark.Empty       => CanvasColor.White(alpha = 0.5)
               case BoardMark.ManualWater => CanvasColor.Water(alpha = 0.5)
               case BoardMark.ManualShip  => CanvasColor.Ship(alpha = 0.5)
               case _                     => CanvasColor.White()
@@ -839,6 +842,9 @@ object BoardView {
   case class SummaryShip(ship: Ship, pieces: List[Coordinate], destroyed: Boolean)
 
   val CanvasSize: Coordinate = Coordinate(1000, 400)
+
+  val BoardMarksSelectorOrder: List[BoardMark] =
+    List(BoardMark.ManualShip, BoardMark.ManualWater)
 
   val MissilesInitialPopupTime: Int = 2000
   val MissilesFastPopupTime: Int = 600

@@ -487,8 +487,28 @@ class GamePresenter(
   }
 
   def mouseWheel(wheelRotation: Int): Unit =
-    if (wheelRotation != 0)
-      rotateSelectedShip(wheelRotation)
+    gameStateProperty.get match {
+      case Some(GameState(_, _, _, _, _: PreGameMode)) =>
+        if (wheelRotation != 0)
+          rotateSelectedShip(wheelRotation)
+      case Some(GameState(_, _, _, _, _: PlayingMode)) =>
+        val nextIndex =
+          gameModel.get.selectedBoardMarkOpt.flatMap(boardMark =>
+            BoardView.BoardMarksSelectorOrder.zipWithIndex.find(_._1 == boardMark)
+          ) match {
+            case None if wheelRotation > 0 =>
+              Some(0)
+            case None if wheelRotation < 0 =>
+              Some(BoardView.BoardMarksSelectorOrder.size - 1)
+            case Some((_, currentIndex)) =>
+              Some(currentIndex + wheelRotation)
+                .filter(index => index >= 0 && index < BoardView.BoardMarksSelectorOrder.size)
+          }
+        gameModel
+          .subProp(_.selectedBoardMarkOpt)
+          .set(nextIndex.map(BoardView.BoardMarksSelectorOrder))
+      case _ =>
+    }
 
   private def rotateSelectedShip(directionDelta: Int): Unit =
     (gameModel.get.selectedShip, gameModeProperty.get) match {
