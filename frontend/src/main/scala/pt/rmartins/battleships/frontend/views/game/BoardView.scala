@@ -24,15 +24,17 @@ class BoardView(
 
   val AbsMargin: Coordinate = Coordinate(0, 0)
 
-  private val sizes = IndexedSeq(10, 12, 15, 20, 30)
+  private val sizes = IndexedSeq(7, 10, 12, 15, 20, 30)
   private def checkSize(screenSize: Int, defaultSizeIndex: Int): Int =
     sizes((if (screenSize < 500) 0 else if (screenSize < 680) 1 else 2) + defaultSizeIndex)
 
   private val SquareSizeBig: ReadableProperty[Int] =
-    screenModel.subProp(_.canvasSize).transform(size => checkSize(size.x, 2))
+    screenModel.subProp(_.canvasSize).transform(size => checkSize(size.x, 3))
   private val SquareSizeMedium: ReadableProperty[Int] =
-    screenModel.subProp(_.canvasSize).transform(size => checkSize(size.x, 1))
+    screenModel.subProp(_.canvasSize).transform(size => checkSize(size.x, 2))
   private val SquareSizeSmall: ReadableProperty[Int] =
+    screenModel.subProp(_.canvasSize).transform(size => checkSize(size.x, 1))
+  private val SquareSizeExtraSmall: ReadableProperty[Int] =
     screenModel.subProp(_.canvasSize).transform(size => checkSize(size.x, 0))
 
   private val MyBoardPreGameSqSize = SquareSizeBig
@@ -95,12 +97,32 @@ class BoardView(
 
   private val PlaceShipsSqSize: ReadableProperty[Int] = SquareSizeSmall
 
-  private val DestructionSummaryPos: ReadableProperty[Coordinate] =
-    combine(MissilesInicialPos, MissilesSqSize, SquareSizeBig).transform {
-      case (missilesPos, missilesSize, squareSizeBig) =>
-        missilesPos + Coordinate(missilesSize + squareSizeBig, 0)
-    }
+  private val DestructionSummaryHitCountSize: ReadableProperty[Int] = SquareSizeExtraSmall
   private val DestructionSummarySqSize: ReadableProperty[Int] = SquareSizeSmall
+  private val DestructionSummaryMargin: ReadableProperty[Int] = SquareSizeSmall
+  private val DestructionSummaryPos: ReadableProperty[Coordinate] =
+    combine(
+      MissilesInicialPos,
+      MissilesSqSize,
+      DestructionSummaryHitCountSize,
+      DestructionSummaryMargin
+    )
+      .transform {
+        case (
+              missilesPos,
+              missilesSize,
+              destructionSummaryHitCountSize,
+              destructionSummaryMargin
+            ) =>
+          missilesPos +
+            Coordinate(
+              missilesSize + destructionSummaryHitCountSize * 2 + destructionSummaryMargin * 2,
+              0
+            )
+      }
+
+  private val DestructionSummaryCombined: ReadableProperty[(Coordinate, Int, Int)] =
+    combine(DestructionSummaryPos, DestructionSummarySqSize, DestructionSummaryMargin)
 
   private val PlaceShipBoardMargin = Coordinate.square(20)
 
@@ -220,20 +242,21 @@ class BoardView(
           None
       }
 
-  val allShipsSummaryCoordinates: ReadableProperty[List[SummaryShip]] =
+  val allShipsSummaryCoordinates
+      : ReadableProperty[List[(Int, Coordinate, Int, List[SummaryShip])]] =
     combine(
       shipsSummaryRelCoordinates,
       gamePresenter.meProperty.transform(_.map(_.turnPlayHistory)),
       gamePresenter.gameModeProperty,
-      DestructionSummaryPos,
-      DestructionSummarySqSize
+      DestructionSummaryCombined,
+      DestructionSummaryHitCountSize
     ).transform {
       case (
             shipsSummary,
             Some(turnPlayHistory),
             Some(PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _)),
-            destructionSummaryPos,
-            destructionSummarySqSize
+            (destructionSummaryPos, destructionSummarySqSize, destructionSummaryMargin),
+            destructionSummaryHitCountSize
           ) =>
         val shipsDestroyed: Map[Int, Int] =
           turnPlayHistory
@@ -241,16 +264,40 @@ class BoardView(
             .groupBy(identity)
             .map { case (shipId, list) => shipId -> list.size }
 
-        shipsSummary.flatMap { case (shipId, viewShipList) =>
-          viewShipList.zipWithIndex.map { case (viewShip, index) =>
-            SummaryShip(
-              viewShip.ship,
-              viewShip.pieces.map(relPieceCoor =>
-                destructionSummaryPos + relPieceCoor * destructionSummarySqSize
-              ),
-              shipsDestroyed.getOrElse(shipId, 0) > index
+        shipsSummary.map { case (shipId, viewShipList) =>
+          val summaryShips: List[SummaryShip] =
+            viewShipList.zipWithIndex.map { case (viewShip, index) =>
+              SummaryShip(
+                viewShip.ship,
+                viewShip.pieces.map(relPieceCoor =>
+                  destructionSummaryPos + relPieceCoor * destructionSummarySqSize
+                ),
+                shipsDestroyed.getOrElse(shipId, 0) > index
+              )
+            }
+
+          val headShip = summaryShips.head
+          val summaryCenter: Coordinate = {
+            val min = headShip.pieces.minBy(_.y).y
+            val max = headShip.pieces.maxBy(_.y).y
+            val centerY =
+              (max + min) / 2 + destructionSummarySqSize / 2 -
+                destructionSummaryHitCountSize / 2 + 1
+            Coordinate(
+              destructionSummaryPos.x - destructionSummaryMargin - destructionSummarySqSize,
+              centerY
             )
           }
+
+          val hitCount: Int =
+            turnPlayHistory
+              .map(_.hitHints.count {
+                case ShipHit(shipHitId, _) if shipHitId == shipId => true
+                case _                                            => false
+              })
+              .sum - summaryShips.count(_.destroyed) * headShip.pieces.size
+
+          (shipId, summaryCenter, hitCount, summaryShips)
         }
       case _ =>
         Nil
@@ -797,11 +844,24 @@ class BoardView(
 
   def drawDestructionSummary(renderingCtx: CanvasRenderingContext2D): Unit = {
     val sqSize = DestructionSummarySqSize.get
-    allShipsSummaryCoordinates.get.foreach { case SummaryShip(_, pieces, destroyed) =>
-      pieces.foreach(drawSquareAbs(renderingCtx, _, sqSize, CanvasColor.Ship()))
+    val hitCountSize = DestructionSummaryHitCountSize.get
+    allShipsSummaryCoordinates.get.foreach { case (_, summaryCenter, hitCount, summaryShipList) =>
+      if (hitCount > 0) {
+        val relCoor = summaryCenter + Coordinate(-4, hitCountSize / 2)
+        renderingCtx.fillStyle = s"rgb(0, 0, 0)"
+        renderingCtx.font = s"bold ${sqSize}px serif"
+        renderingCtx.textBaseline = "middle"
+        renderingCtx.textAlign = "right"
+        renderingCtx.fillText(s"+$hitCount", relCoor.x, relCoor.y)
 
-      if (destroyed)
-        pieces.foreach(drawCrosshairAbs(renderingCtx, _, sqSize, lineWidth = 2.0, alpha = 1.0))
+        drawCrosshairAbs(renderingCtx, summaryCenter, hitCountSize, lineWidth = 2.0, alpha = 1.0)
+      }
+      summaryShipList.foreach { case SummaryShip(_, pieces, destroyed) =>
+        pieces.foreach(drawSquareAbs(renderingCtx, _, sqSize, CanvasColor.Ship()))
+
+        if (destroyed)
+          pieces.foreach(drawCrosshairAbs(renderingCtx, _, sqSize, lineWidth = 2.0, alpha = 1.0))
+      }
     }
   }
 
