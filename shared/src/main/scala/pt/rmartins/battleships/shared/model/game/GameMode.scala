@@ -14,8 +14,6 @@ sealed trait GameMode {
 
 object GameMode extends HasGenCodec[GameMode] {
 
-  //TODO create a simple type with just three values: PreGameMode/PlayingMode/GameOverMode ?
-
   case class PreGameMode(
       iPlacedShips: Boolean,
       enemyPlacedShips: Boolean

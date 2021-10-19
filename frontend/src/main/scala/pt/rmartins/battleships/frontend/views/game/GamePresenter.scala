@@ -9,6 +9,9 @@ import pt.rmartins.battleships.frontend.ApplicationContext.application
 import pt.rmartins.battleships.frontend.routing.{RoutingInGameState, RoutingLoginPageState}
 import pt.rmartins.battleships.frontend.services.UserContextService
 import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
+import pt.rmartins.battleships.frontend.views.game.ModeType._
+import pt.rmartins.battleships.frontend.views.game.Utils.combine
+import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.Utils.canPlaceInBoard
@@ -33,6 +36,9 @@ class GamePresenter(
   val gameStateProperty: Property[Option[GameState]] =
     gameStateModel.bitransform(_.gameState)(GameStateModel(_))
 
+  val enemyProperty: ReadableProperty[Option[SimplePlayer]] =
+    gameStateModel.transform(_.gameState.map(_.enemy))
+
   val gameModeProperty: Property[Option[GameMode]] =
     gameStateProperty.bitransform[Option[GameMode]](_.map(_.gameMode)) {
       case None =>
@@ -40,6 +46,18 @@ class GamePresenter(
       case Some(gameMode) =>
         gameStateModel.get.gameState.map(_.copy(gameMode = gameMode))
     }
+  val modeTypeProperty: ReadableProperty[Option[ModeType]] =
+    gameModeProperty.transform(_.map {
+      case _: PreGameMode  => PreGameModeType
+      case _: PlayingMode  => PlayingModeType
+      case _: GameOverMode => GameOverModeType
+    })
+
+  val preGameModeProperty: Property[Option[PreGameMode]] =
+    gameModeProperty.bitransform[Option[PreGameMode]] {
+      case Some(preGameMode: PreGameMode) => Some(preGameMode)
+      case _                              => None
+    }(identity)
 
   val playingModeProperty: Property[Option[PlayingMode]] =
     gameModeProperty.bitransform[Option[PlayingMode]] {
@@ -92,6 +110,50 @@ class GamePresenter(
     gameStateProperty.set(updatedGameState)
   }
 
+  val chatMessagesProperty: ReadableSeqProperty[ChatMessage] =
+    chatModel.subSeq(_.msgs)
+  val chatMessagesSizeProperty: ReadableProperty[Int] =
+    chatMessagesProperty.transform(_.size)
+  val chatMessagesShowNotification: ReadableProperty[Option[Int]] =
+    combine(
+      chatMessagesSizeProperty,
+      screenModel.subProp(_.lastSeenMessagesChat),
+      selectedTabProperty
+    ).transform { case (totalSize, lastSeenMessageCount, selectedTab) =>
+      Some(totalSize - lastSeenMessageCount)
+        .filter(_ > 0 && selectedTab != ScreenModel.chatTab)
+    }
+
+  val myMovesHistoryProperty: ReadableSeqProperty[TurnPlay] =
+    gameStateProperty
+      .transformToSeq(_.map(_.me.turnPlayHistory).getOrElse(Seq.empty))
+  val myMovesHistorySizeProperty: ReadableProperty[Int] =
+    myMovesHistoryProperty.transform(_.size)
+  val myMovesHistoryShowNotification: ReadableProperty[Option[Int]] =
+    combine(
+      myMovesHistorySizeProperty,
+      screenModel.subProp(_.lastSeenMessagesMyMoves),
+      selectedTabProperty
+    ).transform { case (totalSize, lastSeenMessageCount, selectedTab) =>
+      Some(totalSize - lastSeenMessageCount)
+        .filter(_ > 0 && selectedTab != ScreenModel.myMovesTab)
+    }
+
+  val enemyMovesHistoryProperty: ReadableSeqProperty[TurnPlay] =
+    gameStateProperty
+      .transformToSeq(_.map(_.enemy.turnPlayHistory).getOrElse(Seq.empty))
+  val enemyMovesHistorySizeProperty: ReadableProperty[Int] =
+    enemyMovesHistoryProperty.transform(_.size)
+  val enemyMovesHistoryShowNotification: ReadableProperty[Option[Int]] =
+    combine(
+      enemyMovesHistorySizeProperty,
+      screenModel.subProp(_.lastSeenMessagesEnemyMoves),
+      selectedTabProperty
+    ).transform { case (totalSize, lastSeenMessageCount, selectedTab) =>
+      Some(totalSize - lastSeenMessageCount)
+        .filter(_ > 0 && selectedTab != ScreenModel.enemyMovesTab)
+    }
+
   private var timeRemainingIntervalHandle: Option[Int] = None
   private val timeRemainingIntervalMillis: Int = 100
 
@@ -103,11 +165,16 @@ class GamePresenter(
         }
         timeRemainingIntervalHandle.foreach(window.clearTimeout)
         timeRemainingIntervalHandle = None
+
+        selectedTabProperty.set(ScreenModel.chatTab)
+        screenModel.subProp(_.lastSeenMessagesChat).set(chatMessagesSizeProperty.get)
       case (
             None | Some(_: PreGameMode),
-            Some(GameState(_, _, _, _, PlayingMode(_, _, turnAttackTypes, _, _)))
+            Some(GameState(_, _, me, enemy, PlayingMode(_, _, turnAttackTypes, _, _)))
           ) =>
         selectedTabProperty.set(ScreenModel.myMovesTab)
+        screenModel.subProp(_.lastSeenMessagesMyMoves).set(me.turnPlayHistory.size)
+        screenModel.subProp(_.lastSeenMessagesEnemyMoves).set(enemy.turnPlayHistory.size)
         gameModel.subProp(_.turnAttacks).set(turnAttackTypes.map(Attack(_, None)))
 
         timeRemainingIntervalHandle.foreach(window.clearTimeout)
@@ -155,9 +222,16 @@ class GamePresenter(
             timeout = timeRemainingIntervalMillis
           )
         )
-      case (_, None | Some(GameState(_, _, _, _, _: GameOverMode))) =>
+      case (_, Some(GameState(_, _, _, _, _: GameOverMode))) =>
         timeRemainingIntervalHandle.foreach(window.clearTimeout)
         timeRemainingIntervalHandle = None
+      case (_, None) =>
+        timeRemainingIntervalHandle.foreach(window.clearTimeout)
+        timeRemainingIntervalHandle = None
+
+        chatModel.subProp(_.msgs).set(Seq.empty)
+        selectedTabProperty.set(ScreenModel.chatTab)
+        screenModel.subProp(_.lastSeenMessagesChat).set(0)
       case _ =>
     }
     to.map(_.gameMode) match {
@@ -511,8 +585,8 @@ class GamePresenter(
     }
 
   private def rotateSelectedShip(directionDelta: Int): Unit =
-    (gameModel.get.selectedShip, gameModeProperty.get) match {
-      case (Some(ship), Some(PreGameMode(_, _))) =>
+    (gameModel.get.selectedShip, modeTypeProperty.get) match {
+      case (Some(ship), Some(PreGameModeType)) =>
         gameModel
           .subProp(_.selectedShip)
           .set(Some(ship.rotateBy(directionDelta)))
@@ -646,8 +720,18 @@ class GamePresenter(
         false
     }
 
+  private def updateLastSeen(selectedTab: String): Unit =
+    if (selectedTab == ScreenModel.chatTab)
+      screenModel.subProp(_.lastSeenMessagesChat).set(chatMessagesSizeProperty.get)
+    else if (selectedTab == ScreenModel.myMovesTab)
+      screenModel.subProp(_.lastSeenMessagesMyMoves).set(myMovesHistorySizeProperty.get)
+    else if (selectedTab == ScreenModel.enemyMovesTab)
+      screenModel.subProp(_.lastSeenMessagesEnemyMoves).set(enemyMovesHistorySizeProperty.get)
+
   def setSelectedTab(selectedTab: String): Unit = {
+    updateLastSeen(selectedTabProperty.get)
     selectedTabProperty.set(selectedTab)
+    updateLastSeen(selectedTabProperty.get)
   }
 
 }

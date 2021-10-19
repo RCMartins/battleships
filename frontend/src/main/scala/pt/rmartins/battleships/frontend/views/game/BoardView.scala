@@ -7,6 +7,7 @@ import org.scalajs.dom.raw.HTMLImageElement
 import org.scalajs.dom.{CanvasRenderingContext2D, html}
 import pt.rmartins.battleships.frontend.views.game.BoardView._
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
+import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit
@@ -102,6 +103,7 @@ class BoardView(
   private val DestructionSummaryMargin: ReadableProperty[Int] = SquareSizeSmall
   private val DestructionSummaryPos: ReadableProperty[Coordinate] =
     combine(
+      gamePresenter.modeTypeProperty,
       MissilesInicialPos,
       MissilesSqSize,
       DestructionSummaryHitCountSize,
@@ -109,6 +111,7 @@ class BoardView(
     )
       .transform {
         case (
+              Some(modeType @ (PlayingModeType | GameOverModeType)),
               missilesPos,
               missilesSize,
               destructionSummaryHitCountSize,
@@ -116,9 +119,14 @@ class BoardView(
             ) =>
           missilesPos +
             Coordinate(
-              missilesSize + destructionSummaryHitCountSize * 2 + destructionSummaryMargin * 2,
+              if (modeType == PlayingModeType)
+                missilesSize + destructionSummaryHitCountSize * 2 + destructionSummaryMargin * 3
+              else
+                destructionSummaryHitCountSize * 2 + destructionSummaryMargin * 3,
               0
             )
+        case _ =>
+          Coordinate.origin
       }
 
   private val DestructionSummaryCombined: ReadableProperty[(Coordinate, Int, Int)] =
@@ -192,14 +200,14 @@ class BoardView(
     combine(
       shipsSummaryRelCoordinates,
       gamePresenter.meProperty.transform(_.map(_.shipsLeftToPlace)),
-      gamePresenter.gameModeProperty,
+      gamePresenter.modeTypeProperty,
       PlaceShipsPos,
       PlaceShipsSqSize
     ).transform {
       case (
             shipsSummary,
             Some(shipsLeftToPlace),
-            Some(PreGameMode(_, _)),
+            Some(PreGameModeType),
             placeShipsPos,
             placeShipsSqSize
           ) =>
@@ -247,14 +255,14 @@ class BoardView(
     combine(
       shipsSummaryRelCoordinates,
       gamePresenter.meProperty.transform(_.map(_.turnPlayHistory)),
-      gamePresenter.gameModeProperty,
+      gamePresenter.modeTypeProperty,
       DestructionSummaryCombined,
       DestructionSummaryHitCountSize
     ).transform {
       case (
             shipsSummary,
             Some(turnPlayHistory),
-            Some(PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _)),
+            Some(PlayingModeType | GameOverModeType),
             (destructionSummaryPos, destructionSummarySqSize, destructionSummaryMargin),
             destructionSummaryHitCountSize
           ) =>
@@ -307,14 +315,14 @@ class BoardView(
     combine(
       gamePresenter.mousePositionProperty,
       gamePresenter.meProperty.transform(_.map(_.myBoard.boardSize)),
-      gamePresenter.gameModeProperty,
+      gamePresenter.modeTypeProperty,
       SquareSizeBig,
       MyBoardPreGamePos
     ).transform {
       case (
             Some(mousePosition),
             Some(boardSize),
-            Some(PreGameMode(_, _)),
+            Some(PreGameModeType),
             defaultSquareSize,
             myBoardPosPreGame
           ) =>
@@ -333,13 +341,15 @@ class BoardView(
   val enemyBoardMouseCoordinate: ReadableProperty[Option[Coordinate]] =
     combine(
       gamePresenter.mousePositionProperty,
-      gamePresenter.gameStateProperty, // TODO improve
+      gamePresenter.enemyProperty,
+      gamePresenter.modeTypeProperty,
       EnemyBoardPos,
       EnemyBoardSqSize
     ).transform {
       case (
             Some(mousePosition),
-            Some(GameState(_, _, _, enemy, PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _))),
+            Some(enemy),
+            Some(PlayingModeType | GameOverModeType),
             enemyBoardPos,
             defaultSquareSize
           ) =>
@@ -357,11 +367,11 @@ class BoardView(
 
   private val BoardMarksSelectorAllPositions: ReadableProperty[List[(BoardMark, Coordinate)]] =
     combine(
-      gamePresenter.gameModeProperty,
+      gamePresenter.modeTypeProperty,
       BoardMarksSelectorCombined
     ).transform {
       case (
-            Some(PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _)),
+            Some(PlayingModeType | GameOverModeType),
             (boardMarksSelectorPos, boardMarksSelectorSize, boardMarksSelectorMargin)
           ) =>
         BoardMarksSelectorOrder.zipWithIndex.map { case (boardMark, index) =>
@@ -378,13 +388,13 @@ class BoardView(
   val boardMarkHover: ReadableProperty[Option[BoardMark]] =
     combine(
       gamePresenter.mousePositionProperty,
-      gamePresenter.gameModeProperty,
+      gamePresenter.modeTypeProperty,
       BoardMarksSelectorAllPositions,
       BoardMarksSelectorSize
     ).transform {
       case (
             Some(mousePosition),
-            Some(PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _)),
+            Some(PlayingModeType | GameOverModeType),
             boardMarksSelectorAllPositions,
             boardMarksSelectorSize
           ) =>
@@ -468,6 +478,7 @@ class BoardView(
           selectedBoardMarkOpt
         )
 
+        drawDestructionSummary(renderingCtx)
         drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
       case _ =>
     }
