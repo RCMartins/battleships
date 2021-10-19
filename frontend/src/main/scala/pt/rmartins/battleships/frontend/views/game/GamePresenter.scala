@@ -265,10 +265,10 @@ class GamePresenter(
       gameRpc.startGameWith(otherPlayerUsername)
   }
 
-  def restartGame(): Unit =
+  def rematchGame(): Unit =
     gameStateProperty.get match {
       case Some(GameState(gameId, _, _, _, _)) =>
-        gameRpc.restartGame(gameId)
+        gameRpc.rematchGame(gameId)
       case _ =>
     }
 

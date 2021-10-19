@@ -20,7 +20,7 @@ trait GameRPC {
 
   def getAllMessages: Future[Seq[ChatMessage]]
 
-  def restartGame(gameId: GameId): Future[Unit]
+  def rematchGame(gameId: GameId): Future[Unit]
 
   def confirmShips(gameId: GameId, shipPositions: List[ShipInGame]): Future[Unit]
 

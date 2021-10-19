@@ -292,7 +292,7 @@ class GameView(
   }
 
   rematchButton.listen { _ =>
-    presenter.restartGame()
+    presenter.rematchGame()
   }
 
   private val chatMessagesProperty: ReadableSeqProperty[ChatMessage] =

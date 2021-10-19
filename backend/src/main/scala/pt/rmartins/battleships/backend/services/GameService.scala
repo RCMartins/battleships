@@ -591,7 +591,7 @@ class GameService(rpcClientsService: RpcClientsService) {
       }
     }
 
-  def restartGame(gameId: GameId, playerUsername: Username): Future[Unit] =
+  def rematchGame(gameId: GameId, playerUsername: Username): Future[Unit] =
     Future {
       activeGames.get(gameId).tap {
         case None =>
@@ -602,7 +602,10 @@ class GameService(rpcClientsService: RpcClientsService) {
       }
     }.map {
       case Some(oldGame) =>
-        startGame(oldGame.player1.username, oldGame.player2.username)
+        if (!oldGame.player2.isHuman)
+          startGameWithBots(oldGame.player1.username)
+        else
+          startGame(oldGame.player1.username, oldGame.player2.username)
       case None =>
     }
 

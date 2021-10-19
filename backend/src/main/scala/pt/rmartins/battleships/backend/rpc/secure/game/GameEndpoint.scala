@@ -35,8 +35,8 @@ class GameEndpoint(implicit
   override def getAllMessages: Future[Seq[ChatMessage]] =
     gameService.getAllMessages(ctx.username)
 
-  override def restartGame(gameId: GameId): Future[Unit] =
-    gameService.restartGame(gameId, ctx.username)
+  override def rematchGame(gameId: GameId): Future[Unit] =
+    gameService.rematchGame(gameId, ctx.username)
 
   override def confirmShips(
       gameId: GameId,
