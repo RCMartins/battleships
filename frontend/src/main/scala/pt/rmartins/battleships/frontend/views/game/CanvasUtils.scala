@@ -1,15 +1,18 @@
 package pt.rmartins.battleships.frontend.views.game
 
 import org.scalajs.dom.CanvasRenderingContext2D
-import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasBorder._
 import pt.rmartins.battleships.shared.model.game.{Coordinate, Turn}
 
-object CanvasUtils {
+class CanvasUtils(gamePresenter: GamePresenter) {
+
+  import CanvasBorder._
 
   sealed trait CanvasBorder {
-    val lineColor: String
-    val lineWidth: Double
-    val alpha: Double
+
+    def lineColor: String
+    def lineWidth: Double
+    def alpha: Double
+    def lineDash: Option[Seq[Double]] = None
   }
 
   object CanvasBorder {
@@ -38,6 +41,11 @@ object CanvasUtils {
     case class RedBold(alpha: Double = 1.0) extends CanvasBorder {
       val lineColor: String = "255, 0, 0"
       val lineWidth: Double = 3.0
+    }
+
+    case class DashRed(alpha: Double = 1.0, lineWidth: Double = 3.0) extends CanvasBorder {
+      val lineColor: String = "255, 0, 0"
+      override val lineDash: Option[Seq[Double]] = Some(Seq(4, 2))
     }
 
   }
@@ -98,12 +106,19 @@ object CanvasUtils {
       renderingCtx.fillRect(coor.x, coor.y, size, size)
     }
     if (canvasColor.border.lineColor.nonEmpty) {
+      canvasColor.border.lineDash.foreach { lineDash =>
+        renderingCtx.setLineDash(scalajs.js.Array(lineDash: _*))
+        renderingCtx.lineDashOffset = gamePresenter.lineDashOffset.get
+      }
       renderingCtx.strokeStyle =
         s"rgb(${canvasColor.border.lineColor}, ${canvasColor.border.alpha})"
       renderingCtx.lineWidth = canvasColor.border.lineWidth
       renderingCtx.beginPath()
       renderingCtx.rect(coor.x, coor.y, size, size)
       renderingCtx.stroke()
+
+      renderingCtx.setLineDash(scalajs.js.Array())
+      renderingCtx.lineDashOffset = 0
     }
   }
 

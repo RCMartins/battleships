@@ -10,12 +10,22 @@ case class GameModel(
     turnAttacks: List[Attack],
     turnAttacksSent: Boolean,
     selectedBoardMarkOpt: Option[BoardMark],
-    timeRemaining: Option[(TimeRemaining, TimeRemaining)]
+    timeRemaining: Option[(TimeRemaining, TimeRemaining)],
+    lineDashOffset: Int
 )
 
 object GameModel extends HasModelPropertyCreator[GameModel] {
 
   val default: GameModel =
-    GameModel(None, None, None, Nil, turnAttacksSent = false, None, None)
+    GameModel(
+      mousePosition = None,
+      mouseDown = None,
+      selectedShip = None,
+      turnAttacks = Nil,
+      turnAttacksSent = false,
+      selectedBoardMarkOpt = None,
+      timeRemaining = None,
+      lineDashOffset = 0
+    )
 
 }

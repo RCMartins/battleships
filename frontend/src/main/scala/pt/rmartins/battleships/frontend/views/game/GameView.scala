@@ -17,12 +17,10 @@ import org.scalajs.dom
 import org.scalajs.dom._
 import org.scalajs.dom.html.{Canvas, Div, LI, Span}
 import pt.rmartins.battleships.frontend.services.TranslationsService
-import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasColor
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.css.ChatStyles
 import pt.rmartins.battleships.shared.i18n.Translations
-import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game._
 import scalatags.JsDom
@@ -37,10 +35,12 @@ class GameView(
     chatModel: ModelProperty[ChatModel],
     screenModel: ModelProperty[ScreenModel],
     presenter: GamePresenter,
-    translationsService: TranslationsService
+    translationsService: TranslationsService,
+    canvasUtils: CanvasUtils
 ) extends View
     with CssView {
 
+  import canvasUtils._
   import translationsService._
 
   private val myBoardCanvas: Canvas =
@@ -59,7 +59,7 @@ class GameView(
   }
 
   private val boardView: BoardView =
-    new BoardView(gameModel, screenModel, presenter, myBoardCanvas)
+    new BoardView(gameModel, screenModel, presenter, myBoardCanvas, canvasUtils)
 
   private def reloadBoardView(): Unit = {
     val canvasSize = screenModel.get.canvasSize
@@ -80,8 +80,15 @@ class GameView(
   }
 
   gameStateModel.listen(_ => reloadBoardView())
-  gameModel.listen(_ => reloadBoardView())
   screenModel.subProp(_.canvasSize).listen(_ => reloadBoardView())
+
+  gameModel.subProp(_.mousePosition).listen(_ => reloadBoardView())
+  gameModel.subProp(_.mouseDown).listen(_ => reloadBoardView())
+  gameModel.subProp(_.selectedShip).listen(_ => reloadBoardView())
+  gameModel.subProp(_.turnAttacks).listen(_ => reloadBoardView())
+  gameModel.subProp(_.turnAttacksSent).listen(_ => reloadBoardView())
+  gameModel.subProp(_.selectedBoardMarkOpt).listen(_ => reloadBoardView())
+  gameModel.subProp(_.lineDashOffset).listen(_ => reloadBoardView())
 
   myBoardCanvas.onmousemove = (mouseEvent: MouseEvent) => {
     val rect = myBoardCanvas.getBoundingClientRect()
@@ -421,7 +428,7 @@ class GameView(
       val renderingCtx = shipCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
       val initialPosition = Coordinate(1, canvasSize.y / 2 - (ship.size.y * sqSize) / 2)
       ship.pieces.foreach { shipPiece =>
-        CanvasUtils.drawBoardSquare(
+        drawBoardSquare(
           renderingCtx,
           initialPosition,
           shipPiece,
@@ -429,7 +436,7 @@ class GameView(
           CanvasColor.Ship()
         )
         if (destroyed)
-          CanvasUtils.drawCrosshair(
+          drawCrosshair(
             renderingCtx,
             initialPosition,
             shipPiece,
@@ -447,7 +454,7 @@ class GameView(
       shipCanvas.setAttribute("height", canvasSize.y.toString)
       val renderingCtx = shipCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
       val initialPosition = Coordinate(1, canvasSize.y / 2 - (sqSize / 2))
-      CanvasUtils.drawBoardSquare(
+      drawBoardSquare(
         renderingCtx,
         initialPosition,
         Coordinate.origin,

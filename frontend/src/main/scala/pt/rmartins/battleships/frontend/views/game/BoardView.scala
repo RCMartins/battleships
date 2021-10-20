@@ -6,7 +6,6 @@ import org.scalajs.dom.html.{Canvas, Span}
 import org.scalajs.dom.raw.HTMLImageElement
 import org.scalajs.dom.{CanvasRenderingContext2D, html}
 import pt.rmartins.battleships.frontend.views.game.BoardView._
-import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
@@ -18,8 +17,11 @@ class BoardView(
     gameModel: ModelProperty[GameModel],
     screenModel: ModelProperty[ScreenModel],
     gamePresenter: GamePresenter,
-    myBoardCanvas: Canvas
+    myBoardCanvas: Canvas,
+    canvasUtils: CanvasUtils
 ) {
+
+  import canvasUtils._
 
   // TODO * 10 hardcoded everywhere... instead of a real (Max Board Width/Height) / boardSize
 
@@ -311,6 +313,27 @@ class BoardView(
         Nil
     }
 
+  val summaryShipHover: ReadableProperty[Option[Ship]] =
+    combine(
+      gamePresenter.mousePositionProperty,
+      allShipsSummaryCoordinates,
+      DestructionSummarySqSize
+    ).transform {
+      case (Some(mousePosition), shipsSummary, destructionSummarySqSize) =>
+        val sizeCoor = Coordinate.square(destructionSummarySqSize)
+        shipsSummary
+          .find { case (_, _, _, summaryShips) =>
+            summaryShips.exists(
+              _.pieces.exists(sqCoor =>
+                mousePosition >= sqCoor && mousePosition <= sqCoor + sizeCoor
+              )
+            )
+          }
+          .map(_._4.head.ship)
+      case _ =>
+        None
+    }
+
   val myBoardMouseCoordinate: ReadableProperty[Option[Coordinate]] =
     combine(
       gamePresenter.mousePositionProperty,
@@ -409,8 +432,16 @@ class BoardView(
     }
 
   def paint(): Unit = {
-    val GameModel(mousePositionOpt, _, selectedShipOpt, turnAttacks, _, selectedBoardMarkOpt, _) =
-      gameModel.get
+    val GameModel(
+      mousePositionOpt,
+      _,
+      selectedShipOpt,
+      turnAttacks,
+      _,
+      selectedBoardMarkOpt,
+      _,
+      _
+    ) = gameModel.get
 
     val renderingCtx = myBoardCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
 
@@ -447,14 +478,15 @@ class BoardView(
           turnAttacks,
           EnemyBoardPos.get,
           EnemyBoardSqSize.get,
-          selectedBoardMarkOpt
+          selectedBoardMarkOpt,
+          selectedShipOpt
         )
 
         val ScreenModel(_, _, _, _, _, missilesPopupMillisOpt, extraTurnPopup, extraTurnText) =
           screenModel.get
         drawMissiles(renderingCtx, turnAttacks, missilesPopupMillisOpt)
         drawExtraTurnPopup(renderingCtx, turnAttacks, extraTurnPopup, extraTurnText)
-        drawDestructionSummary(renderingCtx)
+        drawDestructionSummary(renderingCtx, selectedShipOpt)
         drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
       case Some(GameState(_, _, me, enemy, _: GameOverMode)) =>
         drawMyBoard(
@@ -475,10 +507,11 @@ class BoardView(
           Nil,
           EnemyBoardPos.get,
           EnemyBoardSqSize.get,
-          selectedBoardMarkOpt
+          selectedBoardMarkOpt,
+          selectedShipOpt
         )
 
-        drawDestructionSummary(renderingCtx)
+        drawDestructionSummary(renderingCtx, selectedShipOpt)
         drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
       case _ =>
     }
@@ -667,7 +700,8 @@ class BoardView(
       turnAttacks: List[Attack],
       boardPosition: Coordinate,
       squareSize: Int,
-      selectedBoardMarkOpt: Option[BoardMark]
+      selectedBoardMarkOpt: Option[BoardMark],
+      selectedShipOpt: Option[Ship]
   ): Unit = {
     drawBoardLimits(renderingCtx, "Enemy board", enemy.boardSize, boardPosition, squareSize)
 
@@ -698,16 +732,32 @@ class BoardView(
       }
     }
 
-    me.turnPlayHistory.headOption.map(_.turn).foreach { lastTurn =>
-      boardMarksWithCoor.foreach {
-        case (coor, Some(turn), _) if turn == lastTurn =>
-          drawBoardSquare(
-            renderingCtx,
-            boardPosition,
-            coor,
-            squareSize,
-            CanvasColor.White(CanvasBorder.RedBold())
-          )
+    me.turnPlayHistory.zipWithIndex.foreach { case (lastTurnPlay, index) =>
+      selectedShipOpt match {
+        case Some(ship) if lastTurnPlay.hitHints.exists {
+              case ShipHit(shipId, _) if ship.shipId == shipId => true
+              case _                                           => false
+            } =>
+          lastTurnPlay.turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
+            drawBoardSquare(
+              renderingCtx,
+              boardPosition,
+              coor,
+              squareSize,
+              CanvasColor.White(CanvasBorder.DashRed())
+            )
+          }
+        case None =>
+          if (index == 0)
+            lastTurnPlay.turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
+              drawBoardSquare(
+                renderingCtx,
+                boardPosition,
+                coor,
+                squareSize,
+                CanvasColor.White(CanvasBorder.RedBold())
+              )
+            }
         case _ =>
       }
     }
@@ -853,7 +903,10 @@ class BoardView(
     }
   }
 
-  def drawDestructionSummary(renderingCtx: CanvasRenderingContext2D): Unit = {
+  def drawDestructionSummary(
+      renderingCtx: CanvasRenderingContext2D,
+      selectedShipOpt: Option[Ship]
+  ): Unit = {
     val sqSize = DestructionSummarySqSize.get
     val hitCountSize = DestructionSummaryHitCountSize.get
     allShipsSummaryCoordinates.get.foreach { case (_, summaryCenter, hitCount, summaryShipList) =>
@@ -867,8 +920,21 @@ class BoardView(
 
         drawCrosshairAbs(renderingCtx, summaryCenter, hitCountSize, lineWidth = 2.0, alpha = 1.0)
       }
-      summaryShipList.foreach { case SummaryShip(_, pieces, destroyed) =>
-        pieces.foreach(drawSquareAbs(renderingCtx, _, sqSize, CanvasColor.Ship()))
+      summaryShipList.foreach { case SummaryShip(summaryShip, pieces, destroyed) =>
+        pieces.foreach { shipPiece =>
+          drawSquareAbs(renderingCtx, shipPiece, sqSize, CanvasColor.Ship())
+
+          selectedShipOpt.foreach {
+            case selectedShip if selectedShip.shipId == summaryShip.shipId =>
+              drawSquareAbs(
+                renderingCtx,
+                shipPiece,
+                sqSize,
+                CanvasColor.White(CanvasBorder.DashRed(lineWidth = 2.0))
+              )
+            case _ =>
+          }
+        }
 
         if (destroyed)
           pieces.foreach(drawCrosshairAbs(renderingCtx, _, sqSize, lineWidth = 2.0, alpha = 1.0))

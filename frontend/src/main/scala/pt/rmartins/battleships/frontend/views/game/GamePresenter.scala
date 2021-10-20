@@ -9,6 +9,7 @@ import pt.rmartins.battleships.frontend.ApplicationContext.application
 import pt.rmartins.battleships.frontend.routing.{RoutingInGameState, RoutingLoginPageState}
 import pt.rmartins.battleships.frontend.services.UserContextService
 import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
+import pt.rmartins.battleships.frontend.views.game.BoardView.ToPlaceShip
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
@@ -89,6 +90,9 @@ class GamePresenter(
   val mousePositionProperty: Property[Option[Coordinate]] =
     gameModel.subProp(_.mousePosition)
 
+  val lineDashOffset: Property[Int] =
+    gameModel.subProp(_.lineDashOffset)
+
   private val msgCallback = notificationsCenter.onNewMsg { case msg =>
     chatModel.subSeq(_.msgs).append(msg)
   }
@@ -154,6 +158,22 @@ class GamePresenter(
         .filter(_ > 0 && selectedTab != ScreenModel.enemyMovesTab)
     }
 
+  private var lineDashOffsetIntervalHandle: Option[Int] = None
+  private val lineDashOffsetIntervalMillis: Int = 250
+
+  def setLineDashOffsetInterval(active: Boolean): Unit = {
+    lineDashOffsetIntervalHandle.foreach(window.clearTimeout)
+    if (active)
+      lineDashOffsetIntervalHandle = Some(
+        window.setInterval(
+          () => {
+            lineDashOffset.set((lineDashOffset.get + 1) % 17)
+          },
+          timeout = lineDashOffsetIntervalMillis
+        )
+      )
+  }
+
   private var timeRemainingIntervalHandle: Option[Int] = None
   private val timeRemainingIntervalMillis: Int = 100
 
@@ -165,6 +185,7 @@ class GamePresenter(
         }
         timeRemainingIntervalHandle.foreach(window.clearTimeout)
         timeRemainingIntervalHandle = None
+        setLineDashOffsetInterval(active = false)
 
         selectedTabProperty.set(ScreenModel.chatTab)
         screenModel.subProp(_.lastSeenMessagesChat).set(chatMessagesSizeProperty.get)
@@ -176,7 +197,9 @@ class GamePresenter(
         screenModel.subProp(_.lastSeenMessagesMyMoves).set(me.turnPlayHistory.size)
         screenModel.subProp(_.lastSeenMessagesEnemyMoves).set(enemy.turnPlayHistory.size)
         gameModel.subProp(_.turnAttacks).set(turnAttackTypes.map(Attack(_, None)))
+        gameModel.subProp(_.selectedShip).set(None)
 
+        setLineDashOffsetInterval(active = true)
         timeRemainingIntervalHandle.foreach(window.clearTimeout)
         timeRemainingIntervalHandle = Some(
           window.setInterval(
@@ -225,9 +248,11 @@ class GamePresenter(
       case (_, Some(GameState(_, _, _, _, _: GameOverMode))) =>
         timeRemainingIntervalHandle.foreach(window.clearTimeout)
         timeRemainingIntervalHandle = None
+        setLineDashOffsetInterval(active = true)
       case (_, None) =>
         timeRemainingIntervalHandle.foreach(window.clearTimeout)
         timeRemainingIntervalHandle = None
+        setLineDashOffsetInterval(active = false)
 
         chatModel.subProp(_.msgs).set(Seq.empty)
         selectedTabProperty.set(ScreenModel.chatTab)
@@ -367,7 +392,7 @@ class GamePresenter(
 
     (gameModel.get, gameStateProperty.get) match {
       case (
-            GameModel(Some(_), Some(button @ (0 | 2)), _, _, _, selectedBoardMarkOpt, _),
+            GameModel(Some(_), Some(button @ (0 | 2)), _, _, _, selectedBoardMarkOpt, _, _),
             Some(
               gameState @ GameState(
                 gameId,
@@ -414,7 +439,7 @@ class GamePresenter(
 
     (gameModel.get, gameStateProperty.get) match {
       case (
-            GameModel(Some(_), Some(0), selectedShipOpt, _, _, _, _),
+            GameModel(Some(_), Some(0), selectedShipOpt, _, _, _, _, _),
             Some(gameState @ GameState(_, _, me, _, _: PreGameMode))
           ) =>
         boardView.shipToPlaceHover.get.map(_.ship) match {
@@ -433,7 +458,7 @@ class GamePresenter(
             }
         }
       case (
-            GameModel(Some(_), Some(2), _, _, _, _, _),
+            GameModel(Some(_), Some(2), _, _, _, _, _, _),
             Some(
               gameState @ GameState(
                 gameId,
@@ -457,7 +482,16 @@ class GamePresenter(
           case _ =>
         }
       case (
-            GameModel(Some(_), Some(0), _, turnAttacks, turnAttacksSent, selectedBoardMarkOpt, _),
+            GameModel(
+              Some(_),
+              Some(0),
+              selectedShip,
+              turnAttacks,
+              turnAttacksSent,
+              selectedBoardMarkOpt,
+              _,
+              _
+            ),
             Some(
               gameState @ GameState(
                 gameId,
@@ -518,6 +552,22 @@ class GamePresenter(
             gameModel.subProp(_.selectedBoardMarkOpt).set(Some(boardMarkClicked))
           case (None, None, Some(_)) =>
             gameModel.subProp(_.selectedBoardMarkOpt).set(None)
+          case _ =>
+        }
+
+        (
+          boardView.enemyBoardMouseCoordinate.get,
+          boardView.boardMarkHover.get,
+          selectedShip,
+          boardView.summaryShipHover.get
+        ) match {
+          case (_, _, Some(currentSelectedShip), Some(summaryShipHover))
+              if currentSelectedShip.shipId == summaryShipHover.shipId =>
+            gameModel.subProp(_.selectedShip).set(None)
+          case (None, None, Some(_), None) =>
+            gameModel.subProp(_.selectedShip).set(None)
+          case (_, _, _, Some(summaryShipHover)) =>
+            gameModel.subProp(_.selectedShip).set(Some(summaryShipHover))
           case _ =>
         }
       case _ =>

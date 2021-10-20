@@ -42,7 +42,8 @@ class GameViewFactory(
         chatModel,
         screenModel,
         gamePresenter,
-        translationsService
+        translationsService,
+        new CanvasUtils(gamePresenter)
       )
 
     (gameView, gamePresenter)
