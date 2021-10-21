@@ -1,13 +1,7 @@
 package pt.rmartins.battleships.shared.model.game
 
 import com.avsystem.commons.serialization.HasGenCodec
-import pt.rmartins.battleships.shared.model.game.Rotation.{
-  Rotation0,
-  Rotation1,
-  Rotation2,
-  Rotation3
-}
-import pt.rmartins.battleships.shared.model.game.Ship.toShip
+import pt.rmartins.battleships.shared.model.game.Rotation._
 
 import scala.collection.mutable
 import scala.util.chaining.scalaUtilChainingOps
@@ -40,11 +34,29 @@ object Ship extends HasGenCodec[Ship] {
     Ship(thisShipId, piecePairs.map { case (x, y) => Coordinate(x, y) }, Rotation0)
   }
 
+  def l(y: Int, x: Int*): Seq[(Int, Int)] = x.map((_, y))
+
   val Submarine: Ship = List((0, 0)).pipe(toShip)
   val Skeeter: Ship = List((0, 0), (0, 1)).pipe(toShip)
   val Ranger: Ship = List((0, 0), (0, 1), (0, 2)).pipe(toShip)
   val Conqueror: Ship = List((0, 0), (0, 1), (0, 2), (0, 3)).pipe(toShip)
   val AircraftCarrier: Ship = List((0, 0), (1, 0), (2, 0), (1, 1), (1, 2)).pipe(toShip)
+  val TorpedoBoat: Ship = List((1, 0), (0, 1), (0, 2), (2, 1), (2, 2)).pipe(toShip)
+  val Cruiser: Ship = List((0, 0), (1, 1), (2, 2)).pipe(toShip)
+  val Epoch: Ship =
+    List((0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1), (1, 2)).pipe(toShip)
+  val Battleship: Ship =
+    List((0, 0), (1, 0), (2, 0), (1, 1), (0, 2), (1, 2), (2, 2), (1, 3), (1, 4)).pipe(toShip)
+  val MotherShip: Ship =
+    List(l(y = 0, 0, 1, 3, 5, 6), l(y = 1, 1, 2, 3, 4, 5), l(y = 2, 0, 1, 3, 5, 6)).flatten
+      .pipe(toShip)
+  val HeavyCruiser: Ship =
+    List((2, 0), (1, 1), (3, 1), (0, 2), (4, 2), (1, 3), (3, 3)).pipe(toShip)
+  val Destroyer: Ship =
+    List((2, 0), (2, 1), (0, 2), (1, 2), (2, 2), (3, 2), (4, 2), (2, 3), (2, 4)).pipe(toShip)
+  val FireShip: Ship =
+    List((0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5)).pipe(toShip)
+  //val Colossus 3,0 3,1 2,2 3,2 4,2 1,3 2,3 3,3 4,3 5,3 1,4 2,4 3,4 4,4 5,4 1,5 3,5 5,5 0,6 3,6 6,6 3,7
 
   private val allShipsList: List[Ship] =
     List[Ship](
@@ -52,7 +64,15 @@ object Ship extends HasGenCodec[Ship] {
       Skeeter,
       Ranger,
       Conqueror,
-      AircraftCarrier
+      AircraftCarrier,
+      TorpedoBoat,
+      Cruiser,
+      Epoch,
+      Battleship,
+      MotherShip,
+      HeavyCruiser,
+      Destroyer,
+      FireShip
     )
 
   private val cacheRotations: mutable.Map[(Int, Int), Ship] =
