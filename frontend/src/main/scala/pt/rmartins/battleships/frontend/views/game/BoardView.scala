@@ -159,11 +159,16 @@ class BoardView(
         myBoardPreGamePos +
           Coordinate(myBoardPreGameSqSize * boardSize + myBoardPreGameSqSize, 0)
     }
-  private val PlaceShipsSqSize: ReadableProperty[Int] = SquareSizeMedium
 
+  private val SummaryShipsSqSize: ReadableProperty[Int] = SquareSizeMedium
   private val DestructionSummaryHitCountSize: ReadableProperty[Int] = SquareSizeSmall
-  private val DestructionSummarySqSize: ReadableProperty[Int] = SquareSizeMedium
   private val DestructionSummaryMargin: ReadableProperty[Int] = SizeSmall
+  private val SummaryMaxY: ReadableProperty[Int] =
+    combine(BoardSizeProperty, EnemyBoardSqSize, SummaryShipsSqSize).transform {
+      case (boardSize, enemyBoardSqSize, summaryShipsSqSize) =>
+        (boardSize * enemyBoardSqSize) / summaryShipsSqSize
+    }
+
   private val DestructionSummaryPos: ReadableProperty[Coordinate] =
     combine(
       gamePresenter.modeTypeProperty,
@@ -193,7 +198,7 @@ class BoardView(
       }
 
   private val DestructionSummaryCombined: ReadableProperty[(Coordinate, Int, Int)] =
-    combine(DestructionSummaryPos, DestructionSummarySqSize, DestructionSummaryMargin)
+    combine(DestructionSummaryPos, SummaryShipsSqSize, DestructionSummaryMargin)
 
   private val PlaceShipBoardMargin = Coordinate.square(20)
 
@@ -206,20 +211,35 @@ class BoardView(
     new Image("icons/missile-simple.png")
 
   private val shipsSummaryRelCoordinates: ReadableProperty[List[(Int, List[ViewShip])]] =
-    gamePresenter.rulesProperty.transform {
-      case Some(Rules(shipsInThisGame, _, _, _)) =>
+    combine(gamePresenter.rulesProperty, SummaryMaxY).transform {
+      case (Some(Rules(shipsInThisGame, _, _, _)), summaryMaxY) =>
         def getShipsToPlacePos(
             posX: Int,
             posY: Int,
+            columnX: Int,
+            maxX: Int,
             ships: List[List[Ship]],
             currentList: List[ViewShip],
             shipBefore: Option[Ship]
         ): List[List[ViewShip]] =
           ships match {
+            case (ship :: _) :: _ if posY > 0 && posY + ship.pieces.maxBy(_.y).y > summaryMaxY =>
+              val newColumnX = maxX + 6
+              getShipsToPlacePos(
+                posX = newColumnX,
+                posY = 0,
+                columnX = newColumnX,
+                maxX = newColumnX,
+                ships,
+                currentList,
+                shipBefore
+              )
             case (ship :: next) :: nextList =>
               getShipsToPlacePos(
                 posX + ship.size.x + 1,
                 posY,
+                columnX,
+                Math.max(maxX, ship.pieces.map(_ + Coordinate(posX, posY)).maxBy(_.x).x),
                 next :: nextList,
                 ViewShip(ship, ship.pieces.map(_ + Coordinate(posX, posY))) :: currentList,
                 Some(ship)
@@ -227,8 +247,10 @@ class BoardView(
             case Nil :: nextList =>
               currentList.reverse ::
                 getShipsToPlacePos(
-                  0,
+                  columnX,
                   posY + shipBefore.map(_.size.y + 1).getOrElse(0),
+                  columnX,
+                  maxX,
                   nextList,
                   Nil,
                   None
@@ -251,6 +273,8 @@ class BoardView(
         getShipsToPlacePos(
           posX = 0,
           posY = 0,
+          columnX = 0,
+          maxX = 0,
           shipsListList,
           Nil,
           None
@@ -265,7 +289,7 @@ class BoardView(
       gamePresenter.meProperty.transform(_.map(_.shipsLeftToPlace)),
       gamePresenter.modeTypeProperty,
       PlaceShipsPos,
-      PlaceShipsSqSize
+      SummaryShipsSqSize
     ).transform {
       case (
             shipsSummary,
@@ -300,7 +324,7 @@ class BoardView(
     }
 
   val shipToPlaceHover: ReadableProperty[Option[ToPlaceShip]] =
-    combine(gamePresenter.mousePositionProperty, allShipsToPlaceCoordinates, PlaceShipsSqSize)
+    combine(gamePresenter.mousePositionProperty, allShipsToPlaceCoordinates, SummaryShipsSqSize)
       .transform {
         case (Some(mousePosition), shipsSummary, placeShipsSqSize) =>
           val sizeCoor = Coordinate.square(placeShipsSqSize)
@@ -349,13 +373,14 @@ class BoardView(
 
           val headShip = summaryShips.head
           val summaryCenter: Coordinate = {
+            val minX = headShip.pieces.minBy(_.x).x
             val min = headShip.pieces.minBy(_.y).y
             val max = headShip.pieces.maxBy(_.y).y
             val centerY =
               (max + min) / 2 + destructionSummarySqSize / 2 -
                 destructionSummaryHitCountSize / 2 + 1
             Coordinate(
-              destructionSummaryPos.x - destructionSummaryMargin - destructionSummarySqSize,
+              minX - destructionSummaryMargin - destructionSummarySqSize,
               centerY
             )
           }
@@ -378,7 +403,7 @@ class BoardView(
     combine(
       gamePresenter.mousePositionProperty,
       allShipsSummaryCoordinates,
-      DestructionSummarySqSize
+      SummaryShipsSqSize
     ).transform {
       case (Some(mousePosition), shipsSummary, destructionSummarySqSize) =>
         val sizeCoor = Coordinate.square(destructionSummarySqSize)
@@ -591,7 +616,7 @@ class BoardView(
     drawBoardLimits(renderingCtx, "My board", boardSize, boardPosition, squareSize)
 
     val shipToPlaceHoverOpt: Option[ToPlaceShip] = shipToPlaceHover.get
-    val placeShipsSqSize = PlaceShipsSqSize.get
+    val placeShipsSqSize = SummaryShipsSqSize.get
     allShipsToPlaceCoordinates.get.foreach { case ToPlaceShip(ship, pieces, alreadyPlaced) =>
       if (alreadyPlaced)
         pieces.foreach(
@@ -963,7 +988,7 @@ class BoardView(
       renderingCtx: CanvasRenderingContext2D,
       selectedShipOpt: Option[Ship]
   ): Unit = {
-    val sqSize = DestructionSummarySqSize.get
+    val sqSize = SummaryShipsSqSize.get
     val hitCountSize = DestructionSummaryHitCountSize.get
     allShipsSummaryCoordinates.get.foreach { case (_, summaryCenter, hitCount, summaryShipList) =>
       if (hitCount > 0) {

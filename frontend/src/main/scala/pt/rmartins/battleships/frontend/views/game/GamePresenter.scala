@@ -159,7 +159,7 @@ class GamePresenter(
     }
 
   private var lineDashOffsetIntervalHandle: Option[Int] = None
-  private val lineDashOffsetIntervalMillis: Int = 250
+  private val lineDashOffsetIntervalMillis: Int = 200
 
   def setLineDashOffsetInterval(active: Boolean): Unit = {
     lineDashOffsetIntervalHandle.foreach(window.clearTimeout)

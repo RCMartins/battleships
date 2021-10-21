@@ -468,12 +468,23 @@ class GameService(rpcClientsService: RpcClientsService) {
   ): Game = {
     val gameFleet: Fleet =
       Fleet(
+//        (
+//          List.fill(4)(Ship.Submarine) ++
+//            List.fill(3)(Ship.Skeeter) ++
+//            List.fill(2)(Ship.Ranger) ++
+//            List.fill(1)(Ship.Conqueror) ++
+//            List.fill(1)(Ship.AircraftCarrier)
+//        )
         (
-          List.fill(4)(Ship.Submarine) ++
-            List.fill(3)(Ship.Skeeter) ++
-            List.fill(2)(Ship.Ranger) ++
-            List.fill(1)(Ship.Conqueror) ++
-            List.fill(1)(Ship.AircraftCarrier)
+          List.fill(0)(Ship.Submarine) ++
+            List.fill(4)(Ship.Skeeter) ++
+            List.fill(3)(Ship.Ranger) ++
+            List.fill(2)(Ship.Conqueror) ++
+            List.fill(0)(Ship.AircraftCarrier) ++
+            List.fill(2)(Ship.TorpedoBoat) ++
+            List.fill(2)(Ship.Cruiser) ++
+            List.fill(1)(Ship.Epoch) ++
+            List.fill(1)(Ship.Battleship)
         )
           .groupBy(_.shipId)
           .toList
@@ -507,7 +518,7 @@ class GameService(rpcClientsService: RpcClientsService) {
         timeLimit = timeLimit
       )
 
-    val boardSize = Coordinate(10, 10)
+    val boardSize = Coordinate(15, 15)
     val myBoard: ServerMyBoard =
       ServerMyBoard(boardSize, Nil)
     val enemyBoard: ServerEnemyBoard =
