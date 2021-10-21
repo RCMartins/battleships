@@ -1,6 +1,7 @@
 package pt.rmartins.battleships.frontend.views.game
 
 import org.scalajs.dom.CanvasRenderingContext2D
+import org.scalajs.dom.html.Image
 import pt.rmartins.battleships.shared.model.game.{Coordinate, Turn}
 
 class CanvasUtils(gamePresenter: GamePresenter) {
@@ -175,6 +176,29 @@ class CanvasUtils(gamePresenter: GamePresenter) {
     renderingCtx.moveTo(coordinate.x + size, coordinate.y)
     renderingCtx.lineTo(coordinate.x, coordinate.y + size)
     renderingCtx.stroke()
+  }
+
+  def drawImageAbs(
+      renderingCtx: CanvasRenderingContext2D,
+      image: Image,
+      x: Int,
+      y: Int,
+      width: Int,
+      height: Int,
+      useAntiAliasing: Boolean
+  ): Unit = {
+    renderingCtx.imageSmoothingEnabled = useAntiAliasing
+    renderingCtx.drawImage(
+      image,
+      0,
+      0,
+      500,
+      500,
+      x,
+      y,
+      width,
+      height
+    )
   }
 
 }

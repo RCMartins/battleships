@@ -41,20 +41,23 @@ object Ship extends HasGenCodec[Ship] {
   }
 
   val Submarine: Ship = List((0, 0)).pipe(toShip)
-  val PatrolBoat2: Ship = List((0, 0), (0, 1)).pipe(toShip)
-  val PatrolBoat3: Ship = List((0, 0), (0, 1), (0, 2)).pipe(toShip)
-  val PatrolBoat4: Ship = List((0, 0), (0, 1), (0, 2), (0, 3)).pipe(toShip)
-  val Carrier: Ship = List((0, 0), (1, 0), (2, 0), (1, 1), (1, 2)).pipe(toShip)
+  val Skeeter: Ship = List((0, 0), (0, 1)).pipe(toShip)
+  val Ranger: Ship = List((0, 0), (0, 1), (0, 2)).pipe(toShip)
+  val Conqueror: Ship = List((0, 0), (0, 1), (0, 2), (0, 3)).pipe(toShip)
+  val AircraftCarrier: Ship = List((0, 0), (1, 0), (2, 0), (1, 1), (1, 2)).pipe(toShip)
+
+  private val allShipsList: List[Ship] =
+    List[Ship](
+      Submarine,
+      Skeeter,
+      Ranger,
+      Conqueror,
+      AircraftCarrier
+    )
 
   private val cacheRotations: mutable.Map[(Int, Int), Ship] =
     mutable.Map.empty[(Int, Int), Ship] ++
-      List[Ship](
-        Submarine,
-        PatrolBoat2,
-        PatrolBoat3,
-        PatrolBoat4,
-        Carrier
-      ).map(ship => (ship.shipId, Rotation0.rIndex) -> ship)
+      allShipsList.map(ship => (ship.shipId, Rotation0.rIndex) -> ship)
 
   def getShip(shipId: Int, rotation: Rotation): Ship =
     cacheRotations.getOrElseUpdate(
@@ -63,13 +66,7 @@ object Ship extends HasGenCodec[Ship] {
     )
 
   val allShips: Map[Int, Ship] =
-    List(
-      Submarine,
-      PatrolBoat2,
-      PatrolBoat3,
-      PatrolBoat4,
-      Carrier
-    ).map(ship => ship.shipId -> ship).toMap
+    allShipsList.map(ship => ship.shipId -> ship).toMap
 
   val shipLongXMap: Map[Int, Ship] =
     allShips.keys

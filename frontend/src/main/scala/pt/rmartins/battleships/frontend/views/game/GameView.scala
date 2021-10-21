@@ -80,7 +80,11 @@ class GameView(
   }
 
   gameStateModel.listen(_ => reloadBoardView())
+
   screenModel.subProp(_.canvasSize).listen(_ => reloadBoardView())
+  screenModel.subProp(_.missilesPopupMillisOpt).listen(_ => reloadBoardView())
+  screenModel.subProp(_.extraTurnPopup).listen(_ => reloadBoardView())
+  screenModel.subProp(_.extraTurnText).listen(_ => reloadBoardView())
 
   gameModel.subProp(_.mousePosition).listen(_ => reloadBoardView())
   gameModel.subProp(_.mouseDown).listen(_ => reloadBoardView())

@@ -23,86 +23,147 @@ class BoardView(
 
   import canvasUtils._
 
-  // TODO * 10 hardcoded everywhere... instead of a real (Max Board Width/Height) / boardSize
-
   val AbsMargin: Coordinate = Coordinate(0, 0)
 
-  private val sizes = IndexedSeq(7, 10, 12, 15, 20, 30)
-  private def checkSize(screenSize: Int, defaultSizeIndex: Int): Int =
+  private val MinTextSize = 15
+
+  private val BoardSizeProperty: ReadableProperty[Int] =
+    gamePresenter.enemyProperty.transform {
+      case None        => 1
+      case Some(enemy) => enemy.boardSize.x
+    }
+
+  private val squareSizesProperty: ReadableProperty[IndexedSeq[Int]] =
+    BoardSizeProperty.transform { boardSize =>
+      IndexedSeq(70, 100, 120, 150, 200, 300).map(_ / boardSize)
+    }
+
+  private val sizes: IndexedSeq[Int] = IndexedSeq(7, 10, 12, 15, 20, 30)
+
+  private def checkSize(sizes: IndexedSeq[Int], screenSize: Int, defaultSizeIndex: Int): Int =
     sizes((if (screenSize < 500) 0 else if (screenSize < 680) 1 else 2) + defaultSizeIndex)
 
+  private val SizeBig: ReadableProperty[Int] =
+    screenModel.subProp(_.canvasSize).transform { canvasSize =>
+      checkSize(sizes, canvasSize.x, 3)
+    }
+
+  private val SizeMedium: ReadableProperty[Int] =
+    screenModel.subProp(_.canvasSize).transform { canvasSize =>
+      checkSize(sizes, canvasSize.x, 2)
+    }
+
+  private val SizeSmall: ReadableProperty[Int] =
+    screenModel.subProp(_.canvasSize).transform { canvasSize =>
+      checkSize(sizes, canvasSize.x, 1)
+    }
+
   private val SquareSizeBig: ReadableProperty[Int] =
-    screenModel.subProp(_.canvasSize).transform(size => checkSize(size.x, 3))
+    combine(screenModel.subProp(_.canvasSize), squareSizesProperty).transform {
+      case (canvasSize, sizes) =>
+        checkSize(sizes, canvasSize.x, 3)
+    }
   private val SquareSizeMedium: ReadableProperty[Int] =
-    screenModel.subProp(_.canvasSize).transform(size => checkSize(size.x, 2))
+    combine(screenModel.subProp(_.canvasSize), squareSizesProperty).transform {
+      case (canvasSize, sizes) =>
+        checkSize(sizes, canvasSize.x, 2)
+    }
   private val SquareSizeSmall: ReadableProperty[Int] =
-    screenModel.subProp(_.canvasSize).transform(size => checkSize(size.x, 1))
-  private val SquareSizeExtraSmall: ReadableProperty[Int] =
-    screenModel.subProp(_.canvasSize).transform(size => checkSize(size.x, 0))
+    combine(screenModel.subProp(_.canvasSize), squareSizesProperty).transform {
+      case (canvasSize, sizes) =>
+        checkSize(sizes, canvasSize.x, 1)
+    }
 
   private val MyBoardPreGameSqSize = SquareSizeBig
   private val MyBoardInGameSqSize = SquareSizeMedium
   private val MyBoardGameOverSqSize = SquareSizeBig
-  private val MyBoardMargin = SquareSizeMedium
+  private val MyBoardMargin = SizeMedium
 
   private val EnemyBoardSqSize = SquareSizeBig
-  private val EnemyBoardMargin = SquareSizeMedium
+  private val EnemyBoardMargin = SizeMedium
 
   private val MyBoardPreGamePos: ReadableProperty[Coordinate] =
     MyBoardMargin.transform(size => AbsMargin + Coordinate(size, size))
   private val MyBoardInGamePos: ReadableProperty[Coordinate] =
-    screenModel.subProp(_.canvasSize).combine(MyBoardInGameSqSize) {
-      case (canvasSize, myBoardInGameSize) =>
-        AbsMargin + Coordinate(canvasSize.x - myBoardInGameSize * 11, myBoardInGameSize)
+    combine(
+      screenModel.subProp(_.canvasSize),
+      BoardSizeProperty,
+      MyBoardInGameSqSize,
+      MyBoardMargin
+    ).transform { case (canvasSize, boardSize, myBoardInGameSize, myBoardMargin) =>
+      AbsMargin + Coordinate(
+        canvasSize.x - myBoardInGameSize * boardSize - myBoardMargin,
+        myBoardMargin
+      )
     }
   private val MyBoardGameOverPos: ReadableProperty[Coordinate] =
-    combine(screenModel.subProp(_.canvasSize), MyBoardGameOverSqSize, MyBoardMargin)
-      .transform { case (canvasSize, myBoardGameOverSqSize, myBoardMargin) =>
-        Coordinate(canvasSize.x - myBoardGameOverSqSize * 10 - myBoardMargin, myBoardMargin)
+    combine(
+      screenModel.subProp(_.canvasSize),
+      BoardSizeProperty,
+      MyBoardGameOverSqSize,
+      MyBoardMargin
+    )
+      .transform { case (canvasSize, boardSize, myBoardGameOverSqSize, myBoardMargin) =>
+        Coordinate(
+          canvasSize.x - myBoardGameOverSqSize * boardSize - myBoardMargin,
+          myBoardMargin
+        )
       }
   private val EnemyBoardPos: ReadableProperty[Coordinate] =
-    EnemyBoardMargin.transform(size => AbsMargin + Coordinate(size, size))
+    EnemyBoardMargin.transform(size => AbsMargin + Coordinate.square(size))
 
   private val BoardMarksSelectorSize = SquareSizeBig
   private val BoardMarksSelectorMargin = SquareSizeBig.transform(_ / 2)
   private val BoardMarksSelectorPos: ReadableProperty[Coordinate] =
-    combine(EnemyBoardPos, EnemyBoardSqSize, BoardMarksSelectorSize, BoardMarksSelectorMargin)
+    combine(
+      BoardSizeProperty,
+      EnemyBoardPos,
+      EnemyBoardSqSize,
+      BoardMarksSelectorSize,
+      BoardMarksSelectorMargin
+    )
       .transform {
-        case (enemyBoardPos, enemyBoardSize, boardMarksSelectorSize, boardMarksSelectorMargin) =>
+        case (
+              boardSize,
+              enemyBoardPos,
+              enemyBoardSize,
+              boardMarksSelectorSize,
+              boardMarksSelectorMargin
+            ) =>
           enemyBoardPos + Coordinate(
-            enemyBoardSize * 10 / 2 -
+            (enemyBoardSize * boardSize) / 2 -
               (BoardMarksSelectorOrder.size * boardMarksSelectorSize +
                 (BoardMarksSelectorOrder.size - 1) * boardMarksSelectorMargin) / 2,
-            enemyBoardSize * 10 + enemyBoardSize
+            enemyBoardSize * boardSize + enemyBoardSize
           )
       }
   private val BoardMarksSelectorCombined: ReadableProperty[(Coordinate, Int, Int)] =
     combine(BoardMarksSelectorPos, BoardMarksSelectorSize, BoardMarksSelectorMargin)
 
   private val MissilesInicialPos: ReadableProperty[Coordinate] =
-    combine(EnemyBoardPos, SquareSizeBig).transform { case (enemyBoardPos, squareSizeBig) =>
-      enemyBoardPos + Coordinate(10 * squareSizeBig + squareSizeBig / 2, 0)
+    combine(BoardSizeProperty, EnemyBoardPos, SquareSizeBig, SizeBig).transform {
+      case (boardSize, enemyBoardPos, squareSizeBig, sizeBig) =>
+        enemyBoardPos + Coordinate(squareSizeBig * boardSize + sizeBig / 2, 0)
     }
   private val MissilesSqSize: ReadableProperty[Int] =
-    SquareSizeBig.transform(squareSizeBig => squareSizeBig * 2)
+    SizeBig.transform(sizeBig => sizeBig * 2)
 
   private val MissilesPosDiff: ReadableProperty[Coordinate] =
-    combine(MissilesSqSize, SquareSizeBig).transform { case (missilesSqSize, squareSizeBig) =>
-      Coordinate(0, (missilesSqSize + squareSizeBig * 0.25).toInt)
+    combine(MissilesSqSize, SizeBig).transform { case (missilesSqSize, sizeBig) =>
+      Coordinate(0, (missilesSqSize + sizeBig * 0.25).toInt)
     }
 
   private val PlaceShipsPos: ReadableProperty[Coordinate] =
-    combine(MyBoardPreGamePos, MyBoardPreGameSqSize).transform {
-      case (myBoardPreGamePos, myBoardPreGameSqSize) =>
+    combine(BoardSizeProperty, MyBoardPreGamePos, MyBoardPreGameSqSize).transform {
+      case (boardSize, myBoardPreGamePos, myBoardPreGameSqSize) =>
         myBoardPreGamePos +
-          Coordinate(10 * myBoardPreGameSqSize + myBoardPreGameSqSize, 0)
+          Coordinate(myBoardPreGameSqSize * boardSize + myBoardPreGameSqSize, 0)
     }
+  private val PlaceShipsSqSize: ReadableProperty[Int] = SquareSizeMedium
 
-  private val PlaceShipsSqSize: ReadableProperty[Int] = SquareSizeSmall
-
-  private val DestructionSummaryHitCountSize: ReadableProperty[Int] = SquareSizeExtraSmall
-  private val DestructionSummarySqSize: ReadableProperty[Int] = SquareSizeSmall
-  private val DestructionSummaryMargin: ReadableProperty[Int] = SquareSizeSmall
+  private val DestructionSummaryHitCountSize: ReadableProperty[Int] = SquareSizeSmall
+  private val DestructionSummarySqSize: ReadableProperty[Int] = SquareSizeMedium
+  private val DestructionSummaryMargin: ReadableProperty[Int] = SizeSmall
   private val DestructionSummaryPos: ReadableProperty[Coordinate] =
     combine(
       gamePresenter.modeTypeProperty,
@@ -477,7 +538,6 @@ class BoardView(
           enemy,
           turnAttacks,
           EnemyBoardPos.get,
-          EnemyBoardSqSize.get,
           selectedBoardMarkOpt,
           selectedShipOpt
         )
@@ -506,7 +566,6 @@ class BoardView(
           enemy,
           Nil,
           EnemyBoardPos.get,
-          EnemyBoardSqSize.get,
           selectedBoardMarkOpt,
           selectedShipOpt
         )
@@ -600,13 +659,14 @@ class BoardView(
 
     enemy.turnPlayHistory.zipWithIndex.foreach { case (TurnPlay(turn, turnAttacks, _), index) =>
       turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
+        val textSize = Math.max((MinTextSize * 0.6).toInt, (squareSize * 0.6).toInt)
         drawTurnNumberCoor(
           renderingCtx = renderingCtx,
           boardPosition = boardPosition,
           coor = coor,
           size = squareSize,
           turn = turn,
-          textSize = (squareSize * 0.6).toInt
+          textSize = textSize
         )
         if (index == 0)
           drawBoardSquare(
@@ -685,7 +745,7 @@ class BoardView(
       renderingCtx.stroke()
     }
 
-    val fontSize = Math.max(15, squareSize / 2)
+    val fontSize = Math.max(MinTextSize, squareSize / 2)
     renderingCtx.fillStyle = s"rgb(0, 0, 0)"
     renderingCtx.font = s"${fontSize}px serif"
     renderingCtx.textBaseline = "bottom"
@@ -699,10 +759,11 @@ class BoardView(
       enemy: SimplePlayer,
       turnAttacks: List[Attack],
       boardPosition: Coordinate,
-      squareSize: Int,
       selectedBoardMarkOpt: Option[BoardMark],
       selectedShipOpt: Option[Ship]
   ): Unit = {
+    val squareSize: Int = EnemyBoardSqSize.get
+
     drawBoardLimits(renderingCtx, "Enemy board", enemy.boardSize, boardPosition, squareSize)
 
     val boardMarksWithCoor: Seq[(Coordinate, Option[Turn], BoardMark)] =
@@ -791,11 +852,10 @@ class BoardView(
 
     turnAttacks.foreach {
       case Attack(_, Some(enemyBoardCoor)) =>
-        drawCrosshair(
+        drawCrosshairAbs(
           renderingCtx,
-          boardPosition,
-          enemyBoardCoor,
-          squareSize,
+          boardPosition + enemyBoardCoor * squareSize + Coordinate.square(2),
+          squareSize - 4,
           lineWidth = 2.0,
           alpha = 1.0
         )
@@ -834,16 +894,14 @@ class BoardView(
         else
           renderingCtx.globalAlpha = 1.0
 
-        renderingCtx.drawImage(
+        drawImageAbs(
+          renderingCtx,
           attackSimple.element,
-          0,
-          0,
-          500,
-          500,
           missilesPos.x + index * missilesPosDiff.x - currentMissilesDiff.x,
           missilesPos.y + index * missilesPosDiff.y - currentMissilesDiff.y,
           currentMissilesSize,
-          currentMissilesSize
+          currentMissilesSize,
+          useAntiAliasing = true
         )
 
         renderingCtx.globalAlpha = 1.0
@@ -860,14 +918,14 @@ class BoardView(
     (extraTurnPopupOpt, extraTurnPopupTextOpt.map(_.innerText)) match {
       case (Some(timeRemaining), Some(extraTurnText)) =>
         val middleX = myBoardCanvas.width / 2
-        val bottomY = myBoardCanvas.height - SquareSizeMedium.get
-        val textSize = (SquareSizeBig.get * 1.6).toInt
+        val bottomY = myBoardCanvas.height - SizeMedium.get
+        val textSize = (SizeBig.get * 1.6).toInt
         val fadeAlpha =
           if (timeRemaining > ExtraTurnPopupTimeFade)
             1.0
           else
             timeRemaining.toDouble / ExtraTurnPopupTimeFade
-        val extraTurnPopupMissileSize = (SquareSizeBig.get * 1.0).toInt
+        val extraTurnPopupMissileSize = SizeBig.get
         val missilesDiff: Coordinate =
           Coordinate(extraTurnPopupMissileSize, 0)
         val missilesInitialPos: Coordinate =
@@ -885,16 +943,14 @@ class BoardView(
 
           renderingCtx.globalAlpha = fadeAlpha
           turnAttacks.zipWithIndex.foreach { case (Attack(_, _), index) =>
-            renderingCtx.drawImage(
+            drawImageAbs(
+              renderingCtx,
               attackSimple.element,
-              0,
-              0,
-              500,
-              500,
               middleX + missilesInitialPos.x + (missilesDiff * index).x,
               bottomY + missilesInitialPos.y + (missilesDiff * index).y,
               extraTurnPopupMissileSize,
-              extraTurnPopupMissileSize
+              extraTurnPopupMissileSize,
+              useAntiAliasing = false
             )
           }
           renderingCtx.globalAlpha = 1.0
@@ -937,7 +993,15 @@ class BoardView(
         }
 
         if (destroyed)
-          pieces.foreach(drawCrosshairAbs(renderingCtx, _, sqSize, lineWidth = 2.0, alpha = 1.0))
+          pieces.foreach(pieceCoor =>
+            drawCrosshairAbs(
+              renderingCtx,
+              pieceCoor + Coordinate.square(2),
+              sqSize - 4,
+              lineWidth = 2.0,
+              alpha = 1.0
+            )
+          )
       }
     }
   }
