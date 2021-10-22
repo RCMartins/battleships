@@ -214,6 +214,23 @@ class GameView(
     )
   }
 
+  private val hideMyBoardButton =
+    UdashButton(
+      buttonStyle = screenModel.subProp(_.hideMyBoard).transform {
+        case true  => Color.Danger
+        case false => Color.Secondary
+      },
+      block = true.toProperty,
+      componentId = ComponentId("hide-my-board-button")
+    )(nested =>
+      Seq(nested(produceWithNested(screenModel.subProp(_.hideMyBoard)) {
+        case (true, nested) =>
+          span(nested(translatedDynamic(Translations.Game.showMyBoardButton)(_.apply()))).render
+        case (false, nested) =>
+          span(nested(translatedDynamic(Translations.Game.hideMyBoardButton)(_.apply()))).render
+      }))
+    )
+
   private val rematchButton =
     UdashButton(
       buttonStyle = Color.Primary.toProperty,
@@ -229,38 +246,34 @@ class GameView(
         case (None, _) =>
           div(
             `class` := "row",
-            div(`class` := "mx-2"),
-            div(`class` := "mx-1", startGameVsBotButton),
-            div(`class` := "ml-3", startGameVsPlayerButton),
+            div(`class` := "mx-2", startGameVsBotButton),
+            div(`class` := "ml-2", startGameVsPlayerButton),
             usernameInput(factory)
           ).render
         case (_, Some(PreGameMode(false, _))) =>
           div(
             `class` := "row",
-            div(`class` := "mx-2"),
-            div(`class` := "mx-1", confirmShipsButton),
-            div(`class` := "mx-1", undoButton),
-            div(`class` := "mx-1", resetButton),
-            div(`class` := "mx-1", randomPlacementButton)
+            div(`class` := "mx-2", confirmShipsButton),
+            div(`class` := "mx-2", undoButton),
+            div(`class` := "mx-2", resetButton),
+            div(`class` := "mx-2", randomPlacementButton)
           ).render
         case (_, Some(PreGameMode(true, _))) =>
           div(
             `class` := "row",
-            div(`class` := "mx-2"),
-            div(`class` := "mx-1", undoButton),
-            div(`class` := "mx-1", resetButton)
+            div(`class` := "mx-2", undoButton),
+            div(`class` := "mx-2", resetButton)
           ).render
         case (Some(PlayingModeType), _) =>
           div(
-            `class` := "row",
-            div(`class` := "mx-2"),
-            div(`class` := "mx-1", launchAttackButton)
+            `class` := "row justify-content-between",
+            div(`class` := "mx-2", launchAttackButton),
+            div(`class` := "mx-2", hideMyBoardButton)
           ).render
         case (Some(GameOverModeType), _) =>
           div(
             `class` := "row",
-            div(`class` := "mx-2"),
-            div(`class` := "mx-1", rematchButton)
+            div(`class` := "mx-2", rematchButton)
           ).render
         case _ =>
           span.render
@@ -294,6 +307,10 @@ class GameView(
 
   launchAttackButton.listen { _ =>
     presenter.launchAttack()
+  }
+
+  hideMyBoardButton.listen { _ =>
+    screenModel.subProp(_.hideMyBoard).set(!screenModel.get.hideMyBoard)
   }
 
   rematchButton.listen { _ =>

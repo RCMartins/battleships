@@ -543,9 +543,22 @@ class BoardView(
           selectedShipOpt,
           MyBoardPreGamePos.get,
           SquareSizeBig.get,
-          fillEmptySquares = false
+          fillEmptySquares = false,
+          hideMyBoard = false
         )
       case Some(GameState(_, _, me, enemy, _: PlayingMode)) =>
+        val ScreenModel(
+          _,
+          _,
+          _,
+          _,
+          _,
+          missilesPopupMillisOpt,
+          extraTurnPopup,
+          extraTurnText,
+          hideMyBoard
+        ) = screenModel.get
+
         drawMyBoard(
           renderingCtx,
           me,
@@ -554,7 +567,8 @@ class BoardView(
           None,
           MyBoardInGamePos.get,
           SquareSizeMedium.get,
-          fillEmptySquares = true
+          fillEmptySquares = true,
+          hideMyBoard = hideMyBoard
         )
 
         drawEnemyBoard(
@@ -567,8 +581,6 @@ class BoardView(
           selectedShipOpt
         )
 
-        val ScreenModel(_, _, _, _, _, missilesPopupMillisOpt, extraTurnPopup, extraTurnText) =
-          screenModel.get
         drawMissiles(renderingCtx, turnAttacks, missilesPopupMillisOpt)
         drawExtraTurnPopup(renderingCtx, turnAttacks, extraTurnPopup, extraTurnText)
         drawDestructionSummary(renderingCtx, selectedShipOpt)
@@ -582,7 +594,8 @@ class BoardView(
           None,
           MyBoardGameOverPos.get,
           SquareSizeBig.get,
-          fillEmptySquares = true
+          fillEmptySquares = true,
+          hideMyBoard = false
         )
 
         drawEnemyBoard(
@@ -609,7 +622,8 @@ class BoardView(
       selectedShipOpt: Option[Ship],
       boardPosition: Coordinate,
       squareSize: Int,
-      fillEmptySquares: Boolean
+      fillEmptySquares: Boolean,
+      hideMyBoard: Boolean
   ): Unit = {
     val boardSize = me.myBoard.boardSize
 
@@ -652,34 +666,36 @@ class BoardView(
         }
     }
 
-    val water: Array[Array[Boolean]] =
-      Array.fill(boardSize.x, boardSize.y)(fillEmptySquares) // TODO property & Array->Vector
-    if (!fillEmptySquares)
+    if (!hideMyBoard) {
+      val water: Array[Array[Boolean]] =
+        Array.fill(boardSize.x, boardSize.y)(fillEmptySquares) // TODO property & Array->Vector
+      if (!fillEmptySquares)
+        me.myBoard.ships.foreach { case ShipInGame(ship, position) =>
+          ship.pieces
+            .map(_ + position)
+            .foreach { case Coordinate(x, y) =>
+              for (dx <- -1 to 1; dy <- -1 to 1)
+                Some(Coordinate(x + dx, y + dy)).filter(_.isInsideBoard(boardSize)).foreach {
+                  case Coordinate(cx, cy) => water(cx)(cy) = true
+                }
+            }
+        }
+
+      for (x <- 0 until boardSize.x; y <- 0 until boardSize.y)
+        if (water(x)(y))
+          drawBoardSquare(
+            renderingCtx,
+            boardPosition,
+            Coordinate(x, y),
+            squareSize,
+            CanvasColor.Water()
+          )
+
       me.myBoard.ships.foreach { case ShipInGame(ship, position) =>
         ship.pieces
           .map(_ + position)
-          .foreach { case Coordinate(x, y) =>
-            for (dx <- -1 to 1; dy <- -1 to 1)
-              Some(Coordinate(x + dx, y + dy)).filter(_.isInsideBoard(boardSize)).foreach {
-                case Coordinate(cx, cy) => water(cx)(cy) = true
-              }
-          }
+          .foreach(drawBoardSquare(renderingCtx, boardPosition, _, squareSize, CanvasColor.Ship()))
       }
-
-    for (x <- 0 until boardSize.x; y <- 0 until boardSize.y)
-      if (water(x)(y))
-        drawBoardSquare(
-          renderingCtx,
-          boardPosition,
-          Coordinate(x, y),
-          squareSize,
-          CanvasColor.Water()
-        )
-
-    me.myBoard.ships.foreach { case ShipInGame(ship, position) =>
-      ship.pieces
-        .map(_ + position)
-        .foreach(drawBoardSquare(renderingCtx, boardPosition, _, squareSize, CanvasColor.Ship()))
     }
 
     enemy.turnPlayHistory.zipWithIndex.foreach { case (TurnPlay(turn, turnAttacks, _), index) =>
