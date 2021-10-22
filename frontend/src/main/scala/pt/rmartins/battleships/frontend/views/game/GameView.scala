@@ -413,7 +413,11 @@ class GameView(
         ).render
     })
 
-  private def turnPlaysToHtml(turnPlay: TurnPlay): Seq[dom.Element] = {
+  private def turnPlaysToHtml(
+      nested: NestedInterceptor,
+      showCheckbox: Boolean,
+      turnPlay: TurnPlay
+  ): Seq[dom.Element] = {
     val sqSize = 9
     val fleetMaxSize: Coordinate = {
       val size =
@@ -424,6 +428,11 @@ class GameView(
         size
     }
     val canvasSize: Coordinate = fleetMaxSize * sqSize + Coordinate.square(4)
+
+    val emptyCanvas: Canvas = canvas(`class` := "mr-3").render
+    emptyCanvas.setAttribute("width", canvasSize.x.toString)
+    emptyCanvas.setAttribute("height", canvasSize.y.toString)
+    val emptyCanvasDiv: Div = div(emptyCanvas).render
 
     def createShipCanvas(ship: Ship, destroyed: Boolean): Canvas = {
       val shipCanvas = canvas(`class` := "mr-3").render
@@ -468,20 +477,58 @@ class GameView(
       shipCanvas
     }
 
+    val checkId = "check" + turnPlay.turn.toTurnString
+
+    val inputCheckBox =
+      input(
+        id := checkId,
+        `type` := "checkbox",
+        checked
+      ).render
+
+    val checkboxProperty: Property[Boolean] =
+      Property(true)
+
+    val turnHits: Div =
+      div(
+        turnPlay.hitHints.map {
+          case HitHint.Water =>
+            createWaterCanvas()
+          case HitHint.ShipHit(shipId, destroyed) =>
+            createShipCanvas(Ship.shipLongXMap(shipId), destroyed)
+        }
+      ).render
+
+    if (showCheckbox)
+      inputCheckBox.onchange = _ => checkboxProperty.set(inputCheckBox.checked)
+    else
+      inputCheckBox.style.visibility = "hidden"
+
     div(
       ChatStyles.turnContainer,
       div(
-        minWidth := "40px",
-        strong(`class` := "col-6 px-0", turnPlay.turn.toTurnString, ": ")
+        `class` := "form-group my-0",
+        div(
+          `class` := "checkbox",
+          label(
+            minWidth := "70px",
+            `for` := checkId,
+            inputCheckBox,
+            strong(
+              `class` := "col-6 pl-3 py-2",
+              style := "user-select: none",
+              turnPlay.turn.toTurnString,
+              ": "
+            )
+          )
+        )
       ),
       span(
-        turnPlay.hitHints
-          .map {
-            case HitHint.Water =>
-              createWaterCanvas()
-            case HitHint.ShipHit(shipId, destroyed) =>
-              createShipCanvas(Ship.shipLongXMap(shipId), destroyed)
-          }
+        `class` := "mt-1",
+        if (showCheckbox)
+          nested(showIfElse(checkboxProperty)(turnHits, emptyCanvasDiv))
+        else
+          turnHits
       )
     ).render
   }
@@ -495,9 +542,9 @@ class GameView(
           role := "tabpanel",
           ChatStyles.messagesWindow,
           nested(
-            repeat(presenter.myMovesHistoryProperty)(turnPlayProperty =>
-              turnPlaysToHtml(turnPlayProperty.get)
-            )
+            repeatWithNested(presenter.myMovesHistoryProperty) { case (turnPlayProperty, nested) =>
+              turnPlaysToHtml(nested, showCheckbox = true, turnPlayProperty.get)
+            }
           )
         ).render
     })
@@ -512,9 +559,10 @@ class GameView(
             role := "tabpanel",
             ChatStyles.messagesWindow,
             nested(
-              repeat(presenter.enemyMovesHistoryProperty)(turnPlayProperty =>
-                turnPlaysToHtml(turnPlayProperty.get)
-              )
+              repeatWithNested(presenter.enemyMovesHistoryProperty) {
+                case (turnPlayProperty, nested) =>
+                  turnPlaysToHtml(nested, showCheckbox = false, turnPlayProperty.get)
+              }
             )
           ).render
       }

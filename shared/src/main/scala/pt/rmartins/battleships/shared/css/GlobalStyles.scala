@@ -11,11 +11,6 @@ object GlobalStyles extends CssBase {
     float.right
   )
 
-//  val messagesWindow: CssStyle = style(
-//    height :=! "calc(100vh - 420px)",
-//    overflowY.auto
-//  )
-
   val msgDate: CssStyle = style(
     marginLeft(5 px),
     fontSize(0.7 em),

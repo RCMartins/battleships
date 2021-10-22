@@ -653,7 +653,7 @@ class BoardView(
     }
 
     val water: Array[Array[Boolean]] =
-      Array.fill(boardSize.x, boardSize.y)(fillEmptySquares) // TODO property
+      Array.fill(boardSize.x, boardSize.y)(fillEmptySquares) // TODO property & Array->Vector
     if (!fillEmptySquares)
       me.myBoard.ships.foreach { case ShipInGame(ship, position) =>
         ship.pieces
@@ -1067,7 +1067,7 @@ object BoardView {
 
   case class SummaryShip(ship: Ship, pieces: List[Coordinate], destroyed: Boolean)
 
-  val CanvasSize: Coordinate = Coordinate(1000, 400)
+  val CanvasSize: Coordinate = Coordinate(1000, 375)
 
   val BoardMarksSelectorOrder: List[BoardMark] =
     List(BoardMark.ManualShip, BoardMark.ManualWater)

@@ -7,7 +7,7 @@ object Dependencies {
   val versionOfScala = "2.13.6"
 
   // Udash
-  val udashVersion = "0.9.0-M19"
+  val udashVersion = "0.9.0-M21"
   val udashJQueryVersion = "3.0.4"
 
   // Backend
@@ -16,8 +16,8 @@ object Dependencies {
   val typesafeConfigVersion = "1.4.1"
 
   // JS dependencies
-  val bootstrapVersion = "5.1.0"
-  val highchartsVersion = "5.0.14"
+  val bootstrapVersion = "5.1.1"
+  val highchartsVersion = "9.2.2"
 
   // Testing
   val scalatestVersion = "3.2.3"
