@@ -231,6 +231,23 @@ class GameView(
       }))
     )
 
+  private val revealEnemyBoardButton =
+    UdashButton(
+      buttonStyle = screenModel.subProp(_.hideEnemyBoard).transform {
+        case true  => Color.Secondary
+        case false => Color.Primary
+      },
+      block = true.toProperty,
+      componentId = ComponentId("hide-enemy-board-button")
+    )(nested =>
+      Seq(nested(produceWithNested(screenModel.subProp(_.hideEnemyBoard)) {
+        case (true, nested) =>
+          span(nested(translatedDynamic(Translations.Game.hideEnemyBoardButton)(_.apply()))).render
+        case (false, nested) =>
+          span(nested(translatedDynamic(Translations.Game.showEnemyBoardButton)(_.apply()))).render
+      }))
+    )
+
   private val rematchButton =
     UdashButton(
       buttonStyle = Color.Primary.toProperty,
@@ -272,8 +289,9 @@ class GameView(
           ).render
         case (Some(GameOverModeType), _) =>
           div(
-            `class` := "row",
-            div(`class` := "mx-2", rematchButton)
+            `class` := "row justify-content-between",
+            div(`class` := "mx-2", rematchButton),
+            div(`class` := "mx-2", revealEnemyBoardButton)
           ).render
         case _ =>
           span.render
@@ -315,6 +333,10 @@ class GameView(
 
   rematchButton.listen { _ =>
     presenter.rematchGame()
+  }
+
+  revealEnemyBoardButton.listen { _ =>
+    screenModel.subProp(_.hideEnemyBoard).set(!screenModel.get.hideEnemyBoard)
   }
 
   private val chatTabButton: UdashButton =
@@ -704,7 +726,7 @@ class GameView(
                     ": ",
                     span(color := "#FF0000", b(turnStrBinding))
                   ).render
-                case (Some(GameOverMode(turn, youWon, _, _)), nested) =>
+                case (Some(GameOverMode(turn, youWon, _, _, _)), nested) =>
                   val turnStrBinding: Binding =
                     nested(
                       translatedDynamic(

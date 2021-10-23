@@ -556,7 +556,8 @@ class BoardView(
           missilesPopupMillisOpt,
           extraTurnPopup,
           extraTurnText,
-          hideMyBoard
+          hideMyBoard,
+          _
         ) = screenModel.get
 
         drawMyBoard(
@@ -585,18 +586,30 @@ class BoardView(
         drawExtraTurnPopup(renderingCtx, turnAttacks, extraTurnPopup, extraTurnText)
         drawDestructionSummary(renderingCtx, selectedShipOpt)
         drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
-      case Some(GameState(_, _, me, enemy, _: GameOverMode)) =>
-        drawMyBoard(
-          renderingCtx,
-          me,
-          enemy,
-          None,
-          None,
-          MyBoardGameOverPos.get,
-          SquareSizeBig.get,
-          fillEmptySquares = true,
-          hideMyBoard = false
-        )
+      case Some(GameState(_, _, me, enemy, GameOverMode(_, _, _, _, enemyRealBoard))) =>
+        val ScreenModel(_, _, _, _, _, _, _, _, _, hideEnemyBoard) = screenModel.get
+
+        if (hideEnemyBoard)
+          drawGameOverEnemyBoard(
+            renderingCtx,
+            me,
+            enemyRealBoard,
+            MyBoardGameOverPos.get,
+            SquareSizeBig.get,
+            selectedShipOpt
+          )
+        else
+          drawMyBoard(
+            renderingCtx,
+            me,
+            enemy,
+            None,
+            None,
+            MyBoardGameOverPos.get,
+            SquareSizeBig.get,
+            fillEmptySquares = true,
+            hideMyBoard = false
+          )
 
         drawEnemyBoard(
           renderingCtx,
@@ -627,7 +640,14 @@ class BoardView(
   ): Unit = {
     val boardSize = me.myBoard.boardSize
 
-    drawBoardLimits(renderingCtx, "My board", boardSize, boardPosition, squareSize)
+    drawBoardLimits(
+      renderingCtx,
+      "My board",
+      boardSize,
+      boardPosition,
+      squareSize,
+      if (fillEmptySquares) Some(CanvasColor.Water()) else None
+    )
 
     val shipToPlaceHoverOpt: Option[ToPlaceShip] = shipToPlaceHover.get
     val placeShipsSqSize = SummaryShipsSqSize.get
@@ -667,9 +687,10 @@ class BoardView(
     }
 
     if (!hideMyBoard) {
-      val water: Array[Array[Boolean]] =
-        Array.fill(boardSize.x, boardSize.y)(fillEmptySquares) // TODO property & Array->Vector
-      if (!fillEmptySquares)
+      if (!fillEmptySquares) {
+        val water: Array[Array[Boolean]] =
+          Array.fill(boardSize.x, boardSize.y)(fillEmptySquares) // TODO property & Array->Vector
+
         me.myBoard.ships.foreach { case ShipInGame(ship, position) =>
           ship.pieces
             .map(_ + position)
@@ -681,15 +702,16 @@ class BoardView(
             }
         }
 
-      for (x <- 0 until boardSize.x; y <- 0 until boardSize.y)
-        if (water(x)(y))
-          drawBoardSquare(
-            renderingCtx,
-            boardPosition,
-            Coordinate(x, y),
-            squareSize,
-            CanvasColor.Water()
-          )
+        for (x <- 0 until boardSize.x; y <- 0 until boardSize.y)
+          if (water(x)(y))
+            drawBoardSquare(
+              renderingCtx,
+              boardPosition,
+              Coordinate(x, y),
+              squareSize,
+              CanvasColor.Water()
+            )
+      }
 
       me.myBoard.ships.foreach { case ShipInGame(ship, position) =>
         ship.pieces
@@ -757,43 +779,6 @@ class BoardView(
     }
   }
 
-  def drawBoardLimits(
-      renderingCtx: CanvasRenderingContext2D,
-      boardTitle: String,
-      boardSize: Coordinate,
-      boardPosition: Coordinate,
-      squareSize: Int
-  ): Unit = {
-    renderingCtx.strokeStyle = s"rgb(0, 0, 0)"
-    renderingCtx.lineWidth = 1.0
-
-    for (x <- 0 to boardSize.x) {
-      renderingCtx.beginPath()
-      renderingCtx.moveTo(boardPosition.x + x * squareSize, boardPosition.y)
-      renderingCtx.lineTo(
-        boardPosition.x + x * squareSize,
-        boardPosition.y + boardSize.y * squareSize
-      )
-      renderingCtx.stroke()
-    }
-    for (y <- 0 to boardSize.y) {
-      renderingCtx.beginPath()
-      renderingCtx.moveTo(boardPosition.x, boardPosition.y + y * squareSize)
-      renderingCtx.lineTo(
-        boardPosition.x + boardSize.x * squareSize,
-        boardPosition.y + y * squareSize
-      )
-      renderingCtx.stroke()
-    }
-
-    val fontSize = Math.max(MinTextSize, squareSize / 2)
-    renderingCtx.fillStyle = s"rgb(0, 0, 0)"
-    renderingCtx.font = s"${fontSize}px serif"
-    renderingCtx.textBaseline = "bottom"
-    renderingCtx.textAlign = "left"
-    renderingCtx.fillText(boardTitle, boardPosition.x, boardPosition.y - 2)
-  }
-
   def drawEnemyBoard(
       renderingCtx: CanvasRenderingContext2D,
       me: Player,
@@ -805,7 +790,14 @@ class BoardView(
   ): Unit = {
     val squareSize: Int = EnemyBoardSqSize.get
 
-    drawBoardLimits(renderingCtx, "Enemy board", enemy.boardSize, boardPosition, squareSize)
+    drawBoardLimits(
+      renderingCtx,
+      "Enemy board",
+      enemy.boardSize,
+      boardPosition,
+      squareSize,
+      backgroundColor = None
+    )
 
     val boardMarksWithCoor: Seq[(Coordinate, Option[Turn], BoardMark)] =
       me.enemyBoardMarksWithCoor
@@ -829,6 +821,7 @@ class BoardView(
           coor,
           size = squareSize,
           turnNumber,
+          // TODO to property (use same as drawGameOverEnemyBoard)
           textSize = (SquareSizeBig.get * 0.6).toInt
         )
       }
@@ -902,6 +895,119 @@ class BoardView(
         )
       case _ =>
     }
+  }
+
+  def drawGameOverEnemyBoard(
+      renderingCtx: CanvasRenderingContext2D,
+      me: Player,
+      enemyShips: List[ShipInGame],
+      boardPosition: Coordinate,
+      squareSize: Int,
+      selectedShipOpt: Option[Ship]
+  ): Unit = {
+    val boardSize = me.myBoard.boardSize
+
+    drawBoardLimits(
+      renderingCtx,
+      "(Real) Enemy board",
+      boardSize,
+      boardPosition,
+      squareSize,
+      backgroundColor = Some(CanvasColor.Water())
+    )
+
+    enemyShips.foreach { case ShipInGame(ship, position) =>
+      ship.pieces
+        .map(_ + position)
+        .foreach(drawBoardSquare(renderingCtx, boardPosition, _, squareSize, CanvasColor.Ship()))
+    }
+
+    me.turnPlayHistory.zipWithIndex.foreach { case (turnPlay, index) =>
+      turnPlay.turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
+        drawTurnNumberCoor(
+          renderingCtx,
+          boardPosition,
+          coor,
+          size = squareSize,
+          turnPlay.turn,
+          textSize = (SquareSizeBig.get * 0.6).toInt // TODO to property (use same as Enemy board)
+        )
+      }
+      selectedShipOpt match {
+        case Some(ship) if turnPlay.hitHints.exists {
+              case ShipHit(shipId, _) if ship.shipId == shipId => true
+              case _                                           => false
+            } =>
+          turnPlay.turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
+            drawBoardSquare(
+              renderingCtx,
+              boardPosition,
+              coor,
+              squareSize,
+              CanvasColor.White(CanvasBorder.DashRed())
+            )
+          }
+        case None =>
+          if (index == 0)
+            turnPlay.turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
+              drawBoardSquare(
+                renderingCtx,
+                boardPosition,
+                coor,
+                squareSize,
+                CanvasColor.White(CanvasBorder.RedBold())
+              )
+            }
+        case _ =>
+      }
+    }
+  }
+
+  def drawBoardLimits(
+      renderingCtx: CanvasRenderingContext2D,
+      boardTitle: String,
+      boardSize: Coordinate,
+      boardPosition: Coordinate,
+      squareSize: Int,
+      backgroundColor: Option[CanvasColor]
+  ): Unit = {
+    backgroundColor.foreach(canvasColor =>
+      drawSquareAbs(
+        renderingCtx,
+        boardPosition,
+        boardSize.x * squareSize,
+        canvasColor
+      )
+    )
+
+    renderingCtx.strokeStyle = s"rgb(0, 0, 0)"
+    renderingCtx.lineWidth = 1.0
+
+    for (x <- 0 to boardSize.x) {
+      renderingCtx.beginPath()
+      renderingCtx.moveTo(boardPosition.x + x * squareSize, boardPosition.y)
+      renderingCtx.lineTo(
+        boardPosition.x + x * squareSize,
+        boardPosition.y + boardSize.y * squareSize
+      )
+      renderingCtx.stroke()
+    }
+    for (y <- 0 to boardSize.y) {
+      renderingCtx.beginPath()
+      renderingCtx.moveTo(boardPosition.x, boardPosition.y + y * squareSize)
+      renderingCtx.lineTo(
+        boardPosition.x + boardSize.x * squareSize,
+        boardPosition.y + y * squareSize
+      )
+      renderingCtx.stroke()
+    }
+
+    val fontSize = Math.max(MinTextSize, squareSize / 2)
+    renderingCtx.fillStyle = s"rgb(0, 0, 0)"
+    renderingCtx.font = s"${fontSize}px serif"
+    renderingCtx.textBaseline = "bottom"
+    renderingCtx.textAlign = "left"
+    renderingCtx.fillText(boardTitle, boardPosition.x, boardPosition.y - 2)
   }
 
   def drawMissiles(

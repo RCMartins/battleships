@@ -360,7 +360,8 @@ class GameService(rpcClientsService: RpcClientsService) {
               turn,
               me.username == playerWhoWon,
               myTimeRemaining = me.getTimeRemaining,
-              enemyTimeRemaining = enemy.getTimeRemaining
+              enemyTimeRemaining = enemy.getTimeRemaining,
+              enemyRealBoard = enemy.myBoard.ships
             )
         }
 

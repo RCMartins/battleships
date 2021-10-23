@@ -262,7 +262,7 @@ class GamePresenter(
     to.map(_.gameMode) match {
       case Some(PlayingMode(_, _, _, Some(myTimeRemaining), Some(enemyTimeRemaining))) =>
         gameModel.subProp(_.timeRemaining).set(Some((myTimeRemaining, enemyTimeRemaining)))
-      case Some(GameOverMode(_, _, Some(myTimeRemaining), Some(enemyTimeRemaining))) =>
+      case Some(GameOverMode(_, _, Some(myTimeRemaining), Some(enemyTimeRemaining), _)) =>
         gameModel.subProp(_.timeRemaining).set(Some((myTimeRemaining, enemyTimeRemaining)))
       case _ =>
         gameModel.subProp(_.timeRemaining).set(None)
@@ -399,7 +399,7 @@ class GamePresenter(
                 _,
                 me,
                 _,
-                PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _)
+                PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _, _)
               )
             )
           ) =>
@@ -465,7 +465,7 @@ class GamePresenter(
                 _,
                 me,
                 _,
-                PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _)
+                PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _, _)
               )
             )
           ) =>
@@ -498,7 +498,7 @@ class GamePresenter(
                 _,
                 me,
                 _,
-                PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _)
+                PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _, _)
               )
             )
           ) =>

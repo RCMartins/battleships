@@ -58,6 +58,8 @@ object Translations {
     val waitForTurnButton = key("game.buttons.wait_for_turn")
     val hideMyBoardButton = key("game.buttons.hide_my_board")
     val showMyBoardButton = key("game.buttons.show_my_board")
+    val hideEnemyBoardButton = key("game.buttons.hide_enemy_board")
+    val showEnemyBoardButton = key("game.buttons.show_enemy_board")
 
     val extraTurnPopup = key("game.popup.extra_turn")
 

@@ -13,7 +13,8 @@ case class ScreenModel(
     missilesPopupMillisOpt: Option[Int],
     extraTurnPopup: Option[Int],
     extraTurnText: Option[Span],
-    hideMyBoard: Boolean
+    hideMyBoard: Boolean,
+    hideEnemyBoard: Boolean
 )
 
 object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
@@ -32,7 +33,8 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
       missilesPopupMillisOpt = None,
       extraTurnPopup = None,
       extraTurnText = None,
-      hideMyBoard = false
+      hideMyBoard = false,
+      hideEnemyBoard = false
     )
 
 }
