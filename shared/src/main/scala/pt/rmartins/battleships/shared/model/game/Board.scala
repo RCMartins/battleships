@@ -4,10 +4,10 @@ import com.avsystem.commons.serialization.HasGenCodec
 
 case class Board(
     boardSize: Coordinate,
-    ships: List[ShipInGame]
+    ships: List[ShipInBoard]
 ) {
 
-  def addShip(shipInGame: ShipInGame): Board =
+  def addShip(shipInGame: ShipInBoard): Board =
     copy(ships = shipInGame :: ships)
 
   def removeLastShip: Board =

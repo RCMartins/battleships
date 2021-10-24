@@ -10,9 +10,9 @@ trait GameRPC {
 
   def sendMsg(gameId: GameId, msgText: String): Future[Unit]
 
-  def startGameWithBots(): Future[Unit]
+  def startGameWithBots(rules: Rules): Future[Unit]
 
-  def startGameWith(otherPlayerUsername: Username): Future[Unit]
+  def startGameWith(otherPlayerUsername: Username, rules: Rules): Future[Unit]
 
   def quitCurrentGame(gameId: GameId): Future[Unit]
 
@@ -22,7 +22,7 @@ trait GameRPC {
 
   def rematchGame(gameId: GameId): Future[Unit]
 
-  def confirmShips(gameId: GameId, shipPositions: List[ShipInGame]): Future[Unit]
+  def confirmShips(gameId: GameId, shipPositions: List[ShipInBoard]): Future[Unit]
 
   def cancelShipsPlacement(gameId: GameId): Future[Unit]
 

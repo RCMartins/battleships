@@ -3,6 +3,7 @@ package pt.rmartins.battleships.frontend.views.game
 import io.udash.HasModelPropertyCreator
 import org.scalajs.dom.html.Span
 import pt.rmartins.battleships.shared.model.game.Coordinate
+import scalatags.JsDom.all._
 
 case class ScreenModel(
     canvasSize: Coordinate,
@@ -12,9 +13,15 @@ case class ScreenModel(
     lastSeenMessagesEnemyMoves: Int,
     missilesPopupMillisOpt: Option[Int],
     extraTurnPopup: Option[Int],
-    extraTurnText: Option[Span],
+    extraTurnText: Span,
     hideMyBoard: Boolean,
-    hideEnemyBoard: Boolean
+    revealEnemyBoard: Boolean,
+    showErrorModal: Boolean,
+    myBoardTitle: Span,
+    enemyBoardTitle: Span,
+    realEnemyBoardTitle: Span,
+    previewBoardTitle: Span,
+    screenResized: Unit
 )
 
 object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
@@ -32,9 +39,29 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
       lastSeenMessagesEnemyMoves = 0,
       missilesPopupMillisOpt = None,
       extraTurnPopup = None,
-      extraTurnText = None,
+      extraTurnText = span.render,
       hideMyBoard = false,
-      hideEnemyBoard = false
+      revealEnemyBoard = false,
+      showErrorModal = false,
+      myBoardTitle = span.render,
+      enemyBoardTitle = span.render,
+      realEnemyBoardTitle = span.render,
+      previewBoardTitle = span.render,
+      screenResized = ()
     )
+
+  def resetScreenModel(model: ScreenModel): ScreenModel = {
+    model.copy(
+      selectedTab = myMovesTab,
+      lastSeenMessagesChat = 0,
+      lastSeenMessagesMyMoves = 0,
+      lastSeenMessagesEnemyMoves = 0,
+      missilesPopupMillisOpt = None,
+      extraTurnPopup = None,
+      hideMyBoard = false,
+      revealEnemyBoard = false,
+      showErrorModal = false
+    )
+  }
 
 }

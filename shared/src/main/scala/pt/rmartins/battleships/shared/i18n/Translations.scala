@@ -60,11 +60,20 @@ object Translations {
     val showMyBoardButton = key("game.buttons.show_my_board")
     val hideEnemyBoardButton = key("game.buttons.hide_enemy_board")
     val showEnemyBoardButton = key("game.buttons.show_enemy_board")
+    val closeButton = key("game.buttons.close")
 
     val extraTurnPopup = key("game.popup.extra_turn")
+
+    val myBoardTitle = key("game.board.my_board_title")
+    val enemyBoardTitle = key("game.board.enemy_board_title")
+    val realEnemyBoardTitle = key("game.board.real_enemy_board_title")
+    val previewBoardTitle = key("game.board.previewBoardTitle")
 
     val chatTab = key("game.tab.chat")
     val myMovesTab = key("game.tab.my_moves")
     val enemyMovesTab = key("game.tab.enemy_moves")
+
+    val cannotStartGameTitle = key("game.modal.cannot_start_game_title")
+    val cannotStartGameBody = key("game.modal.cannot_start_game_body")
   }
 }

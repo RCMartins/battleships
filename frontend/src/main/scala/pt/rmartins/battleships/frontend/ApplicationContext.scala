@@ -1,11 +1,6 @@
 package pt.rmartins.battleships.frontend
 
-import pt.rmartins.battleships.frontend.routing.{
-  RoutingLoginPageState,
-  RoutingRegistryDef,
-  RoutingState,
-  StatesToViewFactoryDef
-}
+import pt.rmartins.battleships.frontend.routing._
 import pt.rmartins.battleships.frontend.services.rpc.{NotificationsCenter, RPCService}
 import pt.rmartins.battleships.frontend.services.{TranslationsService, UserContextService}
 import pt.rmartins.battleships.shared.model.SharedExceptions
@@ -26,9 +21,12 @@ object ApplicationContext {
     new WindowUrlPathChangeProvider
   )
 
-  application.onRoutingFailure { case _: SharedExceptions.UnauthorizedException =>
-    // automatic redirection to LoginPage
-    application.goTo(RoutingLoginPageState)
+  application.onRoutingFailure {
+    case _: SharedExceptions.UnauthorizedException =>
+      // automatic redirection to LoginPage
+      application.goTo(RoutingLoginPageState)
+    case ex =>
+      println(ex)
   }
 
   val notificationsCenter: NotificationsCenter = new NotificationsCenter

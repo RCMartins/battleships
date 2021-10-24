@@ -1,36 +1,76 @@
 package pt.rmartins.battleships.frontend.views.game
 
-import io.udash.{ModelProperty, ReadableProperty}
+import io.udash.{ModelProperty, ReadableProperty, any2Property}
 import org.scalajs.dom
-import org.scalajs.dom.html.{Canvas, Span}
+import org.scalajs.dom.html.{Canvas, Div, Span}
 import org.scalajs.dom.raw.HTMLImageElement
-import org.scalajs.dom.{CanvasRenderingContext2D, html}
+import org.scalajs.dom._
 import pt.rmartins.battleships.frontend.views.game.BoardView._
+import pt.rmartins.battleships.frontend.views.game.CanvasUtils.{CanvasBorder, CanvasColor}
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.Utils.canPlaceInBoard
+import scalatags.JsDom.all._
+
+import scala.util.chaining.scalaUtilChainingOps
 
 class BoardView(
     gameModel: ModelProperty[GameModel],
     screenModel: ModelProperty[ScreenModel],
     gamePresenter: GamePresenter,
-    myBoardCanvas: Canvas,
     canvasUtils: CanvasUtils
 ) {
 
   import canvasUtils._
 
-  val AbsMargin: Coordinate = Coordinate(0, 0)
+  val myBoardCanvas: Canvas =
+    canvas(id := "mainGameCanvas").render
 
-  private val MinTextSize = 15
+  screenModel.get.canvasSize.pipe { canvasSize =>
+    myBoardCanvas.setAttribute("width", canvasSize.x.toString)
+    myBoardCanvas.setAttribute("height", canvasSize.y.toString)
+  }
+
+  val canvasDiv: Div =
+    div(id := "canvas-div", myBoardCanvas).render
+
+  myBoardCanvas.onmousemove = (mouseEvent: MouseEvent) => {
+    val rect = myBoardCanvas.getBoundingClientRect()
+    gamePresenter.mouseMove(
+      this,
+      mouseEvent.clientX.toInt - rect.left.toInt,
+      mouseEvent.clientY.toInt - rect.top.toInt
+    )
+  }
+
+  myBoardCanvas.onmouseleave = (_: MouseEvent) => {
+    gamePresenter.mouseLeave()
+  }
+
+  myBoardCanvas.onmousedown = (mouseEvent: MouseEvent) => {
+    gamePresenter.mouseDown(this, mouseEvent.button)
+    false // Prevent the mouse down from exiting the canvas
+  }
+
+  myBoardCanvas.onmouseup = (_: MouseEvent) => {
+    gamePresenter.mouseUp()
+  }
+
+  myBoardCanvas.onmousewheel = (wheelEvent: WheelEvent) => {
+    gamePresenter.mouseWheel(wheelEvent.deltaY.toInt / 100)
+  }
+
+  myBoardCanvas.oncontextmenu = (event: MouseEvent) => {
+    event.preventDefault()
+  }
 
   private val BoardSizeProperty: ReadableProperty[Int] =
-    gamePresenter.enemyProperty.transform {
+    gamePresenter.rulesProperty.transform {
       case None        => 1
-      case Some(enemy) => enemy.boardSize.x
+      case Some(rules) => rules.boardSize.x
     }
 
   private val squareSizesProperty: ReadableProperty[IndexedSeq[Int]] =
@@ -83,7 +123,7 @@ class BoardView(
   private val EnemyBoardMargin = SizeMedium
 
   private val MyBoardPreGamePos: ReadableProperty[Coordinate] =
-    MyBoardMargin.transform(size => AbsMargin + Coordinate(size, size))
+    MyBoardMargin.transform(size => Coordinate(size, size))
   private val MyBoardInGamePos: ReadableProperty[Coordinate] =
     combine(
       screenModel.subProp(_.canvasSize),
@@ -91,7 +131,7 @@ class BoardView(
       MyBoardInGameSqSize,
       MyBoardMargin
     ).transform { case (canvasSize, boardSize, myBoardInGameSize, myBoardMargin) =>
-      AbsMargin + Coordinate(
+      Coordinate(
         canvasSize.x - myBoardInGameSize * boardSize - myBoardMargin,
         myBoardMargin
       )
@@ -110,10 +150,10 @@ class BoardView(
         )
       }
   private val EnemyBoardPos: ReadableProperty[Coordinate] =
-    EnemyBoardMargin.transform(size => AbsMargin + Coordinate.square(size))
+    EnemyBoardMargin.transform(size => Coordinate.square(size))
 
-  private val BoardMarksSelectorSize = SquareSizeBig
-  private val BoardMarksSelectorMargin = SquareSizeBig.transform(_ / 2)
+  private val BoardMarksSelectorSize = BoardView.BoardMarkSize.toProperty
+  private val BoardMarksSelectorMargin = BoardView.BoardMarkMargin.toProperty
   private val BoardMarksSelectorPos: ReadableProperty[Coordinate] =
     combine(
       BoardSizeProperty,
@@ -130,12 +170,13 @@ class BoardView(
               boardMarksSelectorSize,
               boardMarksSelectorMargin
             ) =>
-          enemyBoardPos + Coordinate(
-            (enemyBoardSize * boardSize) / 2 -
-              (BoardMarksSelectorOrder.size * boardMarksSelectorSize +
-                (BoardMarksSelectorOrder.size - 1) * boardMarksSelectorMargin) / 2,
-            enemyBoardSize * boardSize + enemyBoardSize
-          )
+          enemyBoardPos +
+            Coordinate(
+              (enemyBoardSize * boardSize) / 2 -
+                (BoardMarksSelectorOrder.size * boardMarksSelectorSize +
+                  (BoardMarksSelectorOrder.size - 1) * boardMarksSelectorMargin) / 2,
+              enemyBoardSize * boardSize + boardMarksSelectorMargin
+            )
       }
   private val BoardMarksSelectorCombined: ReadableProperty[(Coordinate, Int, Int)] =
     combine(BoardMarksSelectorPos, BoardMarksSelectorSize, BoardMarksSelectorMargin)
@@ -203,16 +244,17 @@ class BoardView(
   private val PlaceShipBoardMargin = Coordinate.square(20)
 
   private class Image(src: String) {
-    val element: html.Image = dom.document.createElement("img").asInstanceOf[HTMLImageElement]
+    val element: HTMLImageElement =
+      dom.document.createElement("img").asInstanceOf[HTMLImageElement]
     element.src = src
   }
 
   private val attackSimple: Image =
     new Image("icons/missile-simple.png")
 
-  private val shipsSummaryRelCoordinates: ReadableProperty[List[(Int, List[ViewShip])]] =
+  private val shipsSummaryRelCoordinates: ReadableProperty[List[(ShipId, List[ViewShip])]] =
     combine(gamePresenter.rulesProperty, SummaryMaxY).transform {
-      case (Some(Rules(shipsInThisGame, _, _, _)), summaryMaxY) =>
+      case (Some(Rules(_, shipsInThisGame, _, _, _)), summaryMaxY) =>
         def getShipsToPlacePos(
             posX: Int,
             posY: Int,
@@ -265,8 +307,8 @@ class BoardView(
           shipsInThisGame.ships
             .groupBy(_.shipId)
             .toList
-            .sortBy { case (id, list) =>
-              (-list.head.piecesSize, id)
+            .sortBy { case (shipId, list) =>
+              (-list.head.piecesSize, shipId.id)
             }
             .map(_._2)
 
@@ -298,10 +340,10 @@ class BoardView(
             placeShipsPos,
             placeShipsSqSize
           ) =>
-        val shipsLeftToPlaceMap: Map[Int, Int] =
+        val shipsLeftToPlaceMap: Map[ShipId, Int] =
           shipsLeftToPlace.groupBy(_.shipId).map { case (shipId, list) => shipId -> list.size }
 
-        val shipsPlaced: Map[Int, Int] =
+        val shipsPlaced: Map[ShipId, Int] =
           shipsLeftToPlaceMap.map { case (shipId, shipLeftToPlace) =>
             shipId ->
               shipsSummary
@@ -338,7 +380,7 @@ class BoardView(
       }
 
   val allShipsSummaryCoordinates
-      : ReadableProperty[List[(Int, Coordinate, Int, List[SummaryShip])]] =
+      : ReadableProperty[List[(ShipId, Coordinate, Int, List[SummaryShip])]] =
     combine(
       shipsSummaryRelCoordinates,
       gamePresenter.meProperty.transform(_.map(_.turnPlayHistory)),
@@ -353,7 +395,7 @@ class BoardView(
             (destructionSummaryPos, destructionSummarySqSize, destructionSummaryMargin),
             destructionSummaryHitCountSize
           ) =>
-        val shipsDestroyed: Map[Int, Int] =
+        val shipsDestroyed: Map[ShipId, Int] =
           turnPlayHistory
             .flatMap(_.hitHints.collect { case ShipHit(shipId, true) => shipId })
             .groupBy(identity)
@@ -529,6 +571,8 @@ class BoardView(
       _
     ) = gameModel.get
 
+    val screenModelData = screenModel.get
+
     val renderingCtx = myBoardCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
 
     renderingCtx.clearRect(0, 0, myBoardCanvas.width, myBoardCanvas.height)
@@ -537,6 +581,7 @@ class BoardView(
       case Some(GameState(_, _, me, enemy, _: PreGameMode)) =>
         drawMyBoard(
           renderingCtx,
+          screenModelData.myBoardTitle.innerText,
           me,
           enemy,
           mousePositionOpt,
@@ -547,21 +592,9 @@ class BoardView(
           hideMyBoard = false
         )
       case Some(GameState(_, _, me, enemy, _: PlayingMode)) =>
-        val ScreenModel(
-          _,
-          _,
-          _,
-          _,
-          _,
-          missilesPopupMillisOpt,
-          extraTurnPopup,
-          extraTurnText,
-          hideMyBoard,
-          _
-        ) = screenModel.get
-
         drawMyBoard(
           renderingCtx,
+          screenModelData.myBoardTitle.innerText,
           me,
           enemy,
           None,
@@ -569,11 +602,12 @@ class BoardView(
           MyBoardInGamePos.get,
           SquareSizeMedium.get,
           fillEmptySquares = true,
-          hideMyBoard = hideMyBoard
+          hideMyBoard = screenModelData.hideMyBoard
         )
 
         drawEnemyBoard(
           renderingCtx,
+          screenModelData.enemyBoardTitle.innerText,
           me,
           enemy,
           turnAttacks,
@@ -582,16 +616,20 @@ class BoardView(
           selectedShipOpt
         )
 
-        drawMissiles(renderingCtx, turnAttacks, missilesPopupMillisOpt)
-        drawExtraTurnPopup(renderingCtx, turnAttacks, extraTurnPopup, extraTurnText)
+        drawMissiles(renderingCtx, turnAttacks, screenModelData.missilesPopupMillisOpt)
+        drawExtraTurnPopup(
+          renderingCtx,
+          turnAttacks,
+          screenModelData.extraTurnPopup,
+          screenModelData.extraTurnText.innerText
+        )
         drawDestructionSummary(renderingCtx, selectedShipOpt)
         drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
       case Some(GameState(_, _, me, enemy, GameOverMode(_, _, _, _, enemyRealBoard))) =>
-        val ScreenModel(_, _, _, _, _, _, _, _, _, hideEnemyBoard) = screenModel.get
-
-        if (hideEnemyBoard)
+        if (screenModelData.revealEnemyBoard)
           drawGameOverEnemyBoard(
             renderingCtx,
+            screenModelData.realEnemyBoardTitle.innerText,
             me,
             enemyRealBoard,
             MyBoardGameOverPos.get,
@@ -601,6 +639,7 @@ class BoardView(
         else
           drawMyBoard(
             renderingCtx,
+            screenModelData.myBoardTitle.innerText,
             me,
             enemy,
             None,
@@ -613,6 +652,7 @@ class BoardView(
 
         drawEnemyBoard(
           renderingCtx,
+          screenModelData.enemyBoardTitle.innerText,
           me,
           enemy,
           Nil,
@@ -629,6 +669,7 @@ class BoardView(
 
   def drawMyBoard(
       renderingCtx: CanvasRenderingContext2D,
+      boardTitle: String,
       me: Player,
       enemy: SimplePlayer,
       mousePositionOpt: Option[Coordinate],
@@ -642,11 +683,11 @@ class BoardView(
 
     drawBoardLimits(
       renderingCtx,
-      "My board",
+      boardTitle,
       boardSize,
       boardPosition,
       squareSize,
-      if (fillEmptySquares) Some(CanvasColor.Water()) else None
+      if (fillEmptySquares && !hideMyBoard) Some(CanvasColor.Water()) else None
     )
 
     val shipToPlaceHoverOpt: Option[ToPlaceShip] = shipToPlaceHover.get
@@ -691,7 +732,7 @@ class BoardView(
         val water: Array[Array[Boolean]] =
           Array.fill(boardSize.x, boardSize.y)(fillEmptySquares) // TODO property & Array->Vector
 
-        me.myBoard.ships.foreach { case ShipInGame(ship, position) =>
+        me.myBoard.ships.foreach { case ShipInBoard(ship, position) =>
           ship.pieces
             .map(_ + position)
             .foreach { case Coordinate(x, y) =>
@@ -713,7 +754,7 @@ class BoardView(
             )
       }
 
-      me.myBoard.ships.foreach { case ShipInGame(ship, position) =>
+      me.myBoard.ships.foreach { case ShipInBoard(ship, position) =>
         ship.pieces
           .map(_ + position)
           .foreach(drawBoardSquare(renderingCtx, boardPosition, _, squareSize, CanvasColor.Ship()))
@@ -781,6 +822,7 @@ class BoardView(
 
   def drawEnemyBoard(
       renderingCtx: CanvasRenderingContext2D,
+      boardTitle: String,
       me: Player,
       enemy: SimplePlayer,
       turnAttacks: List[Attack],
@@ -792,7 +834,7 @@ class BoardView(
 
     drawBoardLimits(
       renderingCtx,
-      "Enemy board",
+      boardTitle,
       enemy.boardSize,
       boardPosition,
       squareSize,
@@ -899,8 +941,9 @@ class BoardView(
 
   def drawGameOverEnemyBoard(
       renderingCtx: CanvasRenderingContext2D,
+      boardTitle: String,
       me: Player,
-      enemyShips: List[ShipInGame],
+      enemyShips: List[ShipInBoard],
       boardPosition: Coordinate,
       squareSize: Int,
       selectedShipOpt: Option[Ship]
@@ -909,14 +952,14 @@ class BoardView(
 
     drawBoardLimits(
       renderingCtx,
-      "(Real) Enemy board",
+      boardTitle,
       boardSize,
       boardPosition,
       squareSize,
       backgroundColor = Some(CanvasColor.Water())
     )
 
-    enemyShips.foreach { case ShipInGame(ship, position) =>
+    enemyShips.foreach { case ShipInBoard(ship, position) =>
       ship.pieces
         .map(_ + position)
         .foreach(drawBoardSquare(renderingCtx, boardPosition, _, squareSize, CanvasColor.Ship()))
@@ -961,53 +1004,6 @@ class BoardView(
         case _ =>
       }
     }
-  }
-
-  def drawBoardLimits(
-      renderingCtx: CanvasRenderingContext2D,
-      boardTitle: String,
-      boardSize: Coordinate,
-      boardPosition: Coordinate,
-      squareSize: Int,
-      backgroundColor: Option[CanvasColor]
-  ): Unit = {
-    backgroundColor.foreach(canvasColor =>
-      drawSquareAbs(
-        renderingCtx,
-        boardPosition,
-        boardSize.x * squareSize,
-        canvasColor
-      )
-    )
-
-    renderingCtx.strokeStyle = s"rgb(0, 0, 0)"
-    renderingCtx.lineWidth = 1.0
-
-    for (x <- 0 to boardSize.x) {
-      renderingCtx.beginPath()
-      renderingCtx.moveTo(boardPosition.x + x * squareSize, boardPosition.y)
-      renderingCtx.lineTo(
-        boardPosition.x + x * squareSize,
-        boardPosition.y + boardSize.y * squareSize
-      )
-      renderingCtx.stroke()
-    }
-    for (y <- 0 to boardSize.y) {
-      renderingCtx.beginPath()
-      renderingCtx.moveTo(boardPosition.x, boardPosition.y + y * squareSize)
-      renderingCtx.lineTo(
-        boardPosition.x + boardSize.x * squareSize,
-        boardPosition.y + y * squareSize
-      )
-      renderingCtx.stroke()
-    }
-
-    val fontSize = Math.max(MinTextSize, squareSize / 2)
-    renderingCtx.fillStyle = s"rgb(0, 0, 0)"
-    renderingCtx.font = s"${fontSize}px serif"
-    renderingCtx.textBaseline = "bottom"
-    renderingCtx.textAlign = "left"
-    renderingCtx.fillText(boardTitle, boardPosition.x, boardPosition.y - 2)
   }
 
   def drawMissiles(
@@ -1060,51 +1056,48 @@ class BoardView(
       renderingCtx: CanvasRenderingContext2D,
       turnAttacks: List[Attack],
       extraTurnPopupOpt: Option[Int],
-      extraTurnPopupTextOpt: Option[Span]
-  ): Unit = {
-    (extraTurnPopupOpt, extraTurnPopupTextOpt.map(_.innerText)) match {
-      case (Some(timeRemaining), Some(extraTurnText)) =>
-        val middleX = myBoardCanvas.width / 2
-        val bottomY = myBoardCanvas.height - SizeMedium.get
-        val textSize = (SizeBig.get * 1.6).toInt
-        val fadeAlpha =
-          if (timeRemaining > ExtraTurnPopupTimeFade)
-            1.0
-          else
-            timeRemaining.toDouble / ExtraTurnPopupTimeFade
-        val extraTurnPopupMissileSize = SizeBig.get
-        val missilesDiff: Coordinate =
-          Coordinate(extraTurnPopupMissileSize, 0)
-        val missilesInitialPos: Coordinate =
-          Coordinate(
-            (-missilesDiff.x * (turnAttacks.size / 2.0)).toInt,
-            -textSize - extraTurnPopupMissileSize
+      extraTurnPopupText: String
+  ): Unit =
+    extraTurnPopupOpt.foreach { timeRemaining =>
+      val middleX = myBoardCanvas.width / 2
+      val bottomY = myBoardCanvas.height - SizeMedium.get
+      val textSize = (SizeBig.get * 1.6).toInt
+      val fadeAlpha =
+        if (timeRemaining > ExtraTurnPopupTimeFade)
+          1.0
+        else
+          timeRemaining.toDouble / ExtraTurnPopupTimeFade
+      val extraTurnPopupMissileSize = SizeBig.get
+      val missilesDiff: Coordinate =
+        Coordinate(extraTurnPopupMissileSize, 0)
+      val missilesInitialPos: Coordinate =
+        Coordinate(
+          (-missilesDiff.x * (turnAttacks.size / 2.0)).toInt,
+          -textSize - extraTurnPopupMissileSize
+        )
+
+      if (ExtraTurnAppear(timeRemaining)) {
+        renderingCtx.fillStyle = s"rgb(0, 0, 0, $fadeAlpha)"
+        renderingCtx.font = s"${textSize}px serif"
+        renderingCtx.textBaseline = "bottom"
+        renderingCtx.textAlign = "center"
+        renderingCtx.fillText(extraTurnPopupText, middleX, bottomY)
+
+        renderingCtx.globalAlpha = fadeAlpha
+        turnAttacks.zipWithIndex.foreach { case (Attack(_, _), index) =>
+          drawImageAbs(
+            renderingCtx,
+            attackSimple.element,
+            middleX + missilesInitialPos.x + (missilesDiff * index).x,
+            bottomY + missilesInitialPos.y + (missilesDiff * index).y,
+            extraTurnPopupMissileSize,
+            extraTurnPopupMissileSize,
+            useAntiAliasing = false
           )
-
-        if (ExtraTurnAppear(timeRemaining)) {
-          renderingCtx.fillStyle = s"rgb(0, 0, 0, $fadeAlpha)"
-          renderingCtx.font = s"${textSize}px serif"
-          renderingCtx.textBaseline = "bottom"
-          renderingCtx.textAlign = "center"
-          renderingCtx.fillText(extraTurnText, middleX, bottomY)
-
-          renderingCtx.globalAlpha = fadeAlpha
-          turnAttacks.zipWithIndex.foreach { case (Attack(_, _), index) =>
-            drawImageAbs(
-              renderingCtx,
-              attackSimple.element,
-              middleX + missilesInitialPos.x + (missilesDiff * index).x,
-              bottomY + missilesInitialPos.y + (missilesDiff * index).y,
-              extraTurnPopupMissileSize,
-              extraTurnPopupMissileSize,
-              useAntiAliasing = false
-            )
-          }
-          renderingCtx.globalAlpha = 1.0
         }
-      case _ =>
+        renderingCtx.globalAlpha = 1.0
+      }
     }
-  }
 
   def drawDestructionSummary(
       renderingCtx: CanvasRenderingContext2D,
@@ -1189,7 +1182,11 @@ object BoardView {
 
   case class SummaryShip(ship: Ship, pieces: List[Coordinate], destroyed: Boolean)
 
-  val CanvasSize: Coordinate = Coordinate(1000, 375)
+  val MinTextSize = 15
+  val BoardMarkSize = 30
+  val BoardMarkMargin = 20
+  val CanvasSize: Coordinate =
+    Coordinate(1000, 20 + 300 + BoardMarkMargin * 2 + BoardMarkSize)
 
   val BoardMarksSelectorOrder: List[BoardMark] =
     List(BoardMark.ManualShip, BoardMark.ManualWater)

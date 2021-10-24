@@ -40,6 +40,8 @@ case class Coordinate(x: Int, y: Int) {
       if dx != 0 || dy != 0
     } yield Coordinate(x + dx, y + dy)
 
+  def max: Int = Math.max(x, y)
+
   override def toString: String = s"Coor($x,$y)"
 
 }

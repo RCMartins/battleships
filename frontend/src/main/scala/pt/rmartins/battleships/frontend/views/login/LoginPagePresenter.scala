@@ -5,12 +5,11 @@ import pt.rmartins.battleships.frontend.routing._
 import pt.rmartins.battleships.frontend.services.UserContextService
 import pt.rmartins.battleships.frontend.views.game.Cookies
 import pt.rmartins.battleships.shared.i18n.Translations
-import pt.rmartins.battleships.shared.model.SharedExceptions
 import pt.rmartins.battleships.shared.model.auth.UserContext
-import pt.rmartins.battleships.shared.model.game.Username
+import pt.rmartins.battleships.shared.model.game.{AuthError, Username}
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
+import scala.util.Success
 
 /** Contains the business logic of this view. */
 class LoginPagePresenter(
@@ -31,7 +30,10 @@ class LoginPagePresenter(
     loggingIn(username, userService.loginUsername(username))
   }
 
-  private def loggingIn(username: Username, loginF: Future[UserContext]): Future[Unit] = {
+  private def loggingIn(
+      username: Username,
+      loginF: Future[Either[AuthError, UserContext]]
+  ): Future[Unit] = {
     model.subProp(_.username).set(username)
     model.subProp(_.waitingForResponse).set(true)
     model.subProp(_.errors).set(Seq.empty)
@@ -42,25 +44,26 @@ class LoginPagePresenter(
     }
 
     loginF
-      .map { ctx =>
-        Cookies.saveCookieData(ctx.token, ctx.username)
-        ()
+      .map {
+        case Left(error) =>
+          failure()
+          Left(error)
+        case Right(ctx) =>
+          model.subProp(_.waitingForResponse).set(false)
+          Cookies.saveCookieData(ctx.token, ctx.username)
+          Right(ctx)
       }
       .andThen {
-        case Success(_) =>
-          model.subProp(_.waitingForResponse).set(false)
+        case Success(Right(_)) =>
           application.goTo(RoutingInGameState)
-        case Failure(_: SharedExceptions.UnauthorizedException) =>
-          failure()
-        case Failure(_: SharedExceptions.UserAlreadyExists) =>
-          failure()
+        case Success(Left(AuthError.UnauthorizedException)) =>
+        case Success(Left(AuthError.UserAlreadyExists)) =>
           model.subProp(_.errors).set(Seq(Translations.Auth.userAlreadyExists))
-        case Failure(_: SharedExceptions.UsernameInvalid) =>
-          failure()
+        case Success(Left(AuthError.UsernameInvalid)) =>
           model.subProp(_.errors).set(Seq(Translations.Auth.userNotFound))
-        case Failure(_) =>
-          failure()
+        case _ =>
           model.subProp(_.errors).set(Seq(Translations.Global.unknownError))
       }
+      .map(_ => ())
   }
 }

@@ -2,6 +2,7 @@ package pt.rmartins.battleships.backend.services
 
 import com.softwaremill.quicklens.ModifyPimp
 import io.udash.rpc.ClientId
+import pt.rmartins.battleships.backend.services.GameService.{BotClientId, BotUsername}
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game.BonusReward.ExtraTurn
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
@@ -21,9 +22,6 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   private val activeGamesByPlayer: mutable.Map[Username, Game] = mutable.Map.empty
   private val activeGames: mutable.Map[GameId, Game] = mutable.Map.empty
-
-  private val BotClientId: ClientId = ClientId("0")
-  private val BotUsername: Username = Username("Bot")
 
   @inline
   private def updateActiveGamesByPlayer(player: ServerPlayer, game: Game): Unit = {
@@ -184,13 +182,13 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   case class ServerMyBoard(
       boardSize: Coordinate,
-      ships: List[ShipInGame]
+      ships: List[ShipInBoard]
   ) {
 
-    lazy val efficientShipCheck: Vector[Vector[Option[ShipInGame]]] =
+    lazy val efficientShipCheck: Vector[Vector[Option[ShipInBoard]]] =
       ships
         .flatMap(shipInGame => shipInGame.shipActualPieces.map(_ -> shipInGame))
-        .foldLeft(Vector.fill(boardSize.x)(Vector.fill(boardSize.y)(Option.empty[ShipInGame]))) {
+        .foldLeft(Vector.fill(boardSize.x)(Vector.fill(boardSize.y)(Option.empty[ShipInBoard]))) {
           case (vectorMatrix, (shipPiece, shipInGame)) =>
             vectorMatrix.updated(
               shipPiece.x,
@@ -209,7 +207,7 @@ class GameService(rpcClientsService: RpcClientsService) {
 
     def updateMarks(
         turn: Turn,
-        hits: List[(Coordinate, Option[ShipInGame])]
+        hits: List[(Coordinate, Option[ShipInBoard])]
     ): ServerEnemyBoard = {
       val allWater = hits.forall(_._2.isEmpty)
       val allShipHit = hits.forall(_._2.nonEmpty)
@@ -378,7 +376,7 @@ class GameService(rpcClientsService: RpcClientsService) {
       )
     }
 
-    def placeShips(playerUsername: Username, shipPositions: List[ShipInGame]): Game =
+    def placeShips(playerUsername: Username, shipPositions: List[ShipInBoard]): Game =
       updatePlayer(getPlayerUnsafe(playerUsername).modify(_.myBoard.ships).setTo(shipPositions))
 
     def updatePlayer(updatedPlayer: ServerPlayer): Game =
@@ -431,10 +429,10 @@ class GameService(rpcClientsService: RpcClientsService) {
     }
   }
 
-  def startGameWithBots(playerUsername: Username): Future[Unit] = Future {
+  def startGameWithBots(playerUsername: Username, rules: Rules): Future[Unit] = Future {
     rpcClientsService.getClientIdByUsername(playerUsername) match {
       case Some(playerId) =>
-        val game: Game = createNewGame((playerId, playerUsername), None)
+        val game: Game = createNewGame((playerId, playerUsername), None, rules)
 
         updateServerState(game, None)
         updateBothGameState(game)
@@ -445,7 +443,8 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   def startGame(
       player1Username: Username,
-      player2Username: Username
+      player2Username: Username,
+      rules: Rules
   ): Future[Unit] =
     Future {
       (
@@ -454,7 +453,7 @@ class GameService(rpcClientsService: RpcClientsService) {
       ) match {
         case (Some(player1Id), Some(player2Id)) =>
           val game: Game =
-            createNewGame((player1Id, player1Username), Some((player2Id, player2Username)))
+            createNewGame((player1Id, player1Username), Some((player2Id, player2Username)), rules)
 
           updateServerState(game, None)
           updateBothGameState(game)
@@ -465,69 +464,17 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   private def createNewGame(
       player1Data: (ClientId, Username),
-      player2DataOpt: Option[(ClientId, Username)]
+      player2DataOpt: Option[(ClientId, Username)],
+      rules: Rules
   ): Game = {
-    val gameFleet: Fleet =
-      Fleet(
-//        (
-//          List.fill(4)(Ship.Submarine) ++
-//            List.fill(3)(Ship.Skeeter) ++
-//            List.fill(2)(Ship.Ranger) ++
-//            List.fill(1)(Ship.Conqueror) ++
-//            List.fill(1)(Ship.AircraftCarrier)
-//        )
-        (
-          List.fill(0)(Ship.Submarine) ++
-            List.fill(4)(Ship.Skeeter) ++
-            List.fill(3)(Ship.Ranger) ++
-            List.fill(2)(Ship.Conqueror) ++
-            List.fill(0)(Ship.AircraftCarrier) ++
-            List.fill(2)(Ship.TorpedoBoat) ++
-            List.fill(2)(Ship.Cruiser) ++
-            List.fill(1)(Ship.Epoch) ++
-            List.fill(1)(Ship.Battleship)
-        )
-          .groupBy(_.shipId)
-          .toList
-          .sortBy { case (id, list) =>
-            (-list.head.piecesSize, id)
-          }
-          .flatMap(_._2)
-      )
-
-    val defaultTurnAttackTypes = List.fill(3)(AttackType.Simple)
-    val turnBonuses: List[TurnBonus] =
-      List(
-        TurnBonus(BonusType.FirstBlood, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
-        TurnBonus(BonusType.DoubleKill, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
-        TurnBonus(BonusType.TripleKill, List(ExtraTurn(List.fill(3)(AttackType.Simple))))
-      )
-
-    val timeLimit: Option[RuleTimeLimit] =
-      Some(
-        RuleTimeLimit(
-          initialTotalTimeSeconds = 600,
-          additionalTurnTimeSeconds = Some((10, false))
-        )
-      )
-
-    val rules: Rules =
-      Rules(
-        gameFleet = gameFleet,
-        defaultTurnAttackTypes = defaultTurnAttackTypes,
-        turnBonuses = turnBonuses,
-        timeLimit = timeLimit
-      )
-
-    val boardSize = Coordinate(15, 15)
-    val myBoard: ServerMyBoard =
-      ServerMyBoard(boardSize, Nil)
+    val boardSize = rules.boardSize
+    val myBoard: ServerMyBoard = ServerMyBoard(boardSize, Nil)
     val enemyBoard: ServerEnemyBoard =
       ServerEnemyBoard(
         boardSize,
         Vector.fill(boardSize.x)(Vector.fill(boardSize.y)((None, BoardMark.Empty))),
-        gameFleet.shipAmount,
-        gameFleet.shipAmount
+        rules.gameFleet.shipAmount,
+        rules.gameFleet.shipAmount
       )
 
     val player1First: Boolean = Random.nextBoolean()
@@ -615,16 +562,16 @@ class GameService(rpcClientsService: RpcClientsService) {
     }.map {
       case Some(oldGame) =>
         if (!oldGame.player2.isHuman)
-          startGameWithBots(oldGame.player1.username)
+          startGameWithBots(oldGame.player1.username, oldGame.rules)
         else
-          startGame(oldGame.player1.username, oldGame.player2.username)
+          startGame(oldGame.player1.username, oldGame.player2.username, oldGame.rules)
       case None =>
     }
 
   def confirmShips(
       gameId: GameId,
       playerUsername: Username,
-      shipPositions: List[ShipInGame]
+      shipPositions: List[ShipInBoard]
   ): Future[Unit] =
     Future {
       activeGames.get(gameId) match {
@@ -738,7 +685,7 @@ class GameService(rpcClientsService: RpcClientsService) {
           val gameWithLastTurnUpdated = updateGameTime(game, instantNow)
 
           val enemy = gameWithLastTurnUpdated.enemyPlayer(player)
-          val hits: List[(Coordinate, Option[ShipInGame])] =
+          val hits: List[(Coordinate, Option[ShipInBoard])] =
             turnAttacks.map(_.coordinateOpt.get).map { case coor @ Coordinate(x, y) =>
               coor -> enemy.myBoard.efficientShipCheck(x)(y)
             }
@@ -767,7 +714,7 @@ class GameService(rpcClientsService: RpcClientsService) {
                 case Water =>
                   (true, Int.MaxValue)
                 case ShipHit(shipId, destroyed) =>
-                  (destroyed, shipId)
+                  (destroyed, shipId.id)
               }
 
           val turnPlay: TurnPlay =
@@ -970,5 +917,12 @@ class GameService(rpcClientsService: RpcClientsService) {
     if (game.player2.isHuman)
       rpcClientsService.sendQuitGame(game.player2.clientId)
   }
+
+}
+
+object GameService {
+
+  val BotClientId: ClientId = ClientId("0")
+  val BotUsername: Username = Username("Bot")
 
 }

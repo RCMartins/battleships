@@ -20,11 +20,11 @@ class GameEndpoint(implicit
   override def sendMsg(gameId: GameId, msgText: String): Future[Unit] =
     gameService.sendMsg(gameId, ctx.username, msgText)
 
-  override def startGameWithBots(): Future[Unit] =
-    gameService.startGameWithBots(ctx.username)
+  override def startGameWithBots(rules: Rules): Future[Unit] =
+    gameService.startGameWithBots(ctx.username, rules)
 
-  override def startGameWith(otherPlayerUsername: Username): Future[Unit] =
-    gameService.startGame(ctx.username, otherPlayerUsername)
+  override def startGameWith(otherPlayerUsername: Username, rules: Rules): Future[Unit] =
+    gameService.startGame(ctx.username, otherPlayerUsername, rules)
 
   override def quitCurrentGame(gameId: GameId): Future[Unit] =
     gameService.quitCurrentGame(gameId, ctx.username)
@@ -40,7 +40,7 @@ class GameEndpoint(implicit
 
   override def confirmShips(
       gameId: GameId,
-      shipPositions: List[ShipInGame]
+      shipPositions: List[ShipInBoard]
   ): Future[Unit] =
     gameService.confirmShips(gameId, ctx.username, shipPositions)
 

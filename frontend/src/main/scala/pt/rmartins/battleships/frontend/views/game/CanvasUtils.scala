@@ -2,90 +2,11 @@ package pt.rmartins.battleships.frontend.views.game
 
 import org.scalajs.dom.CanvasRenderingContext2D
 import org.scalajs.dom.html.Image
+import pt.rmartins.battleships.frontend.views.game.BoardView.MinTextSize
+import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasColor
 import pt.rmartins.battleships.shared.model.game.{Coordinate, Turn}
 
 class CanvasUtils(gamePresenter: GamePresenter) {
-
-  import CanvasBorder._
-
-  sealed trait CanvasBorder {
-
-    def lineColor: String
-    def lineWidth: Double
-    def alpha: Double
-    def lineDash: Option[Seq[Double]] = None
-  }
-
-  object CanvasBorder {
-
-    case object NoBorder extends CanvasBorder {
-      val lineColor: String = ""
-      val lineWidth: Double = 0
-      val alpha: Double = 0
-    }
-
-    case class Standard(alpha: Double = 1.0) extends CanvasBorder {
-      val lineColor: String = "0, 0, 0"
-      val lineWidth: Double = 1.0
-    }
-
-    case class Bold(alpha: Double = 1.0) extends CanvasBorder {
-      val lineColor: String = "0, 0, 0"
-      val lineWidth: Double = 2.0
-    }
-
-    case class Red(alpha: Double = 1.0) extends CanvasBorder {
-      val lineColor: String = "255, 0, 0"
-      val lineWidth: Double = 1.0
-    }
-
-    case class RedBold(alpha: Double = 1.0) extends CanvasBorder {
-      val lineColor: String = "255, 0, 0"
-      val lineWidth: Double = 3.0
-    }
-
-    case class DashRed(alpha: Double = 1.0, lineWidth: Double = 3.0) extends CanvasBorder {
-      val lineColor: String = "255, 0, 0"
-      override val lineDash: Option[Seq[Double]] = Some(Seq(4, 2))
-    }
-
-  }
-
-  sealed trait CanvasColor {
-    val fillColor: String
-    val alpha: Double
-    val border: CanvasBorder
-  }
-
-  object CanvasColor {
-
-    case class White(border: CanvasBorder = Standard(), alpha: Double = 0.0) extends CanvasColor {
-      val fillColor: String = "255, 255, 255"
-    }
-
-    case class Ship(border: CanvasBorder = Standard(), alpha: Double = 1.0) extends CanvasColor {
-      val fillColor: String = "160, 94, 39"
-    }
-
-    case class ShipDarker(border: CanvasBorder = Standard(), alpha: Double = 1.0)
-        extends CanvasColor {
-      val fillColor: String = "139, 69, 14"
-    }
-
-    case class Water(border: CanvasBorder = Standard(), alpha: Double = 1.0) extends CanvasColor {
-      val fillColor: String = "0, 206, 209"
-    }
-
-    case class WaterDarker(border: CanvasBorder = Standard(), alpha: Double = 1.0)
-        extends CanvasColor {
-      val fillColor: String = "0, 166, 169"
-    }
-
-    case class Red(border: CanvasBorder = Standard(), alpha: Double = 1.0) extends CanvasColor {
-      val fillColor: String = "255, 0, 0"
-    }
-
-  }
 
   def drawBoardSquare(
       renderingCtx: CanvasRenderingContext2D,
@@ -199,6 +120,138 @@ class CanvasUtils(gamePresenter: GamePresenter) {
       width,
       height
     )
+  }
+
+  def drawBoardLimits(
+      renderingCtx: CanvasRenderingContext2D,
+      boardTitle: String,
+      boardSize: Coordinate,
+      boardPosition: Coordinate,
+      squareSize: Int,
+      backgroundColor: Option[CanvasColor]
+  ): Unit = {
+    backgroundColor.foreach(canvasColor =>
+      drawSquareAbs(
+        renderingCtx,
+        boardPosition,
+        boardSize.x * squareSize,
+        canvasColor
+      )
+    )
+
+    renderingCtx.strokeStyle = s"rgb(0, 0, 0)"
+    renderingCtx.lineWidth = 1.0
+
+    for (x <- 0 to boardSize.x) {
+      renderingCtx.beginPath()
+      renderingCtx.moveTo(boardPosition.x + x * squareSize, boardPosition.y)
+      renderingCtx.lineTo(
+        boardPosition.x + x * squareSize,
+        boardPosition.y + boardSize.y * squareSize
+      )
+      renderingCtx.stroke()
+    }
+    for (y <- 0 to boardSize.y) {
+      renderingCtx.beginPath()
+      renderingCtx.moveTo(boardPosition.x, boardPosition.y + y * squareSize)
+      renderingCtx.lineTo(
+        boardPosition.x + boardSize.x * squareSize,
+        boardPosition.y + y * squareSize
+      )
+      renderingCtx.stroke()
+    }
+
+    val fontSize = MinTextSize
+    renderingCtx.fillStyle = s"rgb(0, 0, 0)"
+    renderingCtx.font = s"${fontSize}px serif"
+    renderingCtx.textBaseline = "bottom"
+    renderingCtx.textAlign = "left"
+    renderingCtx.fillText(boardTitle, boardPosition.x, boardPosition.y - 2)
+  }
+
+}
+
+object CanvasUtils {
+
+  sealed trait CanvasBorder {
+
+    def lineColor: String
+    def lineWidth: Double
+    def alpha: Double
+    def lineDash: Option[Seq[Double]] = None
+  }
+
+  object CanvasBorder {
+
+    case object NoBorder extends CanvasBorder {
+      val lineColor: String = ""
+      val lineWidth: Double = 0
+      val alpha: Double = 0
+    }
+
+    case class Standard(alpha: Double = 1.0) extends CanvasBorder {
+      val lineColor: String = "0, 0, 0"
+      val lineWidth: Double = 1.0
+    }
+
+    case class Bold(alpha: Double = 1.0) extends CanvasBorder {
+      val lineColor: String = "0, 0, 0"
+      val lineWidth: Double = 2.0
+    }
+
+    case class Red(alpha: Double = 1.0) extends CanvasBorder {
+      val lineColor: String = "255, 0, 0"
+      val lineWidth: Double = 1.0
+    }
+
+    case class RedBold(alpha: Double = 1.0) extends CanvasBorder {
+      val lineColor: String = "255, 0, 0"
+      val lineWidth: Double = 3.0
+    }
+
+    case class DashRed(alpha: Double = 1.0, lineWidth: Double = 3.0) extends CanvasBorder {
+      val lineColor: String = "255, 0, 0"
+      override val lineDash: Option[Seq[Double]] = Some(Seq(4, 2))
+    }
+
+  }
+
+  sealed trait CanvasColor {
+    val fillColor: String
+    val alpha: Double
+    val border: CanvasBorder
+  }
+
+  object CanvasColor {
+
+    import CanvasBorder.Standard
+
+    case class White(border: CanvasBorder = Standard(), alpha: Double = 0.0) extends CanvasColor {
+      val fillColor: String = "255, 255, 255"
+    }
+
+    case class Ship(border: CanvasBorder = Standard(), alpha: Double = 1.0) extends CanvasColor {
+      val fillColor: String = "160, 94, 39"
+    }
+
+    case class ShipDarker(border: CanvasBorder = Standard(), alpha: Double = 1.0)
+        extends CanvasColor {
+      val fillColor: String = "139, 69, 14"
+    }
+
+    case class Water(border: CanvasBorder = Standard(), alpha: Double = 1.0) extends CanvasColor {
+      val fillColor: String = "0, 206, 209"
+    }
+
+    case class WaterDarker(border: CanvasBorder = Standard(), alpha: Double = 1.0)
+        extends CanvasColor {
+      val fillColor: String = "0, 166, 169"
+    }
+
+    case class Red(border: CanvasBorder = Standard(), alpha: Double = 1.0) extends CanvasColor {
+      val fillColor: String = "255, 0, 0"
+    }
+
   }
 
 }

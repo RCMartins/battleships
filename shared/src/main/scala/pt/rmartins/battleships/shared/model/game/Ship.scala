@@ -6,7 +6,7 @@ import pt.rmartins.battleships.shared.model.game.Rotation._
 import scala.collection.mutable
 import scala.util.chaining.scalaUtilChainingOps
 
-case class Ship(shipId: Int, pieces: List[Coordinate], rotation: Rotation) {
+case class Ship(shipId: ShipId, pieces: List[Coordinate], rotation: Rotation) {
 
   val piecesSize: Int = pieces.size
 
@@ -31,7 +31,7 @@ object Ship extends HasGenCodec[Ship] {
   private def toShip(piecePairs: List[(Int, Int)]): Ship = {
     val thisShipId = id
     id += 1
-    Ship(thisShipId, piecePairs.map { case (x, y) => Coordinate(x, y) }, Rotation0)
+    Ship(ShipId(thisShipId), piecePairs.map { case (x, y) => Coordinate(x, y) }, Rotation0)
   }
 
   def l(y: Int, x: Int*): Seq[(Int, Int)] = x.map((_, y))
@@ -49,6 +49,7 @@ object Ship extends HasGenCodec[Ship] {
     List((0, 0), (1, 0), (2, 0), (1, 1), (0, 2), (1, 2), (2, 2), (1, 3), (1, 4)).pipe(toShip)
   val MotherShip: Ship =
     List(l(y = 0, 0, 1, 3, 5, 6), l(y = 1, 1, 2, 3, 4, 5), l(y = 2, 0, 1, 3, 5, 6)).flatten
+      .map(_.swap)
       .pipe(toShip)
   val HeavyCruiser: Ship =
     List((2, 0), (1, 1), (3, 1), (0, 2), (4, 2), (1, 3), (3, 3)).pipe(toShip)
@@ -58,7 +59,7 @@ object Ship extends HasGenCodec[Ship] {
     List((0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5)).pipe(toShip)
   //val Colossus 3,0 3,1 2,2 3,2 4,2 1,3 2,3 3,3 4,3 5,3 1,4 2,4 3,4 4,4 5,4 1,5 3,5 5,5 0,6 3,6 6,6 3,7
 
-  private val allShipsList: List[Ship] =
+  val allShipsList: List[Ship] =
     List[Ship](
       Submarine,
       Skeeter,
@@ -69,31 +70,36 @@ object Ship extends HasGenCodec[Ship] {
       Cruiser,
       Epoch,
       Battleship,
-      MotherShip,
-      HeavyCruiser,
-      Destroyer,
-      FireShip
+      MotherShip
+//      HeavyCruiser,
+//      Destroyer,
+//      FireShip
     )
 
-  private val cacheRotations: mutable.Map[(Int, Int), Ship] =
-    mutable.Map.empty[(Int, Int), Ship] ++
+  lazy val allShipsFleetMaxX: Fleet =
+    Fleet(
+      allShipsList.map { ship =>
+        if (ship.size.y > ship.size.x) ship.rotateBy(1) else ship
+      }
+    )
+
+  lazy val shipMaxXMap: Map[ShipId, Ship] =
+    allShipsFleetMaxX.ships.map(ship => ship.shipId -> ship).toMap
+
+  private val cacheRotations: mutable.Map[(ShipId, Int), Ship] =
+    mutable.Map.empty[(ShipId, Int), Ship] ++
       allShipsList.map(ship => (ship.shipId, Rotation0.rIndex) -> ship)
 
-  def getShip(shipId: Int, rotation: Rotation): Ship =
+  def getShip(shipId: ShipId, rotation: Rotation): Ship =
     cacheRotations.getOrElseUpdate(
       (shipId, rotation.rIndex),
       Ship.createRotatedShip(shipId, rotation)
     )
 
-  val allShips: Map[Int, Ship] =
+  val allShipsMap: Map[ShipId, Ship] =
     allShipsList.map(ship => ship.shipId -> ship).toMap
 
-  val shipLongXMap: Map[Int, Ship] =
-    allShips.keys
-      .map(shipId => shipId -> Rotation.all.map(getShip(shipId, _)).maxBy(_.size.x))
-      .toMap
-
-  def createRotatedShip(shipId: Int, rotation: Rotation): Ship = {
+  def createRotatedShip(shipId: ShipId, rotation: Rotation): Ship = {
     def moveNegativeCoor(ship: Ship): Ship = {
       val maxNegX = ship.pieces.minBy(_.x).x
       val maxNegY = ship.pieces.minBy(_.y).y

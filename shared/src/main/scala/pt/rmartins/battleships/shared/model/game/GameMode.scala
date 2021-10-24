@@ -40,7 +40,7 @@ object GameMode extends HasGenCodec[GameMode] {
       youWon: Boolean,
       myTimeRemaining: Option[TimeRemaining],
       enemyTimeRemaining: Option[TimeRemaining],
-      enemyRealBoard: List[ShipInGame]
+      enemyRealBoard: List[ShipInBoard]
   ) extends GameMode {
 
     override def isEndGame: Boolean = true

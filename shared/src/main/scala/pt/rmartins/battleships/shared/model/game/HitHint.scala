@@ -19,7 +19,7 @@ object HitHint extends HasGenCodec[HitHint] {
     val isDestroyed: Boolean = false
   }
 
-  case class ShipHit(shipId: Int, destroyed: Boolean) extends HitHint {
+  case class ShipHit(shipId: ShipId, destroyed: Boolean) extends HitHint {
     val isWater: Boolean = false
     val isDestroyed: Boolean = destroyed
   }

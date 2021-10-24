@@ -1,18 +1,19 @@
 package pt.rmartins.battleships.backend.rpc
 
+import io.udash.i18n.RemoteTranslationRPC
+import io.udash.rpc._
 import pt.rmartins.battleships.backend.rpc.auth.AuthEndpoint
 import pt.rmartins.battleships.backend.rpc.i18n.TranslationsEndpoint
 import pt.rmartins.battleships.backend.rpc.secure.SecureEndpoint
 import pt.rmartins.battleships.backend.services.DomainServices
-import pt.rmartins.battleships.shared.model.auth.{UserContext, UserToken}
 import pt.rmartins.battleships.shared.model.SharedExceptions
+import pt.rmartins.battleships.shared.model.auth.{UserContext, UserToken}
 import pt.rmartins.battleships.shared.rpc.server.MainServerRPC
 import pt.rmartins.battleships.shared.rpc.server.open.AuthRPC
 import pt.rmartins.battleships.shared.rpc.server.secure.SecureRPC
-import io.udash.i18n.RemoteTranslationRPC
-import io.udash.rpc._
 
-class ExposedRpcInterfaces(implicit domainServices: DomainServices, clientId: ClientId) extends MainServerRPC {
+class ExposedRpcInterfaces(implicit domainServices: DomainServices, clientId: ClientId)
+    extends MainServerRPC {
   // required domain services are implicitly passed to the endpoints
   import domainServices._
 
@@ -25,7 +26,7 @@ class ExposedRpcInterfaces(implicit domainServices: DomainServices, clientId: Cl
     secureEndpointCache match {
       case Some((token, endpoint)) if token == ctx.token =>
         endpoint
-      case None =>
+      case _ =>
         val endpoint = new SecureEndpoint
         secureEndpointCache = Some((ctx.token, endpoint))
         endpoint

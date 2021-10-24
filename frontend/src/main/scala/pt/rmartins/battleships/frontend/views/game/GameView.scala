@@ -36,47 +36,25 @@ class GameView(
     screenModel: ModelProperty[ScreenModel],
     presenter: GamePresenter,
     translationsService: TranslationsService,
-    canvasUtils: CanvasUtils
+    boardView: BoardView,
+    preGameView: PreGameView,
+    viewUtils: ViewUtils
 ) extends View
     with CssView {
 
-  import canvasUtils._
   import translationsService._
 
-  private val myBoardCanvas: Canvas =
-    canvas(id := "mainGameCanvas").render
-
-  screenModel.get.canvasSize.pipe { canvasSize =>
-    myBoardCanvas.setAttribute("width", canvasSize.x.toString)
-    myBoardCanvas.setAttribute("height", canvasSize.y.toString)
+  private def reloadBoardView(): Unit = {
+    if (!presenter.onCanvasResize(boardView)) {
+      window.setTimeout(
+        () => boardView.paint(),
+        1
+      )
+    }
   }
-
-  private val canvasDiv: Div =
-    div(id := "canvas-div", myBoardCanvas).render
 
   window.onresize = (_: UIEvent) => {
-    presenter.onCanvasResize(canvasDiv)
-  }
-
-  private val boardView: BoardView =
-    new BoardView(gameModel, screenModel, presenter, myBoardCanvas, canvasUtils)
-
-  private def reloadBoardView(): Unit = {
-    val canvasSize = screenModel.get.canvasSize
-    if (myBoardCanvas.clientWidth != canvasSize.x || myBoardCanvas.clientHeight != canvasSize.y) {
-      myBoardCanvas.setAttribute("width", canvasSize.x.toString)
-      myBoardCanvas.setAttribute("height", canvasSize.y.toString)
-    }
-
-    if (screenModel.get.extraTurnText.isEmpty)
-      screenModel
-        .subProp(_.extraTurnText)
-        .set(Some(span(translatedDynamic(Translations.Game.extraTurnPopup)(_.apply())).render))
-
-    window.setTimeout(
-      () => boardView.paint(),
-      1
-    )
+    presenter.onCanvasResize(boardView)
   }
 
   gameStateModel.listen(_ => reloadBoardView())
@@ -85,6 +63,7 @@ class GameView(
   screenModel.subProp(_.missilesPopupMillisOpt).listen(_ => reloadBoardView())
   screenModel.subProp(_.extraTurnPopup).listen(_ => reloadBoardView())
   screenModel.subProp(_.extraTurnText).listen(_ => reloadBoardView())
+  screenModel.subProp(_.screenResized).listen(_ => reloadBoardView())
 
   gameModel.subProp(_.mousePosition).listen(_ => reloadBoardView())
   gameModel.subProp(_.mouseDown).listen(_ => reloadBoardView())
@@ -93,36 +72,6 @@ class GameView(
   gameModel.subProp(_.turnAttacksSent).listen(_ => reloadBoardView())
   gameModel.subProp(_.selectedBoardMarkOpt).listen(_ => reloadBoardView())
   gameModel.subProp(_.lineDashOffset).listen(_ => reloadBoardView())
-
-  myBoardCanvas.onmousemove = (mouseEvent: MouseEvent) => {
-    val rect = myBoardCanvas.getBoundingClientRect()
-    presenter.mouseMove(
-      boardView,
-      mouseEvent.clientX.toInt - rect.left.toInt,
-      mouseEvent.clientY.toInt - rect.top.toInt
-    )
-  }
-
-  myBoardCanvas.onmouseleave = (_: MouseEvent) => {
-    presenter.mouseLeave()
-  }
-
-  myBoardCanvas.onmousedown = (mouseEvent: MouseEvent) => {
-    presenter.mouseDown(boardView, mouseEvent.button)
-    false // Prevent the mouse down from exiting the canvas
-  }
-
-  myBoardCanvas.onmouseup = (_: MouseEvent) => {
-    presenter.mouseUp()
-  }
-
-  myBoardCanvas.onmousewheel = (wheelEvent: WheelEvent) => {
-    presenter.mouseWheel(wheelEvent.deltaY.toInt / 100)
-  }
-
-  myBoardCanvas.oncontextmenu = (event: MouseEvent) => {
-    event.preventDefault()
-  }
 
   private val startGameVsBotButton = UdashButton(
     buttonStyle = Color.Primary.toProperty,
@@ -144,7 +93,7 @@ class GameView(
     factory.input
       .formGroup(groupId = ComponentId("username")) { nested =>
         factory.input
-          .textInput(preGameModel.subProp(_.username).bitransform(_.username)(Username(_)))(
+          .textInput(preGameModel.subProp(_.enemyUsername).bitransform(_.username)(Username(_)))(
             Some(nested =>
               nested(
                 translatedAttrDynamic(Translations.Game.chooseEnemyPlaceholder, "placeholder")(
@@ -233,14 +182,14 @@ class GameView(
 
   private val revealEnemyBoardButton =
     UdashButton(
-      buttonStyle = screenModel.subProp(_.hideEnemyBoard).transform {
+      buttonStyle = screenModel.subProp(_.revealEnemyBoard).transform {
         case true  => Color.Secondary
         case false => Color.Primary
       },
       block = true.toProperty,
       componentId = ComponentId("hide-enemy-board-button")
     )(nested =>
-      Seq(nested(produceWithNested(screenModel.subProp(_.hideEnemyBoard)) {
+      Seq(nested(produceWithNested(screenModel.subProp(_.revealEnemyBoard)) {
         case (true, nested) =>
           span(nested(translatedDynamic(Translations.Game.hideEnemyBoardButton)(_.apply()))).render
         case (false, nested) =>
@@ -304,7 +253,7 @@ class GameView(
   }
 
   startGameVsPlayerButton.listen { _ =>
-    presenter.startGameWith(preGameModel.subProp(_.username).get)
+    presenter.startGameWith(preGameModel.subProp(_.enemyUsername).get)
   }
 
   confirmShipsButton.listen { _ =>
@@ -336,7 +285,7 @@ class GameView(
   }
 
   revealEnemyBoardButton.listen { _ =>
-    screenModel.subProp(_.hideEnemyBoard).set(!screenModel.get.hideEnemyBoard)
+    screenModel.subProp(_.revealEnemyBoard).set(!screenModel.get.revealEnemyBoard)
   }
 
   private val chatTabButton: UdashButton =
@@ -353,9 +302,15 @@ class GameView(
       )
     )
 
+  private val movesTabDisabledProperty: ReadableProperty[Boolean] =
+    presenter.modeTypeProperty.transform {
+      case Some(PlayingModeType | GameOverModeType) => false
+      case _                                        => true
+    }
+
   private val myMovesTabButton: UdashButton =
     UdashButton(
-      disabled = presenter.inPreGameMode
+      disabled = movesTabDisabledProperty
     )(nested =>
       Seq[Modifier](
         `class` := "nav-link btn-outline-primary" +
@@ -371,7 +326,7 @@ class GameView(
 
   private val enemyMovesTabButton: UdashButton =
     UdashButton(
-      disabled = presenter.inPreGameMode
+      disabled = movesTabDisabledProperty
     )(nested =>
       Seq[Modifier](
         `class` := "nav-link btn-outline-primary" +
@@ -473,49 +428,6 @@ class GameView(
     emptyCanvas.setAttribute("height", canvasSize.y.toString)
     val emptyCanvasDiv: Div = div(emptyCanvas).render
 
-    def createShipCanvas(ship: Ship, destroyed: Boolean): Canvas = {
-      val shipCanvas = canvas(`class` := "mr-3").render
-      shipCanvas.setAttribute("width", canvasSize.x.toString)
-      shipCanvas.setAttribute("height", canvasSize.y.toString)
-      val renderingCtx = shipCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
-      val initialPosition = Coordinate(1, canvasSize.y / 2 - (ship.size.y * sqSize) / 2)
-      ship.pieces.foreach { shipPiece =>
-        drawBoardSquare(
-          renderingCtx,
-          initialPosition,
-          shipPiece,
-          sqSize,
-          CanvasColor.Ship()
-        )
-        if (destroyed)
-          drawCrosshair(
-            renderingCtx,
-            initialPosition,
-            shipPiece,
-            sqSize,
-            lineWidth = 1.0,
-            alpha = 0.8
-          )
-      }
-      shipCanvas
-    }
-
-    def createWaterCanvas(): Canvas = {
-      val shipCanvas = canvas(`class` := "mr-3").render
-      shipCanvas.setAttribute("width", canvasSize.x.toString)
-      shipCanvas.setAttribute("height", canvasSize.y.toString)
-      val renderingCtx = shipCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
-      val initialPosition = Coordinate(1, canvasSize.y / 2 - (sqSize / 2))
-      drawBoardSquare(
-        renderingCtx,
-        initialPosition,
-        Coordinate.origin,
-        sqSize,
-        CanvasColor.Water()
-      )
-      shipCanvas
-    }
-
     val checkId = "check" + turnPlay.turn.toTurnString
 
     val inputCheckBox =
@@ -530,11 +442,17 @@ class GameView(
 
     val turnHits: Div =
       div(
-        turnPlay.hitHints.map {
+        turnPlay.hitHints.flatMap {
           case HitHint.Water =>
-            createWaterCanvas()
+            Seq[Modifier](
+              viewUtils.createWaterCanvas(canvasSize, sqSize),
+              viewUtils.createEmptyCanvas(x = sqSize * 2, y = canvasSize.y)
+            )
           case HitHint.ShipHit(shipId, destroyed) =>
-            createShipCanvas(Ship.shipLongXMap(shipId), destroyed)
+            Seq[Modifier](
+              viewUtils.createShipCanvas(canvasSize, sqSize, Ship.shipMaxXMap(shipId), destroyed),
+              viewUtils.createEmptyCanvas(x = sqSize * 2, y = canvasSize.y)
+            )
         }
       ).render
 
@@ -667,12 +585,55 @@ class GameView(
     }
   }
 
-  override def getTemplate: Modifier = div {
+  private val errorModalId: String = "error-modal"
+  def errorModal(nested: NestedInterceptor): Div =
+    div(
+      `class` := "modal fade",
+      id := errorModalId,
+      div(
+        `class` := "modal-dialog",
+        div(
+          `class` := "modal-content",
+          div(
+            `class` := "modal-header",
+            h5(nested(translatedDynamic(Translations.Game.cannotStartGameTitle)(_.apply()))),
+            span(
+              FontAwesome.Solid.times,
+              FontAwesome.Modifiers.Sizing.x2,
+              attr("data-bs-dismiss") := "modal"
+            )
+          ),
+          div(
+            `class` := "modal-body",
+            nested(translatedDynamic(Translations.Game.cannotStartGameBody)(_.apply()))
+          ),
+          div(
+            `class` := "modal-footer",
+            button(
+              `class` := "btn btn-primary",
+              `type` := "button",
+              attr("data-bs-dismiss") := "modal",
+              nested(translatedDynamic(Translations.Game.closeButton)(_.apply()))
+            )
+          )
+        )
+      )
+    ).render
+
+  screenModel.subProp(_.showErrorModal).listen {
+    case true =>
+      Globals.modalToggle(errorModalId)
+      screenModel.subProp(_.showErrorModal).set(false)
+    case false =>
+  }
+
+  override def getTemplate: Modifier = div(
     UdashCard(componentId = ComponentId("game-panel"))(factory =>
       Seq(
         factory.header(nested =>
           div(
             `class` := "row justify-content-between",
+            errorModal(nested),
             div(
               `class` := "col-7",
               span(
@@ -812,10 +773,30 @@ class GameView(
             )
           ).render
         ),
-        factory.body(_ =>
+        factory.body(nested =>
           Seq[Modifier](
             `class` := "p-0",
-            canvasDiv
+            nested(produceWithNested(gameStateModel.transform(_.gameState.isEmpty)) {
+              case (true, nested) =>
+                val basePreGameDiv = div.render
+
+                var handle: Int = 0
+
+                handle = window.setInterval(
+                  () => {
+                    if (basePreGameDiv.clientWidth != 0) {
+                      val innerDiv = preGameView.createComponents(basePreGameDiv, nested)
+                      basePreGameDiv.appendChild(innerDiv)
+                      window.clearTimeout(handle)
+                    }
+                  },
+                  timeout = 20
+                )
+
+                basePreGameDiv
+              case (false, _) =>
+                boardView.canvasDiv
+            })
           )
         ),
         factory.footer(nested => nested(mainGameForm)),
@@ -823,16 +804,6 @@ class GameView(
         factory.footer(nested => nested(msgForm))
       )
     )
-  }
-
-  window.setTimeout(
-    () => presenter.onCanvasResize(canvasDiv),
-    1
-  )
-
-  window.setTimeout(
-    () => presenter.onCanvasResize(canvasDiv),
-    250
   )
 
 }

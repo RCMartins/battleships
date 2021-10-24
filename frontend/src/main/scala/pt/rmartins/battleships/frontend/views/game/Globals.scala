@@ -8,8 +8,8 @@ import scala.scalajs.js.annotation.JSGlobalScope
 @JSGlobalScope
 object Globals extends js.Object {
 
-  def setCookie(
-      @unused cookieStr: String
-  ): Unit = js.native
+  def setCookie(@unused cookieStr: String): Unit = js.native
+
+  def modalToggle(@unused id: String): Unit = js.native
 
 }

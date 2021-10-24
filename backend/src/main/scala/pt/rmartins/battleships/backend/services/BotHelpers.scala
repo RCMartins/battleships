@@ -10,9 +10,9 @@ object BotHelpers {
   def placeShipsAtRandom(
       boardSize: Coordinate,
       shipsToPlace: List[Ship]
-  ): Either[Unit, List[ShipInGame]] = {
+  ): Either[Unit, List[ShipInBoard]] = {
     def canPlaceInBoard(
-        shipsPlacedSoFar: List[ShipInGame],
+        shipsPlacedSoFar: List[ShipInBoard],
         shipToPlace: Ship,
         boardCoor: Coordinate
     ): Boolean = {
@@ -33,20 +33,20 @@ object BotHelpers {
     @tailrec
     def loopPlaceAllShips(
         ships: List[Ship],
-        shipsPlacedSoFar: List[ShipInGame]
-    ): Either[Unit, List[ShipInGame]] = {
+        shipsPlacedSoFar: List[ShipInBoard]
+    ): Either[Unit, List[ShipInBoard]] = {
       ships match {
         case Nil =>
           Right(shipsPlacedSoFar)
         case headShip :: nextShips =>
-          val result: Option[ShipInGame] =
+          val result: Option[ShipInBoard] =
             Random
               .shuffle(possibleCoorList)
               .map { case (coor, rotation) => (coor, headShip.rotateTo(rotation)) }
               .find { case (coor, shipWithRotation) =>
                 canPlaceInBoard(shipsPlacedSoFar, shipWithRotation, coor)
               }
-              .map { case (coor, shipWithRotation) => ShipInGame(shipWithRotation, coor) }
+              .map { case (coor, shipWithRotation) => ShipInBoard(shipWithRotation, coor) }
 
           result match {
             case None =>
