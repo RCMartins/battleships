@@ -742,18 +742,28 @@ class GameView(
                 `class` := "col-3 row",
                 div(
                   `class` := "col px-0",
-                  showTimeStr(nested, Translations.Game.myTime),
+                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.nonEmpty)) {
+                    case true =>
+                      span(showTimeStr(nested, Translations.Game.myTime)).render
+                    case false =>
+                      span.render
+                  }),
                   br,
                   nested(produce(gameModel.subProp(_.timeRemaining).transform(_.map(_._1))) {
                     case Some(myTimeRemaining) =>
                       showTime(myTimeRemaining)
                     case _ =>
-                      div.render
+                      span.render
                   })
                 ),
                 div(
                   `class` := "col px-0",
-                  showTimeStr(nested, Translations.Game.enemyTime),
+                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.nonEmpty)) {
+                    case true =>
+                      span(showTimeStr(nested, Translations.Game.enemyTime)).render
+                    case false =>
+                      span.render
+                  }),
                   br,
                   nested(produce(gameModel.subProp(_.timeRemaining).transform(_.map(_._2))) {
                     case Some(enemyTimeRemaining) =>

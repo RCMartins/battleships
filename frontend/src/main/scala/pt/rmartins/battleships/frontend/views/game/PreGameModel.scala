@@ -7,7 +7,8 @@ case class PreGameModel(
     enemyUsername: Username,
     boardSize: Coordinate,
     shipCounter: Map[ShipId, Property[Int]],
-    previewBoardOpt: Option[(Board, Int)] // TODO change int to double 0.0 to 1.0
+    previewBoardOpt: Option[(Board, Int)], // TODO change int to double 0.0 to 1.0,
+    timeLimit: Option[RuleTimeLimit]
 )
 
 object PreGameModel extends HasModelPropertyCreator[PreGameModel] {
@@ -22,7 +23,8 @@ object PreGameModel extends HasModelPropertyCreator[PreGameModel] {
       enemyUsername = Username(""),
       boardSize = Coordinate(1, 1),
       shipCounter = Ship.allShipsList.map(_.shipId -> Property(0)).toMap,
-      previewBoardOpt = None
+      previewBoardOpt = None,
+      timeLimit = None
     )
 
 }

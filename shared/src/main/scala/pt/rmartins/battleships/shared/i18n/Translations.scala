@@ -67,7 +67,6 @@ object Translations {
     val myBoardTitle = key("game.board.my_board_title")
     val enemyBoardTitle = key("game.board.enemy_board_title")
     val realEnemyBoardTitle = key("game.board.real_enemy_board_title")
-    val previewBoardTitle = key("game.board.previewBoardTitle")
 
     val chatTab = key("game.tab.chat")
     val myMovesTab = key("game.tab.my_moves")
@@ -75,5 +74,9 @@ object Translations {
 
     val cannotStartGameTitle = key("game.modal.cannot_start_game_title")
     val cannotStartGameBody = key("game.modal.cannot_start_game_body")
+
+    val previewBoardTitle = key("game.pregame.previewBoardTitle")
+    val timeLimit = key("game.pregame.timeLimit")
+    val turnTimeLimit = key("game.pregame.turnTimeLimit")
   }
 }

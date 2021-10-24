@@ -4,12 +4,15 @@ import io.udash.bindings.modifiers.Binding
 import io.udash.bindings.modifiers.Binding.NestedInterceptor
 import io.udash.bootstrap.utils.UdashIcons.FontAwesome
 import io.udash.css._
+import io.udash.i18n.translatedDynamic
 import io.udash.{ModelProperty, bind, produce, toAttrPairOps}
 import org.scalajs.dom._
-import org.scalajs.dom.html.{Canvas, Div}
+import org.scalajs.dom.html.{Canvas, Div, Select}
+import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasColor
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
-import pt.rmartins.battleships.shared.model.game.{Coordinate, Ship}
+import pt.rmartins.battleships.shared.i18n.Translations
+import pt.rmartins.battleships.shared.model.game.{Coordinate, RuleTimeLimit, Ship}
 import scalatags.JsDom.all._
 
 class PreGameView(
@@ -17,26 +20,74 @@ class PreGameView(
     screenModel: ModelProperty[ScreenModel],
     gamePresenter: GamePresenter,
     canvasUtils: CanvasUtils,
-    viewUtils: ViewUtils
+    viewUtils: ViewUtils,
+    translationsService: TranslationsService
 ) extends CssView {
 
-  private val sqSize = 15
+  import translationsService._
+
+  private val sqSize = 14
+  private val defaultHeight = 332
   private val fleetMaxSize: Coordinate = Ship.allShipsFleetMaxX.size
   private val canvasSize: Coordinate = fleetMaxSize * sqSize + Coordinate.square(4)
 
   def createComponents(divElement: Element, nested: NestedInterceptor): Div = {
     div(
-      `class` := "row mx-0 my-2",
+      `class` := "d-flex align-items-start",
       div(
-        `class` := "col-6",
-        div(
-          `class` := "d-flex flex-wrap",
-          createAllShipElems
+        `class` := "nav flex-column nav-pills me-3",
+        role := "tablist",
+        button(
+          `class` := "nav-link active btn",
+          attr("data-bs-toggle") := "pill",
+          attr("data-bs-target") := "#nav-pregame-fleet",
+          `type` := "button",
+          role := "tab",
+          "Fleet"
+        ),
+        button(
+          `class` := "nav-link btn",
+          attr("data-bs-toggle") := "pill",
+          attr("data-bs-target") := "#nav-pregame-options",
+          `type` := "button",
+          role := "tab",
+          "Options"
         )
       ),
       div(
-        `class` := "col-6",
-        createCanvasPreview(divElement, nested)
+        `class` := "tab-content",
+        div(
+          `class` := "tab-pane fade show active",
+          id := "nav-pregame-fleet",
+          role := "tabpanel",
+          div(
+            `class` := "row mx-0 my-2",
+            div(
+              height := s"${defaultHeight}px"
+            ),
+            div(
+              `class` := "col-6 px-0",
+              div(
+                `class` := "d-flex flex-wrap",
+                createAllShipElems
+              )
+            ),
+            div(
+              `class` := "col-6",
+              createCanvasPreview(divElement, nested)
+            )
+          )
+        ),
+        div(
+          `class` := "tab-pane fade",
+          id := "nav-pregame-options",
+          role := "tabpanel",
+          div(
+            `class` := "row",
+            height := s"${defaultHeight}px",
+            createTimeLimitOptions(nested)
+          )
+        )
       )
     ).render
   }
@@ -92,7 +143,7 @@ class PreGameView(
         )
       ) {
         case (boardSize, previewBoardOpt, previewBoardTitle, _) =>
-          val usableWidth = Math.max(50, Math.min(290, divElement.clientWidth / 2 - 85))
+          val usableWidth = Math.max(50, Math.min(290, divElement.clientWidth / 2 - 130))
 
           val boardPos = Coordinate(0, 20)
           val maxWidthPixels = usableWidth
@@ -209,5 +260,125 @@ class PreGameView(
           Seq.empty
       }
     )
+
+  def createTimeLimitOptions(nested: NestedInterceptor): Modifier = {
+    def selectOptionToSeconds(str: String): Int = {
+      val s"$minutes:$seconds" = str
+      minutes.toInt * 60 + seconds.toInt
+    }
+
+    def selectSecondsToString(seconds: Int): String =
+      s"%02d:%02d".format(seconds / 60, seconds % 60)
+
+    val totalTimeLimitCheckBox =
+      input(
+        `class` := "form-control px-1",
+        width := "32px",
+        `type` := "checkbox",
+        checked
+      ).render
+
+    val totalTimeLimitOptions: List[Int] =
+      (preGameModel.get.timeLimit.map(_.initialTotalTimeSeconds).toList ++
+        List(1, 3, 5, 10, 15, 20, 30, 60).map(_ * 60)).distinct.sorted
+    val totalTimeLimit: Select =
+      select(
+        `class` := "px-2",
+        id := "time-limit-input"
+      ).render
+    totalTimeLimitOptions.foreach(seconds =>
+      totalTimeLimit.appendChild(option(selectSecondsToString(seconds)).render)
+    )
+    preGameModel.get.timeLimit
+      .map(_.initialTotalTimeSeconds)
+      .foreach(seconds => totalTimeLimit.value = selectSecondsToString(seconds))
+
+    val turnTimeLimitCheckBox =
+      input(
+        `class` := "form-control px-1",
+        width := "32px",
+        `type` := "checkbox",
+        checked
+      ).render
+
+    val turnTimeLimitOptions: List[Int] =
+      (preGameModel.get.timeLimit.flatMap(_.additionalTurnTimeSeconds.map(_._1)).toList ++
+        List(1, 3, 5, 10, 15, 20, 30, 60)).distinct.sorted
+    val turnTimeLimit: Select =
+      select(
+        `class` := "form-select px-2",
+        id := "turn-time-limit-input"
+      ).render
+    turnTimeLimitOptions.foreach(seconds =>
+      turnTimeLimit.appendChild(option(selectSecondsToString(seconds)).render)
+    )
+    preGameModel.get.timeLimit
+      .flatMap(_.additionalTurnTimeSeconds.map(_._1))
+      .foreach(seconds => turnTimeLimit.value = selectSecondsToString(seconds))
+
+    def generateRuleTimeLimitOpt: Option[RuleTimeLimit] =
+      if (totalTimeLimitCheckBox.checked)
+        Some(
+          RuleTimeLimit(
+            selectOptionToSeconds(totalTimeLimit.value),
+            if (turnTimeLimitCheckBox.checked)
+              Some((selectOptionToSeconds(turnTimeLimit.value), false))
+            else
+              None
+          )
+        )
+      else
+        None
+
+    def updateRuleTimeLimit(): Unit =
+      preGameModel
+        .subProp(_.timeLimit)
+        .set(generateRuleTimeLimitOpt)
+
+    totalTimeLimitCheckBox.onchange = _ => {
+      totalTimeLimit.disabled = !totalTimeLimitCheckBox.checked
+      turnTimeLimitCheckBox.disabled = !totalTimeLimitCheckBox.checked
+      turnTimeLimit.disabled = !totalTimeLimitCheckBox.checked || !turnTimeLimitCheckBox.checked
+      updateRuleTimeLimit()
+    }
+
+    totalTimeLimit.onchange = _ => {
+      updateRuleTimeLimit()
+    }
+
+    turnTimeLimitCheckBox.onchange = _ => {
+      turnTimeLimit.disabled = !turnTimeLimitCheckBox.checked
+      updateRuleTimeLimit()
+    }
+
+    turnTimeLimit.onchange = _ => {
+      updateRuleTimeLimit()
+    }
+
+    div(
+      `class` := "col-12",
+      div(
+        `class` := "btn-group m-3",
+        totalTimeLimitCheckBox,
+        label(
+          `class` := "input-group-text",
+          `for` := "time-limit-input",
+          nested(translatedDynamic(Translations.Game.timeLimit)(_.apply()))
+        ),
+        totalTimeLimit
+      ),
+      br,
+      div(
+        `class` := "btn-group m-3",
+        turnTimeLimitCheckBox,
+        label(
+          `class` := "input-group-text",
+          `for` := "turn-time-limit-input",
+          nested(translatedDynamic(Translations.Game.turnTimeLimit)(_.apply()))
+        ),
+        turnTimeLimit
+      )
+    )
+  }
 
 }

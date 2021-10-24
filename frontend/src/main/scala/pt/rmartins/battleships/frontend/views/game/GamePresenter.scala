@@ -365,16 +365,26 @@ class GamePresenter(
       .subProp(_.previewBoardTitle)
       .set(span(translatedDynamic(Translations.Game.previewBoardTitle)(_.apply())).render)
 
-    initializePreviewShips()
+    initializePreGameModel()
   }
 
-  private def initializePreviewShips(): Unit = {
+  private def initializePreGameModel(): Unit = {
     val (boardSize, fleet) = Fleet.default10By10
     preGameModel.subProp(_.boardSize).set(boardSize)
     val shipCounter = preGameModel.get.shipCounter
     fleet.shipsCounter.foreach { case (shipId, counter) =>
       shipCounter(shipId).set(counter)
     }
+    preGameModel
+      .subProp(_.timeLimit)
+      .set(
+        Some(
+          RuleTimeLimit(
+            initialTotalTimeSeconds = 600,
+            additionalTurnTimeSeconds = Some((10, false))
+          )
+        )
+      )
 
     val allShipCounters = shipCounter.toList
     val combinedShipCounters = allShipCounters.map(_._2).combineToSeqProperty
@@ -526,14 +536,6 @@ class GamePresenter(
           TurnBonus(BonusType.TripleKill, List(ExtraTurn(List.fill(3)(AttackType.Simple))))
         )
 
-      val timeLimit: Option[RuleTimeLimit] =
-        Some(
-          RuleTimeLimit(
-            initialTotalTimeSeconds = 600,
-            additionalTurnTimeSeconds = Some((10, false))
-          )
-        )
-
       val gameFleet: Fleet =
         Fleet.fromShips(
           preGame.shipCounter.toList.flatMap { case (shipId, counterProperty) =>
@@ -547,7 +549,7 @@ class GamePresenter(
           gameFleet = gameFleet,
           defaultTurnAttackTypes = defaultTurnAttackTypes,
           turnBonuses = turnBonuses,
-          timeLimit = timeLimit
+          timeLimit = preGame.timeLimit
         )
       )
     } else

@@ -47,7 +47,8 @@ class GameViewFactory(
         screenModel,
         gamePresenter,
         canvasUtils,
-        viewUtils
+        viewUtils,
+        translationsService
       )
 
     val boardView: BoardView =
