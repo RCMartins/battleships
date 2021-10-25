@@ -6,7 +6,7 @@ object Translations {
   import TranslationKey._
 
   /** The list of supported languages. */
-  val langs = Seq("en")
+  val langs = Seq("en", "pt")
 
   /** The list of translation bundles available in the `backend` resources. */
   val bundlesNames = Seq("auth", "chat", "game", "global")
@@ -33,7 +33,6 @@ object Translations {
     val placeShips = key("game.header.place_ships")
     val placeShipsWaitEnemy = key("game.header.place_ships_wait_enemy")
     val placeShipsEnemyReady = key("game.header.place_ships_enemy_ready")
-    val gameTurn = key1[Int]("game.header.game_turn")
     val yourTurn = key("game.header.your_turn")
     val enemyTurn = key("game.header.enemy_turn")
     val youWon = key("game.header.you_won")
@@ -75,6 +74,8 @@ object Translations {
     val cannotStartGameTitle = key("game.modal.cannot_start_game_title")
     val cannotStartGameBody = key("game.modal.cannot_start_game_body")
 
+    val fleet = key("game.pregame.fleet")
+    val options = key("game.pregame.options")
     val previewBoardTitle = key("game.pregame.previewBoardTitle")
     val timeLimit = key("game.pregame.timeLimit")
     val turnTimeLimit = key("game.pregame.turnTimeLimit")

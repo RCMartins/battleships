@@ -43,7 +43,7 @@ class PreGameView(
           attr("data-bs-target") := "#nav-pregame-fleet",
           `type` := "button",
           role := "tab",
-          "Fleet"
+          nested(translatedDynamic(Translations.Game.fleet)(_.apply()))
         ),
         button(
           `class` := "nav-link btn",
@@ -51,7 +51,7 @@ class PreGameView(
           attr("data-bs-target") := "#nav-pregame-options",
           `type` := "button",
           role := "tab",
-          "Options"
+          nested(translatedDynamic(Translations.Game.options)(_.apply()))
         )
       ),
       div(

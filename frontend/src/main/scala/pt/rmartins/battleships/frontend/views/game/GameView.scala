@@ -726,7 +726,7 @@ class GameView(
                 nested(
                   produceWithNested(presenter.modeTypeProperty) {
                     case (Some(PlayingModeType | GameOverModeType), nested) =>
-                      span(nested(translatedDynamic(key)(_.apply())), ":").render
+                      span(nested(translatedDynamic(key)(_.apply()))).render
                     case _ =>
                       div.render
                   }
