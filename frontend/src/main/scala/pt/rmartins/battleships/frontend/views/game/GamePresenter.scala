@@ -7,8 +7,8 @@ import io.udash.i18n.translatedDynamic
 import org.scalajs.dom.window
 import pt.rmartins.battleships.frontend.ApplicationContext.application
 import pt.rmartins.battleships.frontend.routing.{RoutingInGameState, RoutingLoginPageState}
-import pt.rmartins.battleships.frontend.services.{TranslationsService, UserContextService}
 import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
+import pt.rmartins.battleships.frontend.services.{TranslationsService, UserContextService}
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.i18n.Translations
@@ -138,8 +138,21 @@ class GamePresenter(
     }
 
   val myMovesHistoryProperty: ReadableSeqProperty[TurnPlay] =
-    gameStateProperty
-      .transformToSeq(_.map(_.me.turnPlayHistory).getOrElse(Seq.empty))
+    combine(
+      gameStateProperty,
+      screenModel.subProp(_.showMissesMoves),
+      screenModel.subProp(_.showDisabledMoves),
+      screenModel.subProp(_.disabledMovesSet)
+    ).transformToSeq { case (gameStateOpt, showMissesMoves, showDisabledMoves, disabledMovesSet) =>
+      gameStateOpt
+        .map(
+          _.me.turnPlayHistory.filter { turnPlay =>
+            (showMissesMoves || turnPlay.hitHints.exists(_.isShip)) &&
+            (showDisabledMoves || !disabledMovesSet(turnPlay.turn))
+          }
+        )
+        .getOrElse(Seq.empty)
+    }
   val myMovesHistorySizeProperty: ReadableProperty[Int] =
     myMovesHistoryProperty.transform(_.size)
   val myMovesHistoryShowNotification: ReadableProperty[Option[Int]] =
@@ -153,8 +166,7 @@ class GamePresenter(
     }
 
   val enemyMovesHistoryProperty: ReadableSeqProperty[TurnPlay] =
-    gameStateProperty
-      .transformToSeq(_.map(_.enemy.turnPlayHistory).getOrElse(Seq.empty))
+    gameStateProperty.transformToSeq(_.map(_.enemy.turnPlayHistory).getOrElse(Seq.empty))
   val enemyMovesHistorySizeProperty: ReadableProperty[Int] =
     enemyMovesHistoryProperty.transform(_.size)
   val enemyMovesHistoryShowNotification: ReadableProperty[Option[Int]] =
@@ -170,9 +182,9 @@ class GamePresenter(
   private var lineDashOffsetIntervalHandle: Option[Int] = None
   private val lineDashOffsetIntervalMillis: Int = 200
 
-  def setLineDashOffsetInterval(active: Boolean): Unit = {
+  def setLineDashOffsetInterval(activate: Boolean): Unit = {
     lineDashOffsetIntervalHandle.foreach(window.clearTimeout)
-    if (active)
+    if (activate)
       lineDashOffsetIntervalHandle = Some(
         window.setInterval(
           () => {
@@ -194,7 +206,7 @@ class GamePresenter(
         }
         timeRemainingIntervalHandle.foreach(window.clearTimeout)
         timeRemainingIntervalHandle = None
-        setLineDashOffsetInterval(active = false)
+        setLineDashOffsetInterval(activate = false)
 
         selectedTabProperty.set(ScreenModel.chatTab)
         screenModel.subProp(_.lastSeenMessagesChat).set(chatMessagesSizeProperty.get)
@@ -209,7 +221,7 @@ class GamePresenter(
         gameModel.subProp(_.turnAttacks).set(turnAttackTypes.map(Attack(_, None)))
         gameModel.subProp(_.selectedShip).set(None)
 
-        setLineDashOffsetInterval(active = true)
+        setLineDashOffsetInterval(activate = true)
         timeRemainingIntervalHandle.foreach(window.clearTimeout)
         timeRemainingIntervalHandle = Some(
           window.setInterval(
@@ -258,11 +270,11 @@ class GamePresenter(
       case (_, Some(GameState(_, _, _, _, _: GameOverMode))) =>
         timeRemainingIntervalHandle.foreach(window.clearTimeout)
         timeRemainingIntervalHandle = None
-        setLineDashOffsetInterval(active = true)
+        setLineDashOffsetInterval(activate = true)
       case (_, None) =>
         timeRemainingIntervalHandle.foreach(window.clearTimeout)
         timeRemainingIntervalHandle = None
-        setLineDashOffsetInterval(active = false)
+        setLineDashOffsetInterval(activate = false)
 
         chatModel.subProp(_.msgs).set(Seq.empty)
         selectedTabProperty.set(ScreenModel.chatTab)

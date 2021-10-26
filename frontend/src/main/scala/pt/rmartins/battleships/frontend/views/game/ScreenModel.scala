@@ -2,7 +2,7 @@ package pt.rmartins.battleships.frontend.views.game
 
 import io.udash.HasModelPropertyCreator
 import org.scalajs.dom.html.Span
-import pt.rmartins.battleships.shared.model.game.Coordinate
+import pt.rmartins.battleships.shared.model.game.{Coordinate, Turn}
 import scalatags.JsDom.all._
 
 case class ScreenModel(
@@ -21,7 +21,10 @@ case class ScreenModel(
     enemyBoardTitle: Span,
     realEnemyBoardTitle: Span,
     previewBoardTitle: Span,
-    screenResized: Unit
+    screenResized: Unit,
+    showMissesMoves: Boolean,
+    showDisabledMoves: Boolean,
+    disabledMovesSet: Set[Turn]
 )
 
 object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
@@ -47,7 +50,10 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
       enemyBoardTitle = span.render,
       realEnemyBoardTitle = span.render,
       previewBoardTitle = span.render,
-      screenResized = ()
+      screenResized = (),
+      showMissesMoves = true,
+      showDisabledMoves = true,
+      disabledMovesSet = Set.empty
     )
 
   def resetScreenModel(model: ScreenModel): ScreenModel = {
@@ -60,7 +66,8 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
       extraTurnPopup = None,
       hideMyBoard = false,
       revealEnemyBoard = false,
-      showErrorModal = false
+      showErrorModal = false,
+      disabledMovesSet = Set.empty
     )
   }
 

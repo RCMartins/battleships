@@ -70,6 +70,8 @@ object Translations {
     val chatTab = key("game.tab.chat")
     val myMovesTab = key("game.tab.my_moves")
     val enemyMovesTab = key("game.tab.enemy_moves")
+    val missesMoves = key("game.tab.missed_moves")
+    val disabledMoves = key("game.tab.disabled_moves")
 
     val cannotStartGameTitle = key("game.modal.cannot_start_game_title")
     val cannotStartGameBody = key("game.modal.cannot_start_game_body")

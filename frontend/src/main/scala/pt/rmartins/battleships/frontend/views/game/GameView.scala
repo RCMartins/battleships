@@ -361,7 +361,7 @@ class GameView(
     document.getElementById(enemyMovesTabButton.componentId.value).classList.add("active")
   }
 
-  private def messagesTab(nested: Binding.NestedInterceptor) = {
+  private def messagesTab(nested: Binding.NestedInterceptor): Modifier = {
     def makeNavItem(button: UdashButton): JsDom.TypedTag[LI] =
       li(
         `class` := "nav-item",
@@ -369,19 +369,90 @@ class GameView(
         nested(button)
       )
 
-    Seq[Modifier](
-      ul(
-        `class` := "nav nav-tabs",
-        `role` := "tablist",
-        makeNavItem(chatTabButton),
-        makeNavItem(myMovesTabButton),
-        makeNavItem(enemyMovesTabButton)
+    val missesMovesCheckbox =
+      input(
+        `class` := "form-control px-1",
+        id := "missesMoves-checkbox",
+        width := "32px",
+        `type` := "checkbox"
+      ).render
+
+    screenModel
+      .subProp(_.showMissesMoves)
+      .listen(
+        { showMissesMoves =>
+          if (missesMovesCheckbox.checked != showMissesMoves)
+            missesMovesCheckbox.checked = showMissesMoves
+        },
+        initUpdate = true
+      )
+
+    missesMovesCheckbox.onchange = _ => {
+      screenModel.subProp(_.showMissesMoves).set(missesMovesCheckbox.checked)
+    }
+
+    val disabledMovesCheckbox =
+      input(
+        `class` := "form-control px-1",
+        id := "disabledMoves-checkbox",
+        width := "32px",
+        `type` := "checkbox"
+      ).render
+
+    screenModel
+      .subProp(_.showDisabledMoves)
+      .listen(
+        { showDisabledMoves =>
+          if (disabledMovesCheckbox.checked != showDisabledMoves)
+            disabledMovesCheckbox.checked = showDisabledMoves
+        },
+        initUpdate = true
+      )
+
+    disabledMovesCheckbox.onchange = _ => {
+      screenModel.subProp(_.showDisabledMoves).set(disabledMovesCheckbox.checked)
+    }
+
+    div(
+      `class` := "row",
+      div(
+        `class` := "col-9",
+        ul(
+          `class` := "nav nav-tabs",
+          `role` := "tablist",
+          makeNavItem(chatTabButton),
+          makeNavItem(myMovesTabButton),
+          makeNavItem(enemyMovesTabButton)
+        ),
+        div(
+          `class` := "tab-content",
+          messagesTabItem(nested),
+          myMovesTabItem(nested),
+          enemyMovesTabItem(nested)
+        )
       ),
       div(
-        `class` := "tab-content",
-        messagesTabItem(nested),
-        myMovesTabItem(nested),
-        enemyMovesTabItem(nested)
+        `class` := "col-3 px-0",
+        div(
+          `class` := "btn-group m-3",
+          missesMovesCheckbox,
+          label(
+            `class` := "input-group-text",
+            `for` := "missesMoves-checkbox",
+            style := "user-select: none",
+            nested(translatedDynamic(Translations.Game.missesMoves)(_.apply()))
+          )
+        ),
+        div(
+          `class` := "btn-group m-3",
+          disabledMovesCheckbox,
+          label(
+            `class` := "input-group-text",
+            `for` := "disabledMoves-checkbox",
+            style := "user-select: none",
+            nested(translatedDynamic(Translations.Game.disabledMoves)(_.apply()))
+          )
+        )
       )
     )
   }
@@ -428,17 +499,14 @@ class GameView(
     emptyCanvas.setAttribute("height", canvasSize.y.toString)
     val emptyCanvasDiv: Div = div(emptyCanvas).render
 
-    val checkId = "check" + turnPlay.turn.toTurnString
+    val toTurnString = turnPlay.turn.toTurnString
+    val checkId = "check" + toTurnString
 
     val inputCheckBox =
       input(
         id := checkId,
-        `type` := "checkbox",
-        checked
+        `type` := "checkbox"
       ).render
-
-    val checkboxProperty: Property[Boolean] =
-      Property(true)
 
     val turnHits: Div =
       div(
@@ -456,9 +524,21 @@ class GameView(
         }
       ).render
 
-    if (showCheckbox)
-      inputCheckBox.onchange = _ => checkboxProperty.set(inputCheckBox.checked)
-    else
+    if (showCheckbox) {
+      if (!screenModel.get.disabledMovesSet(turnPlay.turn))
+        inputCheckBox.checked = true
+
+      inputCheckBox.onchange = _ => {
+        screenModel
+          .subProp(_.disabledMovesSet)
+          .set(
+            if (inputCheckBox.checked)
+              screenModel.get.disabledMovesSet - turnPlay.turn
+            else
+              screenModel.get.disabledMovesSet + turnPlay.turn
+          )
+      }
+    } else
       inputCheckBox.style.visibility = "hidden"
 
     div(
@@ -468,13 +548,13 @@ class GameView(
         div(
           `class` := "checkbox",
           label(
-            minWidth := "70px",
+            minWidth := "75px",
             `for` := checkId,
             inputCheckBox,
             strong(
               `class` := "col-6 pl-3 py-2",
               style := "user-select: none",
-              turnPlay.turn.toTurnString,
+              toTurnString,
               ": "
             )
           )
@@ -483,7 +563,10 @@ class GameView(
       span(
         `class` := "mt-1",
         if (showCheckbox)
-          nested(showIfElse(checkboxProperty)(turnHits, emptyCanvasDiv))
+          if (inputCheckBox.checked)
+            turnHits
+          else
+            emptyCanvasDiv
         else
           turnHits
       )
@@ -499,8 +582,11 @@ class GameView(
           role := "tabpanel",
           ChatStyles.messagesWindow,
           nested(
-            repeatWithNested(presenter.myMovesHistoryProperty) { case (turnPlayProperty, nested) =>
-              turnPlaysToHtml(nested, showCheckbox = true, turnPlayProperty.get)
+            produceWithNested(presenter.myMovesHistoryProperty) {
+              case (turnPlaySeqProperty, nested) =>
+                turnPlaySeqProperty.flatMap(turnPlay =>
+                  turnPlaysToHtml(nested, showCheckbox = true, turnPlay)
+                )
             }
           )
         ).render

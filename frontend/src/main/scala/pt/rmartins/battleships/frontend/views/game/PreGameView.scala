@@ -62,9 +62,7 @@ class PreGameView(
           role := "tabpanel",
           div(
             `class` := "row mx-0 my-2",
-            div(
-              height := s"${defaultHeight}px"
-            ),
+            height := s"${defaultHeight}px",
             div(
               `class` := "col-6 px-0",
               div(
@@ -83,7 +81,7 @@ class PreGameView(
           id := "nav-pregame-options",
           role := "tabpanel",
           div(
-            `class` := "row",
+            `class` := "row my-2",
             height := s"${defaultHeight}px",
             createTimeLimitOptions(nested)
           )
