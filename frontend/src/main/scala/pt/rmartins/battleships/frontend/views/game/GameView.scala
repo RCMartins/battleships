@@ -64,6 +64,7 @@ class GameView(
   screenModel.subProp(_.extraTurnPopup).listen(_ => reloadBoardView())
   screenModel.subProp(_.extraTurnText).listen(_ => reloadBoardView())
   screenModel.subProp(_.screenResized).listen(_ => reloadBoardView())
+  screenModel.subProp(_.hoverMove).listen(_ => reloadBoardView())
 
   gameModel.subProp(_.mousePosition).listen(_ => reloadBoardView())
   gameModel.subProp(_.mouseDown).listen(_ => reloadBoardView())
@@ -478,11 +479,7 @@ class GameView(
         ).render
     })
 
-  private def turnPlaysToHtml(
-      nested: NestedInterceptor,
-      showCheckbox: Boolean,
-      turnPlay: TurnPlay
-  ): Seq[dom.Element] = {
+  private def turnPlaysToHtml(showCheckbox: Boolean, turnPlay: TurnPlay): Seq[dom.Element] = {
     val sqSize = 9
     val fleetMaxSize: Coordinate = {
       val size =
@@ -494,10 +491,13 @@ class GameView(
     }
     val canvasSize: Coordinate = fleetMaxSize * sqSize + Coordinate.square(4)
 
-    val emptyCanvas: Canvas = canvas(`class` := "mr-3").render
-    emptyCanvas.setAttribute("width", canvasSize.x.toString)
-    emptyCanvas.setAttribute("height", canvasSize.y.toString)
-    val emptyCanvasDiv: Div = div(emptyCanvas).render
+    def emptyCanvasDiv: Div = {
+      val emptyCanvas: Canvas = canvas(`class` := "mr-3").render
+      emptyCanvas.setAttribute("width", canvasSize.x.toString)
+      emptyCanvas.setAttribute("height", canvasSize.y.toString)
+
+      div(emptyCanvas).render
+    }
 
     val toTurnString = turnPlay.turn.toTurnString
     val checkId = "check" + toTurnString
@@ -537,40 +537,53 @@ class GameView(
             else
               screenModel.get.disabledMovesSet + turnPlay.turn
           )
+        if (!inputCheckBox.checked)
+          screenModel.subProp(_.hoverMove).set(None)
       }
     } else
       inputCheckBox.style.visibility = "hidden"
 
-    div(
-      ChatStyles.turnContainer,
+    val turnDiv =
       div(
-        `class` := "form-group my-0",
+        ChatStyles.turnContainer,
         div(
-          `class` := "checkbox",
-          label(
-            minWidth := "75px",
-            `for` := checkId,
-            inputCheckBox,
-            strong(
-              `class` := "col-6 pl-3 py-2",
-              style := "user-select: none",
-              toTurnString,
-              ": "
+          `class` := "form-group my-0",
+          div(
+            `class` := "checkbox",
+            label(
+              minWidth := "75px",
+              `for` := checkId,
+              inputCheckBox,
+              strong(
+                `class` := "col-6 pl-3 py-2",
+                style := "user-select: none",
+                toTurnString,
+                ": "
+              )
             )
           )
-        )
-      ),
-      span(
-        `class` := "mt-1",
-        if (showCheckbox)
-          if (inputCheckBox.checked)
-            turnHits
-          else
+        ),
+        span(
+          `class` := "mt-1",
+          if (showCheckbox && !inputCheckBox.checked)
             emptyCanvasDiv
-        else
-          turnHits
-      )
-    ).render
+          else
+            turnHits
+        )
+      ).render
+
+    if (showCheckbox) {
+      if (inputCheckBox.checked)
+        turnDiv.onmouseenter = _ => {
+          screenModel.subProp(_.hoverMove).set(Some(turnPlay.turn))
+        }
+
+      turnDiv.onmouseleave = _ => {
+        screenModel.subProp(_.hoverMove).set(None)
+      }
+    }
+
+    turnDiv
   }
 
   private def myMovesTabItem(nested: Binding.NestedInterceptor): Binding =
@@ -582,11 +595,10 @@ class GameView(
           role := "tabpanel",
           ChatStyles.messagesWindow,
           nested(
-            produceWithNested(presenter.myMovesHistoryProperty) {
-              case (turnPlaySeqProperty, nested) =>
-                turnPlaySeqProperty.flatMap(turnPlay =>
-                  turnPlaysToHtml(nested, showCheckbox = true, turnPlay)
-                )
+            produce(presenter.myMovesHistoryProperty) { turnPlaySeqProperty =>
+              turnPlaySeqProperty.flatMap(turnPlay =>
+                turnPlaysToHtml(showCheckbox = true, turnPlay)
+              )
             }
           )
         ).render
@@ -602,9 +614,8 @@ class GameView(
             role := "tabpanel",
             ChatStyles.messagesWindow,
             nested(
-              repeatWithNested(presenter.enemyMovesHistoryProperty) {
-                case (turnPlayProperty, nested) =>
-                  turnPlaysToHtml(nested, showCheckbox = false, turnPlayProperty.get)
+              repeat(presenter.enemyMovesHistoryProperty) { turnPlayProperty =>
+                turnPlaysToHtml(showCheckbox = false, turnPlayProperty.get)
               }
             )
           ).render

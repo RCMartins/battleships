@@ -592,6 +592,9 @@ class BoardView(
           hideMyBoard = false
         )
       case Some(GameState(_, _, me, enemy, _: PlayingMode)) =>
+        drawMissiles(renderingCtx, turnAttacks, screenModelData.missilesPopupMillisOpt)
+        drawDestructionSummary(renderingCtx, selectedShipOpt)
+
         drawMyBoard(
           renderingCtx,
           screenModelData.myBoardTitle.innerText,
@@ -613,19 +616,20 @@ class BoardView(
           turnAttacks,
           EnemyBoardPos.get,
           selectedBoardMarkOpt,
-          selectedShipOpt
+          selectedShipOpt,
+          screenModelData.hoverMove
         )
 
-        drawMissiles(renderingCtx, turnAttacks, screenModelData.missilesPopupMillisOpt)
+        drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
         drawExtraTurnPopup(
           renderingCtx,
           turnAttacks,
           screenModelData.extraTurnPopup,
           screenModelData.extraTurnText.innerText
         )
-        drawDestructionSummary(renderingCtx, selectedShipOpt)
-        drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
       case Some(GameState(_, _, me, enemy, GameOverMode(_, _, _, _, enemyRealBoard))) =>
+        drawDestructionSummary(renderingCtx, selectedShipOpt)
+
         if (screenModelData.revealEnemyBoard)
           drawGameOverEnemyBoard(
             renderingCtx,
@@ -634,7 +638,8 @@ class BoardView(
             enemyRealBoard,
             MyBoardGameOverPos.get,
             SquareSizeBig.get,
-            selectedShipOpt
+            selectedShipOpt,
+            screenModelData.hoverMove
           )
         else
           drawMyBoard(
@@ -658,10 +663,10 @@ class BoardView(
           Nil,
           EnemyBoardPos.get,
           selectedBoardMarkOpt,
-          selectedShipOpt
+          selectedShipOpt,
+          screenModelData.hoverMove
         )
 
-        drawDestructionSummary(renderingCtx, selectedShipOpt)
         drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
       case _ =>
     }
@@ -828,7 +833,8 @@ class BoardView(
       turnAttacks: List[Attack],
       boardPosition: Coordinate,
       selectedBoardMarkOpt: Option[BoardMark],
-      selectedShipOpt: Option[Ship]
+      selectedShipOpt: Option[Ship],
+      hoverMove: Option[Turn]
   ): Unit = {
     val squareSize: Int = EnemyBoardSqSize.get
 
@@ -869,32 +875,29 @@ class BoardView(
       }
     }
 
-    me.turnPlayHistory.zipWithIndex.foreach { case (lastTurnPlay, index) =>
+    me.turnPlayHistory.zipWithIndex.foreach { case (turnPlay, index) =>
+      def drawTurn(canvasColor: CanvasColor): Unit =
+        turnPlay.turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
+          drawBoardSquare(
+            renderingCtx,
+            boardPosition,
+            coor,
+            squareSize,
+            canvasColor
+          )
+        }
+
       selectedShipOpt match {
-        case Some(ship) if lastTurnPlay.hitHints.exists {
+        case _ if hoverMove.contains(turnPlay.turn) =>
+          drawTurn(CanvasColor.White(CanvasBorder.DashBlue()))
+        case Some(ship) if hoverMove.isEmpty && turnPlay.hitHints.exists {
               case ShipHit(shipId, _) if ship.shipId == shipId => true
               case _                                           => false
             } =>
-          lastTurnPlay.turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
-            drawBoardSquare(
-              renderingCtx,
-              boardPosition,
-              coor,
-              squareSize,
-              CanvasColor.White(CanvasBorder.DashRed())
-            )
-          }
+          drawTurn(CanvasColor.White(CanvasBorder.DashRed()))
         case None =>
           if (index == 0)
-            lastTurnPlay.turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
-              drawBoardSquare(
-                renderingCtx,
-                boardPosition,
-                coor,
-                squareSize,
-                CanvasColor.White(CanvasBorder.RedBold())
-              )
-            }
+            drawTurn(CanvasColor.White(CanvasBorder.RedBold()))
         case _ =>
       }
     }
@@ -946,7 +949,8 @@ class BoardView(
       enemyShips: List[ShipInBoard],
       boardPosition: Coordinate,
       squareSize: Int,
-      selectedShipOpt: Option[Ship]
+      selectedShipOpt: Option[Ship],
+      hoverMove: Option[Turn]
   ): Unit = {
     val boardSize = me.myBoard.boardSize
 
@@ -976,31 +980,29 @@ class BoardView(
           textSize = (SquareSizeBig.get * 0.6).toInt // TODO to property (use same as Enemy board)
         )
       }
+
+      def drawTurn(canvasColor: CanvasColor): Unit =
+        turnPlay.turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
+          drawBoardSquare(
+            renderingCtx,
+            boardPosition,
+            coor,
+            squareSize,
+            canvasColor
+          )
+        }
+
       selectedShipOpt match {
-        case Some(ship) if turnPlay.hitHints.exists {
+        case _ if hoverMove.contains(turnPlay.turn) =>
+          drawTurn(CanvasColor.White(CanvasBorder.DashBlue()))
+        case Some(ship) if hoverMove.isEmpty && turnPlay.hitHints.exists {
               case ShipHit(shipId, _) if ship.shipId == shipId => true
               case _                                           => false
             } =>
-          turnPlay.turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
-            drawBoardSquare(
-              renderingCtx,
-              boardPosition,
-              coor,
-              squareSize,
-              CanvasColor.White(CanvasBorder.DashRed())
-            )
-          }
+          drawTurn(CanvasColor.White(CanvasBorder.DashRed()))
         case None =>
           if (index == 0)
-            turnPlay.turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
-              drawBoardSquare(
-                renderingCtx,
-                boardPosition,
-                coor,
-                squareSize,
-                CanvasColor.White(CanvasBorder.RedBold())
-              )
-            }
+            drawTurn(CanvasColor.White(CanvasBorder.RedBold()))
         case _ =>
       }
     }

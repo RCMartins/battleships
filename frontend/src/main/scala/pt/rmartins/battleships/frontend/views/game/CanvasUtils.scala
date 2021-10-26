@@ -214,6 +214,11 @@ object CanvasUtils {
       override val lineDash: Option[Seq[Double]] = Some(Seq(4, 2))
     }
 
+    case class DashBlue(alpha: Double = 1.0, lineWidth: Double = 3.0) extends CanvasBorder {
+      val lineColor: String = "0, 0, 255"
+      override val lineDash: Option[Seq[Double]] = Some(Seq(4, 2))
+    }
+
   }
 
   sealed trait CanvasColor {
