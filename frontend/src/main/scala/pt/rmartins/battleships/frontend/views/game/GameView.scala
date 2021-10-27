@@ -343,23 +343,41 @@ class GameView(
 
   chatTabButton.listen { _ =>
     presenter.setSelectedTab(ScreenModel.chatTab)
-    document.getElementById(chatTabButton.componentId.value).classList.add("active")
-    document.getElementById(myMovesTabButton.componentId.value).classList.remove("active")
-    document.getElementById(enemyMovesTabButton.componentId.value).classList.remove("active")
   }
 
   myMovesTabButton.listen { _ =>
     presenter.setSelectedTab(ScreenModel.myMovesTab)
-    document.getElementById(chatTabButton.componentId.value).classList.remove("active")
-    document.getElementById(myMovesTabButton.componentId.value).classList.add("active")
-    document.getElementById(enemyMovesTabButton.componentId.value).classList.remove("active")
   }
 
   enemyMovesTabButton.listen { _ =>
     presenter.setSelectedTab(ScreenModel.enemyMovesTab)
-    document.getElementById(chatTabButton.componentId.value).classList.remove("active")
-    document.getElementById(myMovesTabButton.componentId.value).classList.remove("active")
-    document.getElementById(enemyMovesTabButton.componentId.value).classList.add("active")
+  }
+
+  private def selectedTabToButtonId(id: String): String =
+    id match {
+      case ScreenModel.chatTab       => chatTabButton.componentId.value
+      case ScreenModel.myMovesTab    => myMovesTabButton.componentId.value
+      case ScreenModel.enemyMovesTab => enemyMovesTabButton.componentId.value
+    }
+
+  presenter.selectedTabProperty.listen { selectedTab =>
+    def updateClass(id: String): Unit =
+      if (selectedTab == id) {
+        document.getElementById(selectedTabToButtonId(id)).classList.add("active")
+        Option(document.getElementById(id)).foreach { elem =>
+          elem.classList.add("show")
+          elem.classList.add("active")
+        }
+      } else {
+        document.getElementById(selectedTabToButtonId(id)).classList.remove("active")
+        Option(document.getElementById(id)).foreach { elem =>
+          elem.classList.remove("show")
+          elem.classList.remove("active")
+        }
+      }
+
+    List(ScreenModel.chatTab, ScreenModel.myMovesTab, ScreenModel.enemyMovesTab)
+      .foreach(updateClass)
   }
 
   private def messagesTab(nested: Binding.NestedInterceptor): Modifier = {
@@ -435,7 +453,7 @@ class GameView(
       div(
         `class` := "col-3 px-0",
         div(
-          `class` := "btn-group m-3",
+          `class` := "btn-group m-3 mt-5",
           missesMovesCheckbox,
           label(
             `class` := "input-group-text",
@@ -458,26 +476,25 @@ class GameView(
     )
   }
 
-  private def messagesTabItem(nested: Binding.NestedInterceptor): Binding =
-    nested(produceWithNested(presenter.selectedTabProperty.transform(_ == ScreenModel.chatTab)) {
-      case (isSelected, nested) =>
+  private def messagesTabItem(nested: Binding.NestedInterceptor): Div =
+    div(
+      `class` := "tab-pane fade" +
+        (if (presenter.selectedTabProperty.get == ScreenModel.chatTab)
+           " show active"
+         else ""),
+      id := ScreenModel.chatTab,
+      role := "tabpanel",
+      ChatStyles.messagesWindow,
+      nested(repeat(presenter.chatMessagesProperty) { msgProperty =>
+        val msg = msgProperty.get
         div(
-          `class` := "tab-pane fade", // + (if (isSelected) " show active" else ""),
-          (`class` := "show active").attrIf(isSelected),
-          id := ScreenModel.chatTab,
-          role := "tabpanel",
-          ChatStyles.messagesWindow,
-          nested(repeat(presenter.chatMessagesProperty) { msgProperty =>
-            val msg = msgProperty.get
-            div(
-              ChatStyles.msgContainer,
-              strong(msg.author, ": "),
-              span(msg.text),
-              span(ChatStyles.msgDate, msg.created.toString)
-            ).render
-          })
+          ChatStyles.msgContainer,
+          strong(msg.author, ": "),
+          span(msg.text),
+          span(ChatStyles.msgDate, msg.created.toString)
         ).render
-    })
+      })
+    ).render
 
   private def turnPlaysToHtml(showCheckbox: Boolean, turnPlay: TurnPlay): Seq[dom.Element] = {
     val sqSize = 9
@@ -495,7 +512,6 @@ class GameView(
       val emptyCanvas: Canvas = canvas(`class` := "mr-3").render
       emptyCanvas.setAttribute("width", canvasSize.x.toString)
       emptyCanvas.setAttribute("height", canvasSize.y.toString)
-
       div(emptyCanvas).render
     }
 
@@ -586,41 +602,33 @@ class GameView(
     turnDiv
   }
 
-  private def myMovesTabItem(nested: Binding.NestedInterceptor): Binding =
-    nested(produceWithNested(presenter.selectedTabProperty.transform(_ == ScreenModel.myMovesTab)) {
-      case (isSelected, nested) =>
-        div(
-          `class` := "tab-pane fade" + (if (isSelected) " show active" else ""),
-          id := ScreenModel.myMovesTab,
-          role := "tabpanel",
-          ChatStyles.messagesWindow,
-          nested(
-            produce(presenter.myMovesHistoryProperty) { turnPlaySeqProperty =>
-              turnPlaySeqProperty.flatMap(turnPlay =>
-                turnPlaysToHtml(showCheckbox = true, turnPlay)
-              )
-            }
-          )
-        ).render
-    })
+  private def myMovesTabItem(nested: Binding.NestedInterceptor): Div =
+    div(
+      `class` := "tab-pane fade" +
+        (if (presenter.selectedTabProperty.get == ScreenModel.myMovesTab)
+           " show active"
+         else ""),
+      id := ScreenModel.myMovesTab,
+      role := "tabpanel",
+      ChatStyles.messagesWindow,
+      nested(produce(presenter.myMovesHistoryProperty) { turnPlaySeqProperty =>
+        turnPlaySeqProperty.flatMap(turnPlay => turnPlaysToHtml(showCheckbox = true, turnPlay))
+      })
+    ).render
 
-  private def enemyMovesTabItem(nested: Binding.NestedInterceptor): Binding =
-    nested(
-      produceWithNested(presenter.selectedTabProperty.transform(_ == ScreenModel.enemyMovesTab)) {
-        case (isSelected, nested) =>
-          div(
-            `class` := "tab-pane fade" + (if (isSelected) " show active" else ""),
-            id := ScreenModel.enemyMovesTab,
-            role := "tabpanel",
-            ChatStyles.messagesWindow,
-            nested(
-              repeat(presenter.enemyMovesHistoryProperty) { turnPlayProperty =>
-                turnPlaysToHtml(showCheckbox = false, turnPlayProperty.get)
-              }
-            )
-          ).render
-      }
-    )
+  private def enemyMovesTabItem(nested: Binding.NestedInterceptor): Div =
+    div(
+      `class` := "tab-pane fade" +
+        (if (presenter.selectedTabProperty.get == ScreenModel.enemyMovesTab)
+           " show active"
+         else ""),
+      id := ScreenModel.enemyMovesTab,
+      role := "tabpanel",
+      ChatStyles.messagesWindow,
+      nested(repeat(presenter.enemyMovesHistoryProperty) { turnPlayProperty =>
+        turnPlaysToHtml(showCheckbox = false, turnPlayProperty.get)
+      })
+    ).render
 
   private val msgInput = TextInput(chatModel.subProp(_.msgInput))(
     translatedAttrDynamic(Translations.Chat.inputPlaceholder, "placeholder")(_.apply())
@@ -738,19 +746,17 @@ class GameView(
                 " ",
                 b(bind(chatModel.subProp(_.username)))
               ),
-              nested(
-                produceWithNested(presenter.enemyProperty.transform(_.map(_.username))) {
-                  case (Some(Username(enemyUsername)), nested) =>
-                    span(
-                      " - ",
-                      nested(translatedDynamic(Translations.Game.playingAgainst)(_.apply())),
-                      " ",
-                      b(enemyUsername)
-                    ).render
-                  case _ =>
-                    span.render
-                }
-              ),
+              nested(produceWithNested(presenter.enemyProperty.transform(_.map(_.username))) {
+                case (Some(Username(enemyUsername)), nested) =>
+                  span(
+                    " - ",
+                    nested(translatedDynamic(Translations.Game.playingAgainst)(_.apply())),
+                    " ",
+                    b(enemyUsername)
+                  ).render
+                case _ =>
+                  span.render
+              }),
               br,
               nested(produceWithNested(presenter.gameModeProperty) {
                 case (Some(PreGameMode(iPlacedShips, enemyPlacedShips)), nested) =>

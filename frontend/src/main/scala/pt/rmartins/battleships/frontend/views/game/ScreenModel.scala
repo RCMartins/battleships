@@ -37,7 +37,7 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
   val default: ScreenModel =
     ScreenModel(
       canvasSize = BoardView.CanvasSize,
-      selectedTab = myMovesTab,
+      selectedTab = chatTab,
       lastSeenMessagesChat = 0,
       lastSeenMessagesMyMoves = 0,
       lastSeenMessagesEnemyMoves = 0,
@@ -60,7 +60,7 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
 
   def resetScreenModel(model: ScreenModel): ScreenModel = {
     model.copy(
-      selectedTab = myMovesTab,
+      selectedTab = chatTab,
       lastSeenMessagesChat = 0,
       lastSeenMessagesMyMoves = 0,
       lastSeenMessagesEnemyMoves = 0,
