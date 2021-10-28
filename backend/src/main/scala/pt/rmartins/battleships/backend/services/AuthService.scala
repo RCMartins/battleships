@@ -23,29 +23,29 @@ class AuthService() {
   def logout(userToken: UserToken): Future[Unit] = Future {
     tokens.synchronized {
       tokens.remove(userToken).foreach { ctx =>
-        usersLogged.remove(ctx.username)
+        usersLogged.remove(ctx.username.toLowerCase)
       }
     }
   }
 
   /** Tries to authenticate user with provided credentials. */
   def loginUsername(username: Username): Future[Either[AuthError, UserContext]] = Future {
-    val usernameTrimmed = username.modify(_.username).using(_.trim)
+    val usernameLower = username.toLowerCase
 
-    if (tokens.synchronized(usersLogged(usernameTrimmed)))
+    if (tokens.synchronized(usersLogged(usernameLower)))
       Left(AuthError.UserAlreadyExists)
-    else if (!validUsername(usernameTrimmed))
+    else if (!validUsername(usernameLower))
       Left(AuthError.UsernameInvalid)
     else {
       val token = UserToken(UUID.randomUUID().toString)
       val ctx = UserContext(
         token,
-        usernameTrimmed
+        username
       )
 
       tokens.synchronized {
         tokens(token) = ctx
-        usersLogged += usernameTrimmed
+        usersLogged += usernameLower
       }
 
       Right(ctx)
@@ -57,7 +57,7 @@ class AuthService() {
       tokens.synchronized {
         tokens.get(userToken)
       } match {
-        case Some(userContext) if userContext.username == username =>
+        case Some(userContext) if userContext.username.toLowerCase == username.toLowerCase =>
           Right(userContext)
         case _ =>
           Left(AuthError.UnauthorizedException)

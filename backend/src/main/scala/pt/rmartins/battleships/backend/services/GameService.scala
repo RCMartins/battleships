@@ -423,8 +423,6 @@ class GameService(rpcClientsService: RpcClientsService) {
         game.updatePlayerByUsername(playerUsername, _.copy(clientId = clientId))
 
       updateServerState(updatedGame)
-
-      // TODO could this reset any state of enemy? like placed ships or placed targets???
       updateBothGameState(updatedGame)
     }
   }
@@ -452,6 +450,8 @@ class GameService(rpcClientsService: RpcClientsService) {
         rpcClientsService.getClientIdByUsername(player2Username)
       ) match {
         case (Some(player1Id), Some(player2Id)) =>
+          val player2Username = rpcClientsService.authenticatedClients(player2Id).username
+
           val game: Game =
             createNewGame((player1Id, player1Username), Some((player2Id, player2Username)), rules)
 

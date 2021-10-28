@@ -26,7 +26,7 @@ class LoginPagePresenter(
   }
 
   def login(): Future[Unit] = {
-    val username = model.subProp(_.username).get
+    val username = model.subProp(_.username).get.trim
     loggingIn(username, userService.loginUsername(username))
   }
 
