@@ -677,18 +677,9 @@ class GameView(
             )
           ).render
       }),
-      FontAwesome.Solid.signOutAlt
+      span(`class` := "pl-2", FontAwesome.Solid.signOutAlt)
     )
   )
-
-  quitGameButton.listen { _ =>
-    presenter.gameStateProperty.get match {
-      case None =>
-        presenter.logout()
-      case Some(_) =>
-        presenter.quitCurrentGame()
-    }
-  }
 
   private val errorModalId: String = "error-modal"
   def errorModal(nested: NestedInterceptor): Div =
@@ -725,6 +716,56 @@ class GameView(
       )
     ).render
 
+  private val quitGameModalId: String = "quit-game-modal"
+  def quitGameModal(nested: NestedInterceptor): Div =
+    div(
+      `class` := "modal fade",
+      id := quitGameModalId,
+      div(
+        `class` := "modal-dialog",
+        div(
+          `class` := "modal-content",
+          div(
+            `class` := "modal-header",
+            h5(nested(translatedDynamic(Translations.Game.confirmQuitGameTitle)(_.apply()))),
+            span(
+              FontAwesome.Solid.times,
+              FontAwesome.Modifiers.Sizing.x2,
+              attr("data-bs-dismiss") := "modal"
+            )
+          ),
+          div(
+            `class` := "modal-footer",
+            button(
+              `class` := "btn btn-secondary",
+              `type` := "button",
+              attr("data-bs-dismiss") := "modal",
+              nested(translatedDynamic(Translations.Game.closeButton)(_.apply()))
+            ),
+            button(
+              `class` := "btn btn-primary",
+              `type` := "button",
+              attr("data-bs-dismiss") := "modal",
+              nested(translatedDynamic(Translations.Game.confirmButton)(_.apply()))
+            ).render.tap {
+              _.onclick = _ => {
+                presenter.quitCurrentGame()
+              }
+            }
+          )
+        )
+      )
+    ).render
+
+  quitGameButton.listen { _ =>
+    presenter.gameStateProperty.get match {
+      case None =>
+        presenter.logout()
+      case Some(_) =>
+        Globals.modalToggle(quitGameModalId)
+    }
+  }
+
   screenModel.subProp(_.showErrorModal).listen {
     case true =>
       Globals.modalToggle(errorModalId)
@@ -739,6 +780,7 @@ class GameView(
           div(
             `class` := "row justify-content-between",
             errorModal(nested),
+            quitGameModal(nested),
             div(
               `class` := "col-7",
               span(
