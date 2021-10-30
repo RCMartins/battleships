@@ -9,10 +9,10 @@ import io.udash.{ModelProperty, bind, produce, toAttrPairOps}
 import org.scalajs.dom._
 import org.scalajs.dom.html.{Canvas, Div, Select}
 import pt.rmartins.battleships.frontend.services.TranslationsService
-import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasColor
+import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.i18n.Translations
-import pt.rmartins.battleships.shared.model.game.{Coordinate, RuleTimeLimit, Ship}
+import pt.rmartins.battleships.shared.model.game.{AttackType, Coordinate, RuleTimeLimit, Ship}
 import scalatags.JsDom.all._
 
 class PreGameView(
@@ -83,7 +83,8 @@ class PreGameView(
           div(
             `class` := "row my-2",
             height := s"${defaultHeight}px",
-            createTimeLimitOptions(nested)
+            createTimeLimitOptions(nested),
+            createCustomShots(nested)
           )
         )
       )
@@ -354,27 +355,108 @@ class PreGameView(
     }
 
     div(
-      `class` := "col-12",
+      `class` := "col-6 border border-secondary",
       div(
-        `class` := "btn-group m-3",
-        totalTimeLimitCheckBox,
-        label(
-          `class` := "input-group-text",
-          `for` := "time-limit-input",
-          nested(translatedDynamic(Translations.Game.timeLimit)(_.apply()))
+        `class` := "d-flex flex-wrap",
+        div(
+          `class` := "btn-group m-3",
+          totalTimeLimitCheckBox,
+          label(
+            `class` := "input-group-text",
+            `for` := totalTimeLimit.id,
+            nested(translatedDynamic(Translations.Game.timeLimit)(_.apply()))
+          ),
+          totalTimeLimit
         ),
-        totalTimeLimit
-      ),
-      br,
+        br,
+        div(
+          `class` := "btn-group m-3",
+          turnTimeLimitCheckBox,
+          label(
+            `class` := "input-group-text",
+            `for` := turnTimeLimit.id,
+            nested(translatedDynamic(Translations.Game.turnTimeLimit)(_.apply()))
+          ),
+          turnTimeLimit
+        )
+      )
+    )
+  }
+
+  def createCustomShots(nested: NestedInterceptor): Modifier = {
+    val missilesSize = Coordinate(50, 50)
+    val missilesDistance = 30
+    val MaxMissiles = 5
+
+    val customShotsCanvas = canvas.render
+    customShotsCanvas.setAttribute(
+      "width",
+      (missilesSize.x + missilesDistance * (MaxMissiles - 1)).toString
+    )
+    customShotsCanvas.setAttribute("height", missilesSize.y.toString)
+
+    def redrawCanvas(missileAmount: Int): Unit = {
+      val renderingCtx = customShotsCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+      renderingCtx.clearRect(0, 0, customShotsCanvas.width, customShotsCanvas.height)
+
+      (0 until missileAmount).foreach { index =>
+        drawImageAbs(
+          renderingCtx,
+          attackSimple.element,
+          x = missilesDistance * index,
+          y = 0,
+          missilesSize.x,
+          missilesSize.y,
+          useAntiAliasing = true
+        )
+      }
+    }
+
+    val amountCustomShots: Select =
+      select(
+        `class` := "form-select px-3",
+        id := "amount-custom-shots-input"
+      ).render
+    (1 to MaxMissiles).foreach(amount =>
+      amountCustomShots.appendChild(option(amount.toString).render)
+    )
+
+    amountCustomShots.onchange = _ => {
+      val missileAmount = amountCustomShots.value.toInt
+      preGameModel
+        .subProp(_.defaultTurnAttackTypes)
+        .set(List.fill(missileAmount)(AttackType.Simple))
+    }
+    preGameModel
+      .subProp(_.defaultTurnAttackTypes)
+      .listen(
+        { defaultTurnAttackTypes =>
+          amountCustomShots.value = defaultTurnAttackTypes.size.toString
+          redrawCanvas(amountCustomShots.value.toInt)
+        },
+        initUpdate = true
+      )
+
+    // TODO how to fix this?
+    window.setTimeout(
+      () => redrawCanvas(preGameModel.get.defaultTurnAttackTypes.size),
+      100
+    )
+
+    div(
+      `class` := "col-6 border border-secondary",
       div(
-        `class` := "btn-group m-3",
-        turnTimeLimitCheckBox,
-        label(
-          `class` := "input-group-text",
-          `for` := "turn-time-limit-input",
-          nested(translatedDynamic(Translations.Game.turnTimeLimit)(_.apply()))
-        ),
-        turnTimeLimit
+        `class` := "d-flex flex-wrap",
+        div(
+          `class` := "btn-group m-3",
+          customShotsCanvas,
+          label(
+            `class` := "input-group-text",
+            `for` := amountCustomShots.id,
+            nested(translatedDynamic(Translations.Game.timeLimit)(_.apply()))
+          ),
+          amountCustomShots
+        )
       )
     )
   }

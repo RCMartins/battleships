@@ -4,7 +4,6 @@ import org.scalajs.dom.CanvasRenderingContext2D
 import org.scalajs.dom.html.Canvas
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasColor
 import pt.rmartins.battleships.shared.model.game.{Coordinate, Ship}
-import scalatags.JsDom
 import scalatags.JsDom.all._
 
 class ViewUtils(canvasUtils: CanvasUtils) {
@@ -36,7 +35,7 @@ class ViewUtils(canvasUtils: CanvasUtils) {
         CanvasColor.Ship()
       )
       if (destroyed)
-        canvasUtils.drawCrosshair(
+        CanvasUtils.drawCrosshair(
           renderingCtx,
           initialPosition,
           shipPiece,

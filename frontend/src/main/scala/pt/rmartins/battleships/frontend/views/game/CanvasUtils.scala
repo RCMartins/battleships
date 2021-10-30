@@ -1,7 +1,9 @@
 package pt.rmartins.battleships.frontend.views.game
 
+import org.scalajs.dom
 import org.scalajs.dom.CanvasRenderingContext2D
 import org.scalajs.dom.html.Image
+import org.scalajs.dom.raw.HTMLImageElement
 import pt.rmartins.battleships.frontend.views.game.BoardView.MinTextSize
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasColor
 import pt.rmartins.battleships.shared.model.game.{Coordinate, Turn}
@@ -42,84 +44,6 @@ class CanvasUtils(gamePresenter: GamePresenter) {
       renderingCtx.setLineDash(scalajs.js.Array())
       renderingCtx.lineDashOffset = 0
     }
-  }
-
-  def drawTurnNumberCoor(
-      renderingCtx: CanvasRenderingContext2D,
-      boardPosition: Coordinate,
-      coor: Coordinate,
-      size: Int,
-      turn: Turn,
-      textSize: Int,
-      textColor: String = "0, 0, 0"
-  ): Unit = {
-    val relCoor = boardPosition + coor * size + Coordinate(size / 2, size / 2 + 2)
-    renderingCtx.fillStyle = s"rgb($textColor)"
-    renderingCtx.font = s"${textSize}px serif"
-    renderingCtx.textBaseline = "middle"
-    renderingCtx.textAlign = "center"
-    renderingCtx.fillText(turn.toTurnString, relCoor.x, relCoor.y)
-  }
-
-  def drawCrosshair(
-      renderingCtx: CanvasRenderingContext2D,
-      boardPosition: Coordinate,
-      coordinate: Coordinate,
-      size: Int,
-      lineWidth: Double,
-      alpha: Double
-  ): Unit = {
-    drawCrosshairAbs(
-      renderingCtx,
-      boardPosition + coordinate * size,
-      size,
-      lineWidth,
-      alpha
-    )
-  }
-
-  def drawCrosshairAbs(
-      renderingCtx: CanvasRenderingContext2D,
-      coordinate: Coordinate,
-      size: Int,
-      lineWidth: Double,
-      alpha: Double
-  ): Unit = {
-    renderingCtx.strokeStyle = s"rgb(255, 0, 0, $alpha)"
-    renderingCtx.lineWidth = lineWidth
-
-    renderingCtx.beginPath()
-    renderingCtx.moveTo(coordinate.x, coordinate.y)
-    renderingCtx.lineTo(coordinate.x + size, coordinate.y + size)
-    renderingCtx.stroke()
-
-    renderingCtx.beginPath()
-    renderingCtx.moveTo(coordinate.x + size, coordinate.y)
-    renderingCtx.lineTo(coordinate.x, coordinate.y + size)
-    renderingCtx.stroke()
-  }
-
-  def drawImageAbs(
-      renderingCtx: CanvasRenderingContext2D,
-      image: Image,
-      x: Int,
-      y: Int,
-      width: Int,
-      height: Int,
-      useAntiAliasing: Boolean
-  ): Unit = {
-    renderingCtx.imageSmoothingEnabled = useAntiAliasing
-    renderingCtx.drawImage(
-      image,
-      0,
-      0,
-      500,
-      500,
-      x,
-      y,
-      width,
-      height
-    )
   }
 
   def drawBoardLimits(
@@ -257,6 +181,83 @@ object CanvasUtils {
       val fillColor: String = "255, 0, 0"
     }
 
+  }
+
+  def drawTurnNumberCoor(
+      renderingCtx: CanvasRenderingContext2D,
+      boardPosition: Coordinate,
+      coor: Coordinate,
+      size: Int,
+      turn: Turn,
+      textSize: Int,
+      textColor: String = "0, 0, 0"
+  ): Unit = {
+    val relCoor = boardPosition + coor * size + Coordinate(size / 2, size / 2 + 2)
+    renderingCtx.fillStyle = s"rgb($textColor)"
+    renderingCtx.font = s"${textSize}px serif"
+    renderingCtx.textBaseline = "middle"
+    renderingCtx.textAlign = "center"
+    renderingCtx.fillText(turn.toTurnString, relCoor.x, relCoor.y)
+  }
+
+  def drawCrosshair(
+      renderingCtx: CanvasRenderingContext2D,
+      boardPosition: Coordinate,
+      coordinate: Coordinate,
+      size: Int,
+      lineWidth: Double,
+      alpha: Double
+  ): Unit = {
+    drawCrosshairAbs(
+      renderingCtx,
+      boardPosition + coordinate * size,
+      size,
+      lineWidth,
+      alpha
+    )
+  }
+
+  def drawCrosshairAbs(
+      renderingCtx: CanvasRenderingContext2D,
+      coordinate: Coordinate,
+      size: Int,
+      lineWidth: Double,
+      alpha: Double
+  ): Unit = {
+    renderingCtx.strokeStyle = s"rgb(255, 0, 0, $alpha)"
+    renderingCtx.lineWidth = lineWidth
+
+    renderingCtx.beginPath()
+    renderingCtx.moveTo(coordinate.x, coordinate.y)
+    renderingCtx.lineTo(coordinate.x + size, coordinate.y + size)
+    renderingCtx.stroke()
+
+    renderingCtx.beginPath()
+    renderingCtx.moveTo(coordinate.x + size, coordinate.y)
+    renderingCtx.lineTo(coordinate.x, coordinate.y + size)
+    renderingCtx.stroke()
+  }
+
+  class CanvasImage(src: String) {
+    val element: HTMLImageElement =
+      dom.document.createElement("img").asInstanceOf[HTMLImageElement]
+    element.src = src
+  }
+
+  val attackSimple: CanvasImage =
+    new CanvasImage("icons/missile-simple.png")
+
+  def drawImageAbs(
+      renderingCtx: CanvasRenderingContext2D,
+      image: Image,
+      x: Int,
+      y: Int,
+      width: Int,
+      height: Int,
+      useAntiAliasing: Boolean
+  ): Unit = {
+    renderingCtx.imageSmoothingEnabled = useAntiAliasing
+    renderingCtx.drawImage(image, 0, 0, 500, 500, x, y, width, height)
   }
 
 }

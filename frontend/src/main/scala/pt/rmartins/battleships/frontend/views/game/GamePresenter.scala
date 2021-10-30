@@ -298,6 +298,8 @@ class GamePresenter(
           shipCounter(shipId).set(counter)
         }
         preGameModel.subProp(_.boardSize).set(rules.boardSize)
+        preGameModel.subProp(_.timeLimit).set(rules.timeLimit)
+        preGameModel.subProp(_.defaultTurnAttackTypes).set(rules.defaultTurnAttackTypes)
       case _ =>
     }
   }
@@ -397,6 +399,7 @@ class GamePresenter(
           )
         )
       )
+    preGameModel.subProp(_.defaultTurnAttackTypes).set(List.fill(3)(AttackType.Simple))
 
     val allShipCounters = shipCounter.toList
     val combinedShipCounters = allShipCounters.map(_._2).combineToSeqProperty
@@ -540,7 +543,6 @@ class GamePresenter(
   private def createCurrentRules: Option[Rules] = {
     val preGame = preGameModel.get
     if (preGame.previewBoardOpt.exists(_._2 >= PreGameModel.MinPreviewTries)) {
-      val defaultTurnAttackTypes = List.fill(3)(AttackType.Simple)
       val turnBonuses: List[TurnBonus] =
         List(
           TurnBonus(BonusType.FirstBlood, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
@@ -559,7 +561,7 @@ class GamePresenter(
         Rules(
           boardSize = preGame.boardSize,
           gameFleet = gameFleet,
-          defaultTurnAttackTypes = defaultTurnAttackTypes,
+          defaultTurnAttackTypes = preGame.defaultTurnAttackTypes,
           turnBonuses = turnBonuses,
           timeLimit = preGame.timeLimit
         )

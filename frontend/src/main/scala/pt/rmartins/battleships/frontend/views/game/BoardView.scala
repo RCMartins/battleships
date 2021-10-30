@@ -1,12 +1,10 @@
 package pt.rmartins.battleships.frontend.views.game
 
 import io.udash.{ModelProperty, ReadableProperty, any2Property}
-import org.scalajs.dom
-import org.scalajs.dom.html.{Canvas, Div, Span}
-import org.scalajs.dom.raw.HTMLImageElement
 import org.scalajs.dom._
+import org.scalajs.dom.html.{Canvas, Div}
 import pt.rmartins.battleships.frontend.views.game.BoardView._
-import pt.rmartins.battleships.frontend.views.game.CanvasUtils.{CanvasBorder, CanvasColor}
+import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
@@ -190,8 +188,8 @@ class BoardView(
     SizeBig.transform(sizeBig => sizeBig * 2)
 
   private val MissilesPosDiff: ReadableProperty[Coordinate] =
-    combine(MissilesSqSize, SizeBig).transform { case (missilesSqSize, sizeBig) =>
-      Coordinate(0, (missilesSqSize + sizeBig * 0.25).toInt)
+    MissilesSqSize.transform { missilesSqSize =>
+      Coordinate(0, missilesSqSize)
     }
 
   private val PlaceShipsPos: ReadableProperty[Coordinate] =
@@ -242,15 +240,6 @@ class BoardView(
     combine(DestructionSummaryPos, SummaryShipsSqSize, DestructionSummaryMargin)
 
   private val PlaceShipBoardMargin = Coordinate.square(20)
-
-  private class Image(src: String) {
-    val element: HTMLImageElement =
-      dom.document.createElement("img").asInstanceOf[HTMLImageElement]
-    element.src = src
-  }
-
-  private val attackSimple: Image =
-    new Image("icons/missile-simple.png")
 
   private val shipsSummaryRelCoordinates: ReadableProperty[List[(ShipId, List[ViewShip])]] =
     combine(gamePresenter.rulesProperty, SummaryMaxY).transform {
