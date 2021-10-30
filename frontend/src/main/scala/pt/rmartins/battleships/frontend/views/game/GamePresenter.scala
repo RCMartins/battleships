@@ -620,6 +620,9 @@ class GamePresenter(
     }
 
   def mouseMove(boardView: BoardView, mouseX: Int, mouseY: Int): Unit = {
+    boardView.myBoardCanvas.setAttribute("tabindex", "0")
+    boardView.myBoardCanvas.focus()
+
     gameModel.subProp(_.mousePosition).set(Some(Coordinate(mouseX, mouseY)))
 
     (gameModel.get, gameStateProperty.get) match {
@@ -667,6 +670,9 @@ class GamePresenter(
     gameModel.subProp(_.mouseDown).set(None)
 
   def mouseDown(boardView: BoardView, button: Int): Unit = {
+    boardView.myBoardCanvas.setAttribute("tabindex", "0")
+    boardView.myBoardCanvas.focus()
+
     gameModel.subProp(_.mouseDown).set(Some(button))
 
     (gameModel.get, gameStateProperty.get) match {
@@ -838,11 +844,21 @@ class GamePresenter(
       false
 
   def keyDown(key: String): Unit = {
-    if (key == "R")
-      rotateSelectedShip(1)
+    gameStateProperty.get match {
+      case Some(GameState(_, _, _, _, _: PreGameMode)) =>
+        if (key.equalsIgnoreCase("R"))
+          rotateSelectedShip(1)
+      case Some(GameState(_, _, _, _, _: PlayingMode)) =>
+        if (key.equalsIgnoreCase(" "))
+          launchAttack()
+      case _ =>
+    }
   }
 
-  def mouseWheel(wheelRotation: Int): Unit =
+  def mouseWheel(boardView: BoardView, wheelRotation: Int): Unit = {
+    boardView.myBoardCanvas.setAttribute("tabindex", "0")
+    boardView.myBoardCanvas.focus()
+
     gameStateProperty.get match {
       case Some(GameState(_, _, _, _, _: PreGameMode)) =>
         if (wheelRotation != 0)
@@ -865,6 +881,7 @@ class GamePresenter(
           .set(nextIndex.map(BoardView.BoardMarksSelectorOrder))
       case _ =>
     }
+  }
 
   private def rotateSelectedShip(directionDelta: Int): Unit =
     (gameModel.get.selectedShip, modeTypeProperty.get) match {
@@ -986,10 +1003,11 @@ class GamePresenter(
     }
 
   def launchAttack(): Unit =
-    (gameModel.get.turnAttacks, gameStateProperty.get) match {
+    (gameModel.get.turnAttacksSent, gameModel.get.turnAttacks, gameStateProperty.get) match {
       case (
+            false,
             turnAttacks,
-            Some(GameState(gameId, _, _, _, PlayingMode(_, turn, _, _, _)))
+            Some(GameState(gameId, _, _, _, PlayingMode(true, turn, _, _, _)))
           ) if turnAttacks.forall(_.isPlaced) =>
         gameModel.subProp(_.turnAttacksSent).set(true)
         gameRpc.sendTurnAttacks(gameId, turn, turnAttacks)

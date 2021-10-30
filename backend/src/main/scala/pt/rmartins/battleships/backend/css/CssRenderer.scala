@@ -1,8 +1,7 @@
 package pt.rmartins.battleships.backend.css
 
-import pt.rmartins.battleships.shared.css.{ChatStyles, GlobalStyles, LoginPageStyles}
 import io.udash.css._
-
+import pt.rmartins.battleships.shared.css.{ChatStyles, GameStyles, GlobalStyles, LoginPageStyles}
 import scalacss.internal.{Renderer, StringRenderer}
 
 /** Renderer of styles based on UdashCSS. */
@@ -12,13 +11,16 @@ class CssRenderer(path: String, renderPretty: Boolean) {
     else StringRenderer.formatTiny
 
   def render(): Unit = {
-    new CssFileRenderer(path,
+    new CssFileRenderer(
+      path,
       Seq(
         // the list of styles to be rendered
         GlobalStyles,
         LoginPageStyles,
-        ChatStyles
-      ), createMain = true
+        ChatStyles,
+        GameStyles
+      ),
+      createMain = true
     ).render()(renderer)
   }
 }

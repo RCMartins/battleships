@@ -1,5 +1,6 @@
 package pt.rmartins.battleships.frontend.views.game
 
+import io.udash.css.CssView
 import io.udash.{ModelProperty, ReadableProperty, any2Property}
 import org.scalajs.dom._
 import org.scalajs.dom.html.{Canvas, Div}
@@ -7,6 +8,7 @@ import pt.rmartins.battleships.frontend.views.game.BoardView._
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
+import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit
 import pt.rmartins.battleships.shared.model.game._
@@ -20,16 +22,23 @@ class BoardView(
     screenModel: ModelProperty[ScreenModel],
     gamePresenter: GamePresenter,
     canvasUtils: CanvasUtils
-) {
+) extends CssView {
 
   import canvasUtils._
 
   val myBoardCanvas: Canvas =
-    canvas(id := "mainGameCanvas").render
+    canvas(
+      GameStyles.canvasWithoutBorder,
+      id := "mainGameCanvas"
+    ).render
 
   screenModel.get.canvasSize.pipe { canvasSize =>
     myBoardCanvas.setAttribute("width", canvasSize.x.toString)
     myBoardCanvas.setAttribute("height", canvasSize.y.toString)
+  }
+
+  myBoardCanvas.onkeypress = (event: KeyboardEvent) => {
+    gamePresenter.keyDown(event.key)
   }
 
   val canvasDiv: Div =
@@ -58,7 +67,7 @@ class BoardView(
   }
 
   myBoardCanvas.onmousewheel = (wheelEvent: WheelEvent) => {
-    gamePresenter.mouseWheel(wheelEvent.deltaY.toInt / 100)
+    gamePresenter.mouseWheel(this, wheelEvent.deltaY.toInt / 100)
   }
 
   myBoardCanvas.oncontextmenu = (event: MouseEvent) => {
