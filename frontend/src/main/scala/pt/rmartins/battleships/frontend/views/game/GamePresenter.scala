@@ -883,9 +883,20 @@ class GamePresenter(
   private def rotateSelectedShip(directionDelta: Int): Unit =
     (gameModel.get.selectedShip, modeTypeProperty.get) match {
       case (Some(ship), Some(PreGameModeType)) =>
-        gameModel
-          .subProp(_.selectedShip)
-          .set(Some(ship.rotateBy(directionDelta)))
+        val updatedShip =
+          if (directionDelta.abs != 1)
+            ship.rotateBy(directionDelta)
+          else {
+            val possibleUpdatedShip = ship.rotateBy(directionDelta)
+            if (
+              possibleUpdatedShip.pieces.sortWith(Coordinate.defaultCompare(_, _) < 0) ==
+                ship.pieces.sortWith(Coordinate.defaultCompare(_, _) < 0)
+            )
+              possibleUpdatedShip.rotateBy(directionDelta)
+            else
+              possibleUpdatedShip
+          }
+        gameModel.subProp(_.selectedShip).set(Some(updatedShip))
       case _ =>
     }
 
