@@ -16,7 +16,7 @@ case class ScreenModel(
     extraTurnText: Span,
     hideMyBoard: Boolean,
     revealEnemyBoard: Boolean,
-    showErrorModal: Boolean,
+    errorModalType: Option[ErrorModalType],
     myBoardTitle: Span,
     enemyBoardTitle: Span,
     realEnemyBoardTitle: Span,
@@ -46,7 +46,7 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
       extraTurnText = span.render,
       hideMyBoard = false,
       revealEnemyBoard = false,
-      showErrorModal = false,
+      errorModalType = None,
       myBoardTitle = span.render,
       enemyBoardTitle = span.render,
       realEnemyBoardTitle = span.render,
@@ -68,7 +68,7 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
       extraTurnPopup = None,
       hideMyBoard = false,
       revealEnemyBoard = false,
-      showErrorModal = false,
+      errorModalType = None,
       disabledMovesSet = Set.empty,
       hoverMove = None
     )

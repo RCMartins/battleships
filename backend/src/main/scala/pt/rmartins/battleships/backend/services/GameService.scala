@@ -430,10 +430,13 @@ class GameService(rpcClientsService: RpcClientsService) {
   def startGameWithBots(playerUsername: Username, rules: Rules): Future[Unit] = Future {
     rpcClientsService.getClientIdByUsername(playerUsername) match {
       case Some(playerId) =>
-        val game: Game = createNewGame((playerId, playerUsername), None, rules)
-
-        updateServerState(game, None)
-        updateBothGameState(game)
+        createNewGame((playerId, playerUsername), None, rules) match {
+          case Some(game) =>
+            updateServerState(game, None)
+            updateBothGameState(game)
+          case None =>
+            sendSystemMessage(playerUsername, "Error starting game vs bot! (Invalid rules)")
+        }
       case _ =>
         sendSystemMessage(playerUsername, "Error starting game vs bot!")
     }
@@ -451,12 +454,20 @@ class GameService(rpcClientsService: RpcClientsService) {
       ) match {
         case (Some(player1Id), Some(player2Id)) =>
           val player2Username = rpcClientsService.authenticatedClients(player2Id).username
-
-          val game: Game =
-            createNewGame((player1Id, player1Username), Some((player2Id, player2Username)), rules)
-
-          updateServerState(game, None)
-          updateBothGameState(game)
+          createNewGame(
+            (player1Id, player1Username),
+            Some((player2Id, player2Username)),
+            rules
+          ) match {
+            case Some(game) =>
+              updateServerState(game, None)
+              updateBothGameState(game)
+            case None =>
+              sendSystemMessage(
+                player1Username,
+                s"Could not find player '$player2Username' (Invalid rules)"
+              )
+          }
         case _ =>
           sendSystemMessage(player1Username, s"Could not find player '$player2Username'")
       }
@@ -466,60 +477,66 @@ class GameService(rpcClientsService: RpcClientsService) {
       player1Data: (ClientId, Username),
       player2DataOpt: Option[(ClientId, Username)],
       rules: Rules
-  ): Game = {
-    val boardSize = rules.boardSize
-    val myBoard: ServerMyBoard = ServerMyBoard(boardSize, Nil)
-    val enemyBoard: ServerEnemyBoard =
-      ServerEnemyBoard(
-        boardSize,
-        Vector.fill(boardSize.x)(Vector.fill(boardSize.y)((None, BoardMark.Empty))),
-        rules.gameFleet.shipAmount,
-        rules.gameFleet.shipAmount
-      )
+  ): Option[Game] = {
+    if (rules.gameFleet.ships.isEmpty)
+      None
+    else {
+      val boardSize = rules.boardSize
+      val myBoard: ServerMyBoard = ServerMyBoard(boardSize, Nil)
+      val enemyBoard: ServerEnemyBoard =
+        ServerEnemyBoard(
+          boardSize,
+          Vector.fill(boardSize.x)(Vector.fill(boardSize.y)((None, BoardMark.Empty))),
+          rules.gameFleet.shipAmount,
+          rules.gameFleet.shipAmount
+        )
 
-    val player1First: Boolean = Random.nextBoolean()
+      val player1First: Boolean = Random.nextBoolean()
 
-    val (player1Id, player1Username) = player1Data
-    val player1: ServerPlayer =
-      ServerPlayer(
-        clientId = player1Id,
-        username = player1Username,
-        startedFirst = player1First,
-        myBoard = myBoard,
-        enemyBoard = enemyBoard,
-        turnPlayHistory = Nil,
-        currentTurnOpt = None,
-        currentTurnAttackTypes = Nil,
-        extraTurnQueue = Nil,
-        timeRemaining = None
-      )
-    val (player2Id, player2Username) = player2DataOpt.getOrElse((BotClientId, BotUsername))
-    val player2: ServerPlayer =
-      ServerPlayer(
-        clientId = player2Id,
-        username = player2Username,
-        startedFirst = !player1First,
-        myBoard = myBoard,
-        enemyBoard = enemyBoard,
-        turnPlayHistory = Nil,
-        currentTurnOpt = None,
-        currentTurnAttackTypes = Nil,
-        extraTurnQueue = Nil,
-        timeRemaining = None
-      )
+      val (player1Id, player1Username) = player1Data
+      val player1: ServerPlayer =
+        ServerPlayer(
+          clientId = player1Id,
+          username = player1Username,
+          startedFirst = player1First,
+          myBoard = myBoard,
+          enemyBoard = enemyBoard,
+          turnPlayHistory = Nil,
+          currentTurnOpt = None,
+          currentTurnAttackTypes = Nil,
+          extraTurnQueue = Nil,
+          timeRemaining = None
+        )
+      val (player2Id, player2Username) = player2DataOpt.getOrElse((BotClientId, BotUsername))
+      val player2: ServerPlayer =
+        ServerPlayer(
+          clientId = player2Id,
+          username = player2Username,
+          startedFirst = !player1First,
+          myBoard = myBoard,
+          enemyBoard = enemyBoard,
+          turnPlayHistory = Nil,
+          currentTurnOpt = None,
+          currentTurnAttackTypes = Nil,
+          extraTurnQueue = Nil,
+          timeRemaining = None
+        )
 
-    val gameId = GameId(UUID.randomUUID().toString)
-    Game(
-      gameId = gameId,
-      messages = Nil,
-      boardSize = boardSize,
-      rules = rules,
-      player1 = player1,
-      player2 = player2,
-      playerWhoWonOpt = None,
-      currentTurnPlayer = None,
-      lastUpdateTimeOpt = None
-    )
+      val gameId = GameId(UUID.randomUUID().toString)
+      Some(
+        Game(
+          gameId = gameId,
+          messages = Nil,
+          boardSize = boardSize,
+          rules = rules,
+          player1 = player1,
+          player2 = player2,
+          playerWhoWonOpt = None,
+          currentTurnPlayer = None,
+          lastUpdateTimeOpt = None
+        )
+      )
+    }
   }
 
   def quitCurrentGame(gameId: GameId, playerUsername: Username): Future[Unit] =

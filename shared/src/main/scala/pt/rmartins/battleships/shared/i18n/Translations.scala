@@ -74,7 +74,8 @@ object Translations {
     val disabledMoves = key("game.tab.disabled_moves")
 
     val cannotStartGameTitle = key("game.modal.cannot_start_game_title")
-    val cannotStartGameBody = key("game.modal.cannot_start_game_body")
+    val startGameBoardSizeError = key("game.modal.start_game_board_size_error")
+    val startGameEmptyFleetError = key("game.modal.start_game_empty_fleet_error")
     val confirmQuitGameTitle = key("game.modal.confirm_quit_game_title")
 
     val fleet = key("game.pregame.fleet")

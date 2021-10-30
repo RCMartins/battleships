@@ -682,7 +682,7 @@ class GameView(
   )
 
   private val errorModalId: String = "error-modal"
-  def errorModal(nested: NestedInterceptor): Div =
+  def startGameErrorModal(nested: NestedInterceptor): Div =
     div(
       `class` := "modal fade",
       id := errorModalId,
@@ -701,7 +701,18 @@ class GameView(
           ),
           div(
             `class` := "modal-body",
-            nested(translatedDynamic(Translations.Game.cannotStartGameBody)(_.apply()))
+            nested(produceWithNested(screenModel.subProp(_.errorModalType)) {
+              case (Some(ErrorModalType.SmallBoardError), nested) =>
+                span(
+                  nested(translatedDynamic(Translations.Game.startGameBoardSizeError)(_.apply()))
+                ).render
+              case (Some(ErrorModalType.EmptyFleetError), nested) =>
+                span(
+                  nested(translatedDynamic(Translations.Game.startGameEmptyFleetError)(_.apply()))
+                ).render
+              case _ =>
+                span.render
+            })
           ),
           div(
             `class` := "modal-footer",
@@ -766,11 +777,10 @@ class GameView(
     }
   }
 
-  screenModel.subProp(_.showErrorModal).listen {
-    case true =>
+  screenModel.subProp(_.errorModalType).listen {
+    case Some(_) =>
       Globals.modalToggle(errorModalId)
-      screenModel.subProp(_.showErrorModal).set(false)
-    case false =>
+    case None =>
   }
 
   override def getTemplate: Modifier = div(
@@ -779,7 +789,7 @@ class GameView(
         factory.header(nested =>
           div(
             `class` := "row justify-content-between",
-            errorModal(nested),
+            startGameErrorModal(nested),
             quitGameModal(nested),
             div(
               `class` := "col-7",

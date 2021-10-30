@@ -540,9 +540,13 @@ class GamePresenter(
     }
   }
 
-  private def createCurrentRules: Option[Rules] = {
+  private def createCurrentRules: Either[ErrorModalType, Rules] = {
     val preGame = preGameModel.get
-    if (preGame.previewBoardOpt.exists(_._2 >= PreGameModel.MinPreviewTries)) {
+    if (preGame.previewBoardOpt.exists(_._2 < PreGameModel.MinPreviewTries))
+      Left(ErrorModalType.SmallBoardError)
+    else if (preGame.shipCounter.forall(_._2.get == 0))
+      Left(ErrorModalType.EmptyFleetError)
+    else {
       val turnBonuses: List[TurnBonus] =
         List(
           TurnBonus(BonusType.FirstBlood, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
@@ -557,7 +561,7 @@ class GamePresenter(
           }
         )
 
-      Some(
+      Right(
         Rules(
           boardSize = preGame.boardSize,
           gameFleet = gameFleet,
@@ -566,33 +570,26 @@ class GamePresenter(
           timeLimit = preGame.timeLimit
         )
       )
-    } else
-      None
+    }
   }
 
-  def showErrorModal(): Unit = {
-    screenModel.subProp(_.showErrorModal).set(true)
+  def showErrorModal(errorModalType: ErrorModalType): Unit = {
+    screenModel.subProp(_.errorModalType).set(Some(errorModalType), force = true)
   }
 
   def startGameWithBots(): Unit = {
     createCurrentRules match {
-      case None =>
-        showErrorModal()
-      case Some(rules) =>
-        gameRpc.startGameWithBots(rules)
+      case Left(errorModalType) => showErrorModal(errorModalType)
+      case Right(rules)         => gameRpc.startGameWithBots(rules)
     }
   }
 
-  def startGameWith(otherPlayerUsername: Username): Unit = {
-    if (otherPlayerUsername.username.nonEmpty) {
+  def startGameWith(otherPlayerUsername: Username): Unit =
+    if (otherPlayerUsername.username.nonEmpty)
       createCurrentRules match {
-        case None =>
-          showErrorModal()
-        case Some(rules) =>
-          gameRpc.startGameWith(otherPlayerUsername, rules)
+        case Left(errorModalType) => showErrorModal(errorModalType)
+        case Right(rules)         => gameRpc.startGameWith(otherPlayerUsername, rules)
       }
-    }
-  }
 
   def rematchGame(): Unit =
     gameStateProperty.get match {
