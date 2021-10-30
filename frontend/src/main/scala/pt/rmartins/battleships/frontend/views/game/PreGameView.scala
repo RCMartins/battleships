@@ -355,7 +355,7 @@ class PreGameView(
     }
 
     div(
-      `class` := "col-6 border border-secondary",
+      `class` := "col-6",
       div(
         `class` := "d-flex flex-wrap",
         div(
@@ -444,7 +444,7 @@ class PreGameView(
     )
 
     div(
-      `class` := "col-6 border border-secondary",
+      `class` := "col-6",
       div(
         `class` := "d-flex flex-wrap",
         div(
