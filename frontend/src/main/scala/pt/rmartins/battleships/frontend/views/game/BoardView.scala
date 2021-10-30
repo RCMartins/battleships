@@ -263,7 +263,7 @@ class BoardView(
             shipBefore: Option[Ship]
         ): List[List[ViewShip]] =
           ships match {
-            case (ship :: _) :: _ if posY > 0 && posY + ship.pieces.maxBy(_.y).y > summaryMaxY =>
+            case (ship :: _) :: _ if posY > 0 && posY + ship.pieces.maxBy(_.y).y >= summaryMaxY =>
               val newColumnX = maxX + 6
               getShipsToPlacePos(
                 posX = newColumnX,
@@ -301,10 +301,30 @@ class BoardView(
               Nil
           }
 
-        val shipsListList: List[List[Ship]] =
+        val shipsGrouped: List[(ShipId, List[Ship])] =
           shipsInThisGame.ships
             .groupBy(_.shipId)
             .toList
+
+        val minX =
+          shipsGrouped.map { case (_, ships) =>
+            val ship = ships.head
+            val size = ships.size
+            ship.size.min * size + size - 1
+          }.max
+
+        val shipsListList: List[List[Ship]] =
+          shipsGrouped
+            .map { case (shipId, ships) =>
+              val ship = ships.head
+              val size = ships.size
+              val fullSizeX = ship.size.x * size + size - 1
+              val fullSizeY = ship.size.y * size + size - 1
+              if (Math.max(minX, fullSizeX) * ship.size.y < Math.max(minX, fullSizeY) * ship.size.x)
+                (shipId, ships)
+              else
+                (shipId, ships.map(_.rotateBy(1)))
+            }
             .sortBy { case (shipId, list) =>
               (-list.head.piecesSize, shipId.id)
             }

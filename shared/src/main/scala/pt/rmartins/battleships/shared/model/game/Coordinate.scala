@@ -40,6 +40,8 @@ case class Coordinate(x: Int, y: Int) {
       if dx != 0 || dy != 0
     } yield Coordinate(x + dx, y + dy)
 
+  def min: Int = Math.min(x, y)
+
   def max: Int = Math.max(x, y)
 
   override def toString: String = s"Coor($x,$y)"
@@ -51,5 +53,11 @@ object Coordinate extends HasGenCodec[Coordinate] {
   val origin: Coordinate = Coordinate(0, 0)
 
   def square(size: Int): Coordinate = Coordinate(size, size)
+
+  def defaultCompare(coor1: Coordinate, coor2: Coordinate): Int =
+    if (coor1.x == coor2.x)
+      coor2.y - coor1.y
+    else
+      coor2.x - coor1.x
 
 }
