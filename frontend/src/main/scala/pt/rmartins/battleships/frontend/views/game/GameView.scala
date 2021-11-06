@@ -66,6 +66,7 @@ class GameView(
   screenModel.subProp(_.screenResized).listen(_ => reloadBoardView())
   screenModel.subProp(_.hoverMove).listen(_ => reloadBoardView())
   screenModel.subProp(_.tick).listen(_ => reloadBoardView())
+  translationsService.currentLangProperty.listen(_ => reloadBoardView())
 
   gameModel.subProp(_.mousePosition).listen(_ => reloadBoardView())
   gameModel.subProp(_.mouseDown).listen(_ => reloadBoardView())
