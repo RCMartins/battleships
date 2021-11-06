@@ -263,6 +263,8 @@ class GamePresenter(
                   )
                 case _ =>
               }
+
+              screenModel.subProp(_.tick).set(screenModel.get.tick + 1)
             },
             timeout = timeRemainingIntervalMillis
           )

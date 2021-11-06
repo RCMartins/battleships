@@ -171,7 +171,8 @@ class PreGameView(
             boardSize,
             boardPos,
             sqSize,
-            backgroundColor = backgroundColor
+            backgroundColor = backgroundColor,
+            None
           )
 
           previewBoardOpt.foreach { case (board, _) =>

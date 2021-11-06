@@ -52,7 +52,8 @@ class CanvasUtils(gamePresenter: GamePresenter) {
       boardSize: Coordinate,
       boardPosition: Coordinate,
       squareSize: Int,
-      backgroundColor: Option[CanvasColor]
+      backgroundColor: Option[CanvasColor],
+      drawAsSelectedTick: Option[Int]
   ): Unit = {
     backgroundColor.foreach(canvasColor =>
       drawSquareAbs(
@@ -81,6 +82,28 @@ class CanvasUtils(gamePresenter: GamePresenter) {
       renderingCtx.lineTo(
         boardPosition.x + boardSize.x * squareSize,
         boardPosition.y + y * squareSize
+      )
+      renderingCtx.stroke()
+    }
+
+    drawAsSelectedTick.foreach { tick =>
+      val tickState = 7 - tick % 7
+      renderingCtx.beginPath()
+      renderingCtx.rect(
+        boardPosition.x - tickState,
+        boardPosition.y - tickState,
+        boardSize.x * squareSize + tickState * 2,
+        boardSize.y * squareSize + tickState * 2
+      )
+      renderingCtx.stroke()
+
+      val tickState2 = Math.max(0, tickState - 3)
+      renderingCtx.beginPath()
+      renderingCtx.rect(
+        boardPosition.x - tickState2,
+        boardPosition.y - tickState2,
+        boardSize.x * squareSize + tickState2 * 2,
+        boardSize.y * squareSize + tickState2 * 2
       )
       renderingCtx.stroke()
     }

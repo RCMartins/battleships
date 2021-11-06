@@ -607,9 +607,11 @@ class BoardView(
           MyBoardPreGamePos.get,
           SquareSizeBig.get,
           fillEmptySquares = false,
-          hideMyBoard = false
+          hideMyBoard = false,
+          isMyTurn = false,
+          tick = screenModelData.tick
         )
-      case Some(GameState(_, _, me, enemy, _: PlayingMode)) =>
+      case Some(GameState(_, _, me, enemy, PlayingMode(isMyTurn, _, _, _, _))) =>
         drawMissiles(renderingCtx, turnAttacks, screenModelData.missilesPopupMillisOpt)
         drawDestructionSummary(renderingCtx, selectedShipOpt)
 
@@ -623,7 +625,9 @@ class BoardView(
           MyBoardInGamePos.get,
           SquareSizeMedium.get,
           fillEmptySquares = true,
-          hideMyBoard = screenModelData.hideMyBoard
+          hideMyBoard = screenModelData.hideMyBoard,
+          isMyTurn = !isMyTurn,
+          tick = screenModelData.tick
         )
 
         drawEnemyBoard(
@@ -635,7 +639,9 @@ class BoardView(
           EnemyBoardPos.get,
           selectedBoardMarkOpt,
           selectedShipOpt,
-          screenModelData.hoverMove
+          screenModelData.hoverMove,
+          isMyTurn = isMyTurn,
+          tick = screenModelData.tick
         )
 
         drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
@@ -670,7 +676,9 @@ class BoardView(
             MyBoardGameOverPos.get,
             SquareSizeBig.get,
             fillEmptySquares = true,
-            hideMyBoard = false
+            hideMyBoard = false,
+            isMyTurn = false,
+            tick = screenModelData.tick
           )
 
         drawEnemyBoard(
@@ -682,7 +690,9 @@ class BoardView(
           EnemyBoardPos.get,
           selectedBoardMarkOpt,
           selectedShipOpt,
-          screenModelData.hoverMove
+          screenModelData.hoverMove,
+          isMyTurn = false,
+          tick = screenModelData.tick
         )
 
         drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
@@ -700,7 +710,9 @@ class BoardView(
       boardPosition: Coordinate,
       squareSize: Int,
       fillEmptySquares: Boolean,
-      hideMyBoard: Boolean
+      hideMyBoard: Boolean,
+      isMyTurn: Boolean,
+      tick: Int
   ): Unit = {
     val boardSize = me.myBoard.boardSize
 
@@ -710,7 +722,8 @@ class BoardView(
       boardSize,
       boardPosition,
       squareSize,
-      if (fillEmptySquares && !hideMyBoard) Some(CanvasColor.Water()) else None
+      if (fillEmptySquares && !hideMyBoard) Some(CanvasColor.Water()) else None,
+      Some(tick).filter(_ => isMyTurn)
     )
 
     val shipToPlaceHoverOpt: Option[ToPlaceShip] = shipToPlaceHover.get
@@ -852,7 +865,9 @@ class BoardView(
       boardPosition: Coordinate,
       selectedBoardMarkOpt: Option[BoardMark],
       selectedShipOpt: Option[Ship],
-      hoverMove: Option[Turn]
+      hoverMove: Option[Turn],
+      isMyTurn: Boolean,
+      tick: Int
   ): Unit = {
     val squareSize: Int = EnemyBoardSqSize.get
 
@@ -862,7 +877,8 @@ class BoardView(
       enemy.boardSize,
       boardPosition,
       squareSize,
-      backgroundColor = None
+      backgroundColor = None,
+      Some(tick).filter(_ => isMyTurn)
     )
 
     val boardMarksWithCoor: Seq[(Coordinate, Option[Turn], BoardMark)] =
@@ -978,7 +994,8 @@ class BoardView(
       boardSize,
       boardPosition,
       squareSize,
-      backgroundColor = Some(CanvasColor.Water())
+      backgroundColor = Some(CanvasColor.Water()),
+      None
     )
 
     enemyShips.foreach { case ShipInBoard(ship, position) =>
