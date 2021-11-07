@@ -1,18 +1,19 @@
 package pt.rmartins.battleships.shared.model.game
 
 import com.avsystem.commons.serialization.HasGenCodec
-import pt.rmartins.battleships.shared.model.utils.Utils
+import pt.rmartins.battleships.shared.model.utils.BoardUtils
+import pt.rmartins.battleships.shared.model.utils.BoardUtils.BoardMarks
 
 case class Player(
     shipsLeftToPlace: List[Ship], // TODO remove this from here to GameModel?
     myBoard: Board,
-    enemyBoardMarks: Vector[Vector[(Option[Turn], BoardMark)]],
+    enemyBoardMarks: BoardMarks,
     turnPlayHistory: List[TurnPlay]
 ) {
 
   def updateBoardMark(boardCoor: Coordinate, updatedBoardMark: BoardMark): Player =
     copy(enemyBoardMarks =
-      Utils.updateVectorUsing(
+      BoardUtils.updateBoardMarksUsing(
         enemyBoardMarks,
         boardCoor,
         { case (turnNumberOpt, _) => (turnNumberOpt, updatedBoardMark) }

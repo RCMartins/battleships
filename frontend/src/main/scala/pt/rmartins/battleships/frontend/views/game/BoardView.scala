@@ -12,7 +12,7 @@ import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit
 import pt.rmartins.battleships.shared.model.game._
-import pt.rmartins.battleships.shared.model.utils.Utils.canPlaceInBoard
+import pt.rmartins.battleships.shared.model.utils.BoardUtils.canPlaceInBoard
 import scalatags.JsDom.all._
 
 import scala.util.chaining.scalaUtilChainingOps

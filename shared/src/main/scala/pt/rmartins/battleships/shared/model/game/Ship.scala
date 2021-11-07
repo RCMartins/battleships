@@ -51,13 +51,10 @@ object Ship extends HasGenCodec[Ship] {
     List(l(y = 0, 0, 1, 3, 5, 6), l(y = 1, 1, 2, 3, 4, 5), l(y = 2, 0, 1, 3, 5, 6)).flatten
       .map(_.swap)
       .pipe(toShip)
-  val HeavyCruiser: Ship =
+  val Atoll: Ship =
     List((2, 0), (1, 1), (3, 1), (0, 2), (4, 2), (1, 3), (3, 3)).pipe(toShip)
   val Destroyer: Ship =
     List((2, 0), (2, 1), (0, 2), (1, 2), (2, 2), (3, 2), (4, 2), (2, 3), (2, 4)).pipe(toShip)
-  val FireShip: Ship =
-    List((0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5)).pipe(toShip)
-  //val Colossus 3,0 3,1 2,2 3,2 4,2 1,3 2,3 3,3 4,3 5,3 1,4 2,4 3,4 4,4 5,4 1,5 3,5 5,5 0,6 3,6 6,6 3,7
 
   val allShipsList: List[Ship] =
     List[Ship](
@@ -71,9 +68,8 @@ object Ship extends HasGenCodec[Ship] {
       Epoch,
       Battleship,
       MotherShip
-//      HeavyCruiser,
+//      Atoll,
 //      Destroyer,
-//      FireShip
     )
 
   lazy val allShipsFleetMaxX: Fleet =
@@ -98,6 +94,19 @@ object Ship extends HasGenCodec[Ship] {
 
   val allShipsMap: Map[ShipId, Ship] =
     allShipsList.map(ship => ship.shipId -> ship).toMap
+
+  val allShipsUniqueRotations: Map[ShipId, List[Ship]] =
+    allShipsList
+      .map(ship =>
+        ship.shipId ->
+          Rotation.all
+            .map(getShip(ship.shipId, _))
+            .map(ship => (ship, ship.pieces.toSet))
+            .distinctBy(_._2)
+            .map(_._1)
+            .toList
+      )
+      .toMap
 
   def createRotatedShip(shipId: ShipId, rotation: Rotation): Ship = {
     def moveNegativeCoor(ship: Ship): Ship = {

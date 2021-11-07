@@ -8,7 +8,8 @@ import pt.rmartins.battleships.shared.model.game.BonusReward.ExtraTurn
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game.HitHint.{ShipHit, Water}
 import pt.rmartins.battleships.shared.model.game._
-import pt.rmartins.battleships.shared.model.utils.Utils.updateVectorUsing
+import pt.rmartins.battleships.shared.model.utils.BoardUtils
+import pt.rmartins.battleships.shared.model.utils.BoardUtils._
 
 import java.time.{Duration, Instant}
 import java.util.{Date, UUID}
@@ -72,7 +73,7 @@ class GameService(rpcClientsService: RpcClientsService) {
                 //  the fleet should be validated before starting game...
                 //  Create Fleet class to hold ship lists and to validate fleets ?????
                 //  Also needs board size + any specific data
-                BotHelpers.placeShipsAtRandom(
+                BotHelper.placeShipsAtRandom(
                   player.myBoard.boardSize,
                   game.rules.gameFleet.ships
                 ) match {
@@ -89,18 +90,17 @@ class GameService(rpcClientsService: RpcClientsService) {
         gamesList
           .flatMap(game => game.getCurrentTurnPlayer.map((game, _)))
           .filter(!_._2.isHuman)
+          .map { case (game, bot) => bot.botHelper.map((game, bot, _)) }
           .foreach {
-            case (game, bot) if !bot.isHuman =>
+            case Some((game, bot, botHelper)) =>
               // TODO check if we are 'out' of time for this loop
 
               bot.currentTurnOpt.foreach { currentTurn =>
+                bot.turnPlayHistory.headOption
+                  .foreach(lastTurn => botHelper.updateBotBoardMarks(lastTurn))
                 val turnAttacks: List[Attack] =
-                  BotHelpers.placeAttacks(
-                    bot.enemyBoard.boardSize,
-                    bot.enemyBoard.boardMarks,
-                    bot.currentTurnAttackTypes
-                  )
-                sendTurnAttacks(game.gameId, bot.username, currentTurn, turnAttacks)
+                  botHelper.placeAttacks(bot.currentTurnAttackTypes)
+                unsafeSendTurnAttacks(game, bot, currentTurn, turnAttacks)
               }
             case _ =>
           }
@@ -200,7 +200,7 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   case class ServerEnemyBoard(
       boardSize: Coordinate,
-      boardMarks: Vector[Vector[(Option[Turn], BoardMark)]],
+      boardMarks: BoardMarks,
       totalShips: Int,
       shipsLeft: Int
   ) {
@@ -214,23 +214,27 @@ class GameService(rpcClientsService: RpcClientsService) {
       val allSubmarineHits =
         allShipHit && hits.forall(_._2.exists(_.ship.shipId == Ship.Submarine.shipId))
 
-      val updatedBoardMarks: Vector[Vector[(Option[Turn], BoardMark)]] =
+      val updatedBoardMarks: BoardMarks =
         hits.foldLeft(boardMarks) { case (marks, (coor, _)) =>
           if (allWater)
-            updateVectorUsing(marks, coor, _ => (Some(turn), BoardMark.Water))
+            updateBoardMarksUsing(marks, coor, _ => (Some(turn), BoardMark.Water))
           else if (allShipHit)
-            updateVectorUsing(marks, coor, _ => (Some(turn), BoardMark.ShipHit))
+            updateBoardMarksUsing(marks, coor, _ => (Some(turn), BoardMark.ShipHit))
           else
-            updateVectorUsing(marks, coor, { case (_, boardMark) => (Some(turn), boardMark) })
+            updateBoardMarksUsing(marks, coor, { case (_, boardMark) => (Some(turn), boardMark) })
         }
 
-      val updatedBoardMarks2: Vector[Vector[(Option[Turn], BoardMark)]] =
+      val updatedBoardMarks2: BoardMarks =
         if (allSubmarineHits)
           hits
             .flatMap(_._1.get8CoorAround)
             .filter(_.isInsideBoard(boardSize))
             .foldLeft(updatedBoardMarks) { case (marks, coor) =>
-              updateVectorUsing(marks, coor, { case (turnOpt, _) => (turnOpt, BoardMark.Water) })
+              updateBoardMarksUsing(
+                marks,
+                coor,
+                { case (turnOpt, _) => (turnOpt, BoardMark.Water) }
+              )
             }
         else
           updatedBoardMarks
@@ -260,7 +264,8 @@ class GameService(rpcClientsService: RpcClientsService) {
       currentTurnOpt: Option[Turn],
       currentTurnAttackTypes: List[AttackType],
       extraTurnQueue: List[ExtraTurn],
-      timeRemaining: Option[ServerTimeRemaining]
+      timeRemaining: Option[ServerTimeRemaining],
+      botHelper: Option[BotHelper]
   ) {
 
     val isHuman: Boolean = clientId != BotClientId
@@ -486,7 +491,7 @@ class GameService(rpcClientsService: RpcClientsService) {
       val enemyBoard: ServerEnemyBoard =
         ServerEnemyBoard(
           boardSize,
-          Vector.fill(boardSize.x)(Vector.fill(boardSize.y)((None, BoardMark.Empty))),
+          BoardUtils.createEmptyBoardMarks(boardSize),
           rules.gameFleet.shipAmount,
           rules.gameFleet.shipAmount
         )
@@ -505,9 +510,11 @@ class GameService(rpcClientsService: RpcClientsService) {
           currentTurnOpt = None,
           currentTurnAttackTypes = Nil,
           extraTurnQueue = Nil,
-          timeRemaining = None
+          timeRemaining = None,
+          botHelper = None
         )
       val (player2Id, player2Username) = player2DataOpt.getOrElse((BotClientId, BotUsername))
+      val botHelper = if (player2DataOpt.nonEmpty) None else Some(new BotHelper(rules))
       val player2: ServerPlayer =
         ServerPlayer(
           clientId = player2Id,
@@ -519,7 +526,8 @@ class GameService(rpcClientsService: RpcClientsService) {
           currentTurnOpt = None,
           currentTurnAttackTypes = Nil,
           extraTurnQueue = Nil,
-          timeRemaining = None
+          timeRemaining = None,
+          botHelper = botHelper
         )
 
       val gameId = GameId(UUID.randomUUID().toString)
@@ -698,120 +706,7 @@ class GameService(rpcClientsService: RpcClientsService) {
               } &&
               validateTurnAttacks(player)
             } =>
-          val instantNow = Instant.now()
-          val gameWithLastTurnUpdated = updateGameTime(game, instantNow)
-
-          val enemy = gameWithLastTurnUpdated.enemyPlayer(player)
-          val hits: List[(Coordinate, Option[ShipInBoard])] =
-            turnAttacks.map(_.coordinateOpt.get).map { case coor @ Coordinate(x, y) =>
-              coor -> enemy.myBoard.efficientShipCheck(x)(y)
-            }
-
-          val hitHints: List[HitHint] =
-            hits
-              .groupBy(_._2)
-              .toList
-              .flatMap {
-                case (None, listOfMisses) =>
-                  listOfMisses.map(_ => HitHint.Water)
-                case (Some(shipInGame), listOfHits) =>
-                  val hitsOnTheShip =
-                    listOfHits.map(_ => HitHint.ShipHit(shipInGame.ship.shipId, destroyed = false))
-                  val shipIsDestroyed =
-                    shipInGame.shipActualPieces.forall { case pieceCoor @ Coordinate(x, y) =>
-                      listOfHits.exists(_._1 == pieceCoor) ||
-                        player.enemyBoard.boardMarks(x)(y)._1.nonEmpty
-                    }
-                  if (shipIsDestroyed)
-                    hitsOnTheShip.head.copy(destroyed = true) :: hitsOnTheShip.tail
-                  else
-                    hitsOnTheShip
-              }
-              .sortBy {
-                case Water =>
-                  (true, Int.MaxValue)
-                case ShipHit(shipId, destroyed) =>
-                  (destroyed, shipId.id)
-              }
-
-          val turnPlay: TurnPlay =
-            TurnPlay(currentTurn, turnAttacks, hitHints)
-
-          val killsThisTurn = hitHints.count(_.isDestroyed)
-
-          val updatedPlayer =
-            player
-              .modify(_.turnPlayHistory)
-              .using(turnPlay :: _)
-              .modify(_.enemyBoard)
-              .using(_.updateMarks(currentTurn, hits))
-              .modify(_.enemyBoard.shipsLeft)
-              .using(_ - killsThisTurn)
-
-          val gameOver = updatedPlayer.enemyBoard.shipsLeft == 0
-          val updatedGameWithPlayer: Game = gameWithLastTurnUpdated.updatePlayer(updatedPlayer)
-          val updatedGameWithTurnTime =
-            if (gameOver) {
-              setGameOver(updatedGameWithPlayer, updatedPlayer.username)
-            } else {
-              val bonusRewardList: List[BonusReward] =
-                rewardExtraTurns(gameBeforeHits = game, turnPlay = turnPlay)
-              val extraTurnBonuses: List[ExtraTurn] =
-                bonusRewardList.collect { case extraTurn @ ExtraTurn(_) => extraTurn }
-
-              val updatedGameWithNextTurn: Game =
-                updatedPlayer.extraTurnQueue ++ extraTurnBonuses match {
-                  case ExtraTurn(attackTypes) :: nextExtraTurns =>
-                    val updatedPlayerWithExtraTurns =
-                      updatedPlayer
-                        .modify(_.currentTurnOpt)
-                        .using(_.map { case Turn(currentTurn, extraTurn) =>
-                          Turn(currentTurn, extraTurn.map(_ + 1).orElse(Some(1)))
-                        })
-                        .modify(_.currentTurnAttackTypes)
-                        .setTo(attackTypes)
-                        .modify(_.extraTurnQueue)
-                        .setTo(nextExtraTurns)
-
-                    updatedGameWithPlayer.updatePlayer(updatedPlayerWithExtraTurns)
-                  case Nil =>
-                    val updatedPlayerWithExtraTurns =
-                      updatedPlayer
-                        .modify(_.currentTurnOpt)
-                        .using(_.map { case Turn(currentTurn, _) => Turn(currentTurn + 1, None) })
-                        .modify(_.currentTurnAttackTypes)
-                        .setTo(updatedGameWithPlayer.rules.defaultTurnAttackTypes)
-
-                    updatedGameWithPlayer
-                      .updatePlayer(updatedPlayerWithExtraTurns)
-                      .modify(_.currentTurnPlayer)
-                      .using(_.map(updatedGameWithPlayer.enemyPlayer(_).username))
-                }
-
-              updatedGameWithNextTurn.getCurrentTurnPlayer match {
-                case None =>
-                  updatedGameWithNextTurn
-                case Some(serverPlayer) =>
-                  updatedGameWithNextTurn.rules.timeLimit match {
-                    case Some(RuleTimeLimit(_, Some((additionalTurnTimeSeconds, _)))) =>
-                      updatedGameWithNextTurn.updatePlayer(
-                        serverPlayer.modify(_.timeRemaining).using {
-                          _.map { serverTimeRemaining =>
-                            serverTimeRemaining.copy(turnTimeRemainingNanosOpt =
-                              Some(additionalTurnTimeSeconds * 1000L * 1000L * 1000L)
-                            )
-                          }
-                        }
-                      )
-                    case _ =>
-                      updatedGameWithNextTurn
-                  }
-              }
-            }
-
-          val finalGameUpdated = updateGameTime(updatedGameWithTurnTime, Instant.now())
-          updateServerState(finalGameUpdated)
-          updateBothGameState(finalGameUpdated)
+          unsafeSendTurnAttacks(game, player, currentTurn, turnAttacks)
         case Some((game, _)) =>
           sendSystemMessage(
             playerUsername,
@@ -825,6 +720,128 @@ class GameService(rpcClientsService: RpcClientsService) {
           )
       }
     }
+  }
+
+  private def unsafeSendTurnAttacks(
+      game: Game,
+      player: ServerPlayer,
+      currentTurn: Turn,
+      turnAttacks: List[Attack]
+  ): Unit = {
+    val instantNow = Instant.now()
+    val gameWithLastTurnUpdated = updateGameTime(game, instantNow)
+
+    val enemy = gameWithLastTurnUpdated.enemyPlayer(player)
+    val hits: List[(Coordinate, Option[ShipInBoard])] =
+      turnAttacks.map(_.coordinateOpt.get).map { case coor @ Coordinate(x, y) =>
+        coor -> enemy.myBoard.efficientShipCheck(x)(y)
+      }
+
+    val hitHints: List[HitHint] =
+      hits
+        .groupBy(_._2)
+        .toList
+        .flatMap {
+          case (None, listOfMisses) =>
+            listOfMisses.map(_ => HitHint.Water)
+          case (Some(shipInGame), listOfHits) =>
+            val hitsOnTheShip =
+              listOfHits.map(_ => HitHint.ShipHit(shipInGame.ship.shipId, destroyed = false))
+            val shipIsDestroyed =
+              shipInGame.shipActualPieces.forall { case pieceCoor @ Coordinate(x, y) =>
+                listOfHits.exists(_._1 == pieceCoor) ||
+                  player.enemyBoard.boardMarks(x)(y)._1.nonEmpty
+              }
+            if (shipIsDestroyed)
+              hitsOnTheShip.head.copy(destroyed = true) :: hitsOnTheShip.tail
+            else
+              hitsOnTheShip
+        }
+        .sortBy {
+          case Water =>
+            (true, Int.MaxValue)
+          case ShipHit(shipId, destroyed) =>
+            (destroyed, shipId.id)
+        }
+
+    val turnPlay: TurnPlay =
+      TurnPlay(currentTurn, turnAttacks, hitHints)
+
+    val killsThisTurn = hitHints.count(_.isDestroyed)
+
+    val updatedPlayer =
+      player
+        .modify(_.turnPlayHistory)
+        .using(turnPlay :: _)
+        .modify(_.enemyBoard)
+        .using(_.updateMarks(currentTurn, hits))
+        .modify(_.enemyBoard.shipsLeft)
+        .using(_ - killsThisTurn)
+
+    val gameOver = updatedPlayer.enemyBoard.shipsLeft == 0
+    val updatedGameWithPlayer: Game = gameWithLastTurnUpdated.updatePlayer(updatedPlayer)
+    val updatedGameWithTurnTime =
+      if (gameOver) {
+        setGameOver(updatedGameWithPlayer, updatedPlayer.username)
+      } else {
+        val bonusRewardList: List[BonusReward] =
+          rewardExtraTurns(gameBeforeHits = game, turnPlay = turnPlay)
+        val extraTurnBonuses: List[ExtraTurn] =
+          bonusRewardList.collect { case extraTurn @ ExtraTurn(_) => extraTurn }
+
+        val updatedGameWithNextTurn: Game =
+          updatedPlayer.extraTurnQueue ++ extraTurnBonuses match {
+            case ExtraTurn(attackTypes) :: nextExtraTurns =>
+              val updatedPlayerWithExtraTurns =
+                updatedPlayer
+                  .modify(_.currentTurnOpt)
+                  .using(_.map { case Turn(currentTurn, extraTurn) =>
+                    Turn(currentTurn, extraTurn.map(_ + 1).orElse(Some(1)))
+                  })
+                  .modify(_.currentTurnAttackTypes)
+                  .setTo(attackTypes)
+                  .modify(_.extraTurnQueue)
+                  .setTo(nextExtraTurns)
+
+              updatedGameWithPlayer.updatePlayer(updatedPlayerWithExtraTurns)
+            case Nil =>
+              val updatedPlayerWithExtraTurns =
+                updatedPlayer
+                  .modify(_.currentTurnOpt)
+                  .using(_.map { case Turn(currentTurn, _) => Turn(currentTurn + 1, None) })
+                  .modify(_.currentTurnAttackTypes)
+                  .setTo(updatedGameWithPlayer.rules.defaultTurnAttackTypes)
+
+              updatedGameWithPlayer
+                .updatePlayer(updatedPlayerWithExtraTurns)
+                .modify(_.currentTurnPlayer)
+                .using(_.map(updatedGameWithPlayer.enemyPlayer(_).username))
+          }
+
+        updatedGameWithNextTurn.getCurrentTurnPlayer match {
+          case None =>
+            updatedGameWithNextTurn
+          case Some(serverPlayer) =>
+            updatedGameWithNextTurn.rules.timeLimit match {
+              case Some(RuleTimeLimit(_, Some((additionalTurnTimeSeconds, _)))) =>
+                updatedGameWithNextTurn.updatePlayer(
+                  serverPlayer.modify(_.timeRemaining).using {
+                    _.map { serverTimeRemaining =>
+                      serverTimeRemaining.copy(turnTimeRemainingNanosOpt =
+                        Some(additionalTurnTimeSeconds * 1000L * 1000L * 1000L)
+                      )
+                    }
+                  }
+                )
+              case _ =>
+                updatedGameWithNextTurn
+            }
+        }
+      }
+
+    val finalGameUpdated = updateGameTime(updatedGameWithTurnTime, Instant.now())
+    updateServerState(finalGameUpdated)
+    updateBothGameState(finalGameUpdated)
   }
 
   private def rewardExtraTurns(gameBeforeHits: Game, turnPlay: TurnPlay): List[BonusReward] = {
@@ -855,10 +872,10 @@ class GameService(rpcClientsService: RpcClientsService) {
         case None =>
           sendSystemMessage(playerUsername, "Error finding game!")
         case Some((game, Some(player))) if game.gameStarted =>
-          val updatedBoardMarks: Vector[Vector[(Option[Turn], BoardMark)]] =
+          val updatedBoardMarks: BoardMarks =
             updatedBoardMarksList.foldLeft(player.enemyBoard.boardMarks) {
               case (boardMarks, (coor, newBoardMark)) =>
-                updateVectorUsing(
+                updateBoardMarksUsing(
                   boardMarks,
                   coor,
                   {

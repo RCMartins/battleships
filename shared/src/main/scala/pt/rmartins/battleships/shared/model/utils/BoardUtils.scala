@@ -2,16 +2,21 @@ package pt.rmartins.battleships.shared.model.utils
 
 import pt.rmartins.battleships.shared.model.game.{Board, BoardMark, Coordinate, Ship, Turn}
 
-object Utils {
+object BoardUtils {
 
-  def updateVectorUsing(
-      marks: Vector[Vector[(Option[Turn], BoardMark)]],
+  type BoardMarks = Vector[Vector[(Option[Turn], BoardMark)]]
+
+  def createEmptyBoardMarks(boardSize: Coordinate): BoardMarks =
+    Vector.fill(boardSize.x)(Vector.fill(boardSize.y)((None, BoardMark.Empty)))
+
+  def updateBoardMarksUsing(
+      boardMarks: BoardMarks,
       coordinate: Coordinate,
       f: PartialFunction[(Option[Turn], BoardMark), (Option[Turn], BoardMark)]
-  ): Vector[Vector[(Option[Turn], BoardMark)]] = {
-    val vectorX: Vector[(Option[Turn], BoardMark)] = marks(coordinate.x)
+  ): BoardMarks = {
+    val vectorX: Vector[(Option[Turn], BoardMark)] = boardMarks(coordinate.x)
     val current = vectorX(coordinate.y)
-    marks.updated(
+    boardMarks.updated(
       coordinate.x,
       vectorX.updated(
         coordinate.y,

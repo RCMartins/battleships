@@ -19,6 +19,8 @@ inThisBuild(
     scalaVersion := Dependencies.versionOfScala,
     organization := "pt.rmartins.battleships",
     scalacOptions ++= Seq(
+      "-encoding",
+      "UTF-8",
       "-feature",
       "-deprecation",
       "-unchecked",

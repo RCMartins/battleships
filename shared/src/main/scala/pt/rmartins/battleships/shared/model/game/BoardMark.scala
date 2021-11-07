@@ -6,6 +6,11 @@ sealed trait BoardMark {
 
   def isPermanent: Boolean = false
 
+  def isWater: Boolean =
+    this == BoardMark.Water ||
+      this == BoardMark.ManualWater ||
+      this == BoardMark.ManualQuestionWater
+
 }
 
 object BoardMark extends HasGenCodec[BoardMark] {

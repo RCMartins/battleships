@@ -47,7 +47,6 @@ object Fleet extends HasGenCodec[Fleet] {
           List.fill(4)(Ship.Skeeter) ++
           List.fill(3)(Ship.Ranger) ++
           List.fill(2)(Ship.Conqueror) ++
-          List.fill(0)(Ship.AircraftCarrier) ++
           List.fill(2)(Ship.TorpedoBoat) ++
           List.fill(2)(Ship.Cruiser) ++
           List.fill(1)(Ship.Epoch) ++

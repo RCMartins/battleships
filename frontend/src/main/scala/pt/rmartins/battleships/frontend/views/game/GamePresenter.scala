@@ -16,7 +16,7 @@ import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game.BonusReward.ExtraTurn
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game._
-import pt.rmartins.battleships.shared.model.utils.Utils.canPlaceInBoard
+import pt.rmartins.battleships.shared.model.utils.BoardUtils.canPlaceInBoard
 import pt.rmartins.battleships.shared.rpc.server.game.GameRPC
 import scalatags.JsDom.all.span
 

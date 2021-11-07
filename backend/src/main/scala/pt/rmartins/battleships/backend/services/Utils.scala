@@ -21,4 +21,15 @@ object Utils {
       case _                                          => None
     }
 
+  def combinations[A](ls: List[A], amount: Int): List[List[A]] =
+    if (amount == 0)
+      List(Nil)
+    else
+      ls match {
+        case Nil =>
+          Nil
+        case head :: tail =>
+          combinations(tail, amount) ++ combinations(tail, amount - 1).map(head :: _)
+      }
+
 }
