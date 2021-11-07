@@ -583,7 +583,7 @@ class BoardView(
       _,
       selectedShipOpt,
       turnAttacks,
-      _,
+      turnAttacksQueuedStatus,
       selectedBoardMarkOpt,
       _,
       _
@@ -640,6 +640,7 @@ class BoardView(
           selectedBoardMarkOpt,
           selectedShipOpt,
           screenModelData.hoverMove,
+          attacksQueuedStatus = turnAttacksQueuedStatus,
           isMyTurn = isMyTurn,
           tick = screenModelData.tick
         )
@@ -691,6 +692,7 @@ class BoardView(
           selectedBoardMarkOpt,
           selectedShipOpt,
           screenModelData.hoverMove,
+          attacksQueuedStatus = AttacksQueuedStatus.NotSet,
           isMyTurn = false,
           tick = screenModelData.tick
         )
@@ -866,6 +868,7 @@ class BoardView(
       selectedBoardMarkOpt: Option[BoardMark],
       selectedShipOpt: Option[Ship],
       hoverMove: Option[Turn],
+      attacksQueuedStatus: AttacksQueuedStatus,
       isMyTurn: Boolean,
       tick: Int
   ): Unit = {
@@ -970,7 +973,8 @@ class BoardView(
           boardPosition + enemyBoardCoor * squareSize + Coordinate.square(2),
           squareSize - 4,
           lineWidth = 2.0,
-          alpha = 1.0
+          alpha = 1.0,
+          red = attacksQueuedStatus != AttacksQueuedStatus.Queued
         )
       case _ =>
     }
@@ -1233,7 +1237,7 @@ object BoardView {
   val MissilesMaxOversize: Double = 0.5
   val MissilesFastPerc: Double = 0.9
 
-  val ExtraTurnPopupTime: Int = 6800
+  val ExtraTurnPopupTime: Int = 7600
   def ExtraTurnAppear(timeRemaining: Int): Boolean =
     timeRemaining < 4000 || ((timeRemaining / 400) % 2 == 0)
   val ExtraTurnPopupTimeFade: Int = 2000

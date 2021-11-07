@@ -315,43 +315,50 @@ class GamePresenter(
   }
 
   playingModeProperty
-    .transform(_.map(inGameMode => (inGameMode.turn, inGameMode.turnAttackTypes)))
+    .transform(
+      _.map(inGameMode => (inGameMode.isMyTurn, inGameMode.turn, inGameMode.turnAttackTypes))
+    )
     .listen {
-      case Some((Turn(_, extraTurn), turnAttackTypes)) if gameModel.get.turnAttacksSent =>
-        gameModel.subProp(_.turnAttacksSent).set(false)
-        gameModel.subProp(_.turnAttacks).set(turnAttackTypes.map(Attack(_, None)))
-        screenModel
-          .subProp(_.missilesPopupMillisOpt)
-          .set(Some(BoardView.MissilesInitialPopupTime))
-        screenModel
-          .subProp(_.extraTurnPopup)
-          .set(extraTurn.map(_ => BoardView.ExtraTurnPopupTime))
+      case Some((isMyTurn, Turn(_, extraTurn), turnAttackTypes)) =>
+        gameModel.get.turnAttacksQueuedStatus match {
+          case AttacksQueuedStatus.NotSet =>
+          case AttacksQueuedStatus.Queued if isMyTurn =>
+            launchAttack()
+          case AttacksQueuedStatus.Sent =>
+            gameModel.subProp(_.turnAttacksQueuedStatus).set(AttacksQueuedStatus.NotSet)
+            gameModel.subProp(_.turnAttacks).set(turnAttackTypes.map(Attack(_, None)))
+            screenModel
+              .subProp(_.missilesPopupMillisOpt)
+              .set(Some(BoardView.MissilesInitialPopupTime))
+            screenModel
+              .subProp(_.extraTurnPopup)
+              .set(extraTurn.map(_ => BoardView.ExtraTurnPopupTime))
 
-        if (newTurnAnimationHandle.isEmpty) {
-          newTurnAnimationHandle = Some(
-            window.setInterval(
-              () => {
-                val screen = screenModel.get
+            newTurnAnimationHandle.foreach(window.clearInterval)
+            newTurnAnimationHandle = Some(
+              window.setInterval(
+                () => {
+                  val screen = screenModel.get
 
-                screen.missilesPopupMillisOpt.foreach { missilesPopupMillis =>
-                  val updatedTime = missilesPopupMillis - newTurnAnimationMillis
-                  screenModel
-                    .subProp(_.missilesPopupMillisOpt)
-                    .set(Some(updatedTime).filter(_ > 0))
-                }
-                screen.extraTurnPopup.foreach { timeRemaining =>
-                  val updatedTime = timeRemaining - newTurnAnimationMillis
-                  screenModel
-                    .subProp(_.extraTurnPopup)
-                    .set(Some(updatedTime).filter(_ > 0))
-                }
+                  screen.missilesPopupMillisOpt.foreach { missilesPopupMillis =>
+                    val updatedTime = missilesPopupMillis - newTurnAnimationMillis
+                    screenModel
+                      .subProp(_.missilesPopupMillisOpt)
+                      .set(Some(updatedTime).filter(_ > 0))
+                  }
+                  screen.extraTurnPopup.foreach { timeRemaining =>
+                    val updatedTime = timeRemaining - newTurnAnimationMillis
+                    screenModel
+                      .subProp(_.extraTurnPopup)
+                      .set(Some(updatedTime).filter(_ > 0))
+                  }
 
-                if (screen.missilesPopupMillisOpt.isEmpty && screen.extraTurnPopup.isEmpty)
-                  stopNewTurnAnimation()
-              },
-              newTurnAnimationMillis
+                  if (screen.missilesPopupMillisOpt.isEmpty && screen.extraTurnPopup.isEmpty)
+                    stopNewTurnAnimation()
+                },
+                newTurnAnimationMillis
+              )
             )
-          )
         }
       case _ =>
     }
@@ -761,7 +768,8 @@ class GamePresenter(
             }
           case (Some(enemyBoardCoor), None, None)
               if gameState.gameMode.isPlaying &&
-                !turnAttacksSent && isValidCoordinateTarget(enemyBoardCoor) =>
+                turnAttacksSent == AttacksQueuedStatus.NotSet &&
+                isValidCoordinateTarget(enemyBoardCoor) =>
             def setFirstMissile(turnAttacks: List[Attack]): List[Attack] =
               turnAttacks match {
                 case Nil =>
@@ -1013,16 +1021,23 @@ class GamePresenter(
     }
 
   def launchAttack(): Unit =
-    (gameModel.get.turnAttacksSent, gameModel.get.turnAttacks, gameStateProperty.get) match {
+    (
+      gameModel.get.turnAttacksQueuedStatus,
+      gameModel.get.turnAttacks,
+      gameStateProperty.get
+    ) match {
       case (
-            false,
+            AttacksQueuedStatus.NotSet | AttacksQueuedStatus.Queued,
             turnAttacks,
-            Some(GameState(gameId, _, _, _, PlayingMode(true, turn, _, _, _)))
+            Some(GameState(gameId, _, _, _, PlayingMode(isMyTurn, turn, _, _, _)))
           ) if turnAttacks.forall(_.isPlaced) =>
-        gameModel.subProp(_.turnAttacksSent).set(true)
-        gameRpc.sendTurnAttacks(gameId, turn, turnAttacks)
-
-        stopNewTurnAnimation()
+        if (isMyTurn) {
+          gameModel.subProp(_.turnAttacksQueuedStatus).set(AttacksQueuedStatus.Sent)
+          gameRpc.sendTurnAttacks(gameId, turn, turnAttacks)
+          stopNewTurnAnimation()
+        } else {
+          gameModel.subProp(_.turnAttacksQueuedStatus).set(AttacksQueuedStatus.Queued)
+        }
       case _ =>
     }
 

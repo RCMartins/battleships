@@ -8,7 +8,7 @@ case class GameModel(
     mouseDown: Option[Int],
     selectedShip: Option[Ship],
     turnAttacks: List[Attack],
-    turnAttacksSent: Boolean,
+    turnAttacksQueuedStatus: AttacksQueuedStatus,
     selectedBoardMarkOpt: Option[BoardMark],
     timeRemaining: Option[(TimeRemaining, TimeRemaining)],
     lineDashOffset: Int
@@ -22,7 +22,7 @@ object GameModel extends HasModelPropertyCreator[GameModel] {
       mouseDown = None,
       selectedShip = None,
       turnAttacks = Nil,
-      turnAttacksSent = false,
+      turnAttacksQueuedStatus = AttacksQueuedStatus.NotSet,
       selectedBoardMarkOpt = None,
       timeRemaining = None,
       lineDashOffset = 0

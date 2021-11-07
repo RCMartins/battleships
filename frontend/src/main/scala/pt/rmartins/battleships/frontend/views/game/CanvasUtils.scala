@@ -245,9 +245,10 @@ object CanvasUtils {
       coordinate: Coordinate,
       size: Int,
       lineWidth: Double,
-      alpha: Double
+      alpha: Double,
+      red: Boolean = true
   ): Unit = {
-    renderingCtx.strokeStyle = s"rgb(255, 0, 0, $alpha)"
+    renderingCtx.strokeStyle = if (red) s"rgb(255, 0, 0, $alpha)" else s"rgb(0, 0, 255, $alpha)"
     renderingCtx.lineWidth = lineWidth
 
     renderingCtx.beginPath()

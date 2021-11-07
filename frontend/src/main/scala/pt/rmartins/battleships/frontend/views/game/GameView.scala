@@ -72,7 +72,7 @@ class GameView(
   gameModel.subProp(_.mouseDown).listen(_ => reloadBoardView())
   gameModel.subProp(_.selectedShip).listen(_ => reloadBoardView())
   gameModel.subProp(_.turnAttacks).listen(_ => reloadBoardView())
-  gameModel.subProp(_.turnAttacksSent).listen(_ => reloadBoardView())
+  gameModel.subProp(_.turnAttacksQueuedStatus).listen(_ => reloadBoardView())
   gameModel.subProp(_.selectedBoardMarkOpt).listen(_ => reloadBoardView())
   gameModel.subProp(_.lineDashOffset).listen(_ => reloadBoardView())
 
@@ -145,10 +145,11 @@ class GameView(
 
   private val launchAttackButton = {
     val launchAttackIsDisabledProperty =
-      presenter.playingModeProperty
-        .transform(_.map(_.isMyTurn))
-        .combine(gameModel.subProp(_.turnAttacks)) { case (isMyTurnOpt, turnAttacks) =>
-          !isMyTurnOpt.exists(isMyTurn => isMyTurn && turnAttacks.forall(_.isPlaced))
+      gameModel
+        .subProp(_.turnAttacksQueuedStatus)
+        .combine(gameModel.subProp(_.turnAttacks)) { case (turnAttacksQueuedStatus, turnAttacks) =>
+          turnAttacksQueuedStatus != AttacksQueuedStatus.NotSet ||
+            !turnAttacks.forall(_.isPlaced)
         }
 
     UdashButton(
@@ -157,12 +158,29 @@ class GameView(
       componentId = ComponentId("launch-attack-button"),
       disabled = launchAttackIsDisabledProperty
     )(nested =>
-      Seq(nested(produceWithNested(presenter.isMyTurnProperty) {
-        case (true, nested) =>
-          span(nested(translatedDynamic(Translations.Game.launchAttackButton)(_.apply()))).render
-        case (false, nested) =>
-          span(nested(translatedDynamic(Translations.Game.waitForTurnButton)(_.apply()))).render
-      }))
+      Seq(
+        nested(
+          produceWithNested(
+            combine(
+              gameModel.subProp(_.turnAttacksQueuedStatus),
+              presenter.isMyTurnProperty
+            )
+          ) {
+            case ((AttacksQueuedStatus.NotSet, true), nested) =>
+              span(
+                nested(translatedDynamic(Translations.Game.launchAttackButton)(_.apply()))
+              ).render
+            case ((AttacksQueuedStatus.NotSet, false), nested) =>
+              span(
+                nested(translatedDynamic(Translations.Game.queueAttackButton)(_.apply()))
+              ).render
+            case ((_, _), nested) =>
+              span(
+                nested(translatedDynamic(Translations.Game.waitForTurnButton)(_.apply()))
+              ).render
+          }
+        )
+      )
     )
   }
 

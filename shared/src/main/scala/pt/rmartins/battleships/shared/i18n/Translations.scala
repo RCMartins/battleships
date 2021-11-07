@@ -54,6 +54,7 @@ object Translations {
     val resetButton = key("game.buttons.reset")
     val randomButton = key("game.buttons.random")
     val launchAttackButton = key("game.buttons.launch_attack")
+    val queueAttackButton = key("game.buttons.queue_attack")
     val waitForTurnButton = key("game.buttons.wait_for_turn")
     val hideMyBoardButton = key("game.buttons.hide_my_board")
     val showMyBoardButton = key("game.buttons.show_my_board")
