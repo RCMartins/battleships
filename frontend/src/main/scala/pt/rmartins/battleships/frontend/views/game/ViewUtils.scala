@@ -19,13 +19,17 @@ class ViewUtils(canvasUtils: CanvasUtils) {
       canvasSize: Coordinate,
       sqSize: Int,
       ship: Ship,
-      destroyed: Boolean
+      destroyed: Boolean,
+      centerInCanvas: Boolean = false,
+      margin: Coordinate = Coordinate.square(2)
   ): Canvas = {
     val shipCanvas = canvas.render
     shipCanvas.setAttribute("width", canvasSize.x.toString)
     shipCanvas.setAttribute("height", canvasSize.y.toString)
     val renderingCtx = shipCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
-    val initialPosition = Coordinate(1, canvasSize.y / 2 - (ship.size.y * sqSize) / 2)
+    val realShipSize = ship.size * sqSize
+    val initialPosition =
+      margin + (if (centerInCanvas) canvasSize / 2 - realShipSize / 2 else Coordinate.origin)
     ship.pieces.foreach { shipPiece =>
       canvasUtils.drawBoardSquare(
         renderingCtx,

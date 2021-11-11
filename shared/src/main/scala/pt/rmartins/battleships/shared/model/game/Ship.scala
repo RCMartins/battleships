@@ -53,8 +53,24 @@ object Ship extends HasGenCodec[Ship] {
       .pipe(toShip)
   val Atoll: Ship =
     List((2, 0), (1, 1), (3, 1), (0, 2), (4, 2), (1, 3), (3, 3)).pipe(toShip)
-  val Destroyer: Ship =
+  val HoleStar: Ship =
+    List((0, 1), (1, 0), (1, 2), (2, 1)).pipe(toShip)
+  val SmallStar: Ship =
+    List((0, 1), (1, 0), (1, 1), (1, 2), (2, 1)).pipe(toShip)
+  val StarShip: Ship =
     List((2, 0), (2, 1), (0, 2), (1, 2), (2, 2), (3, 2), (4, 2), (2, 3), (2, 4)).pipe(toShip)
+  val lShip: Ship =
+    List((0, 0), (0, 1), (0, 2), (1, 2)).pipe(toShip)
+  val missileShip: Ship =
+    List((0, 1), (1, 0), (1, 1), (1, 2), (2, 1), (2, 2), (2, 3), (3, 2), (3, 3)).pipe(toShip)
+  val wShip: Ship =
+    List((0, 2), (1, 1), (1, 2), (2, 0), (2, 1)).pipe(toShip)
+  val arrowShip: Ship =
+    List((0, 2), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2)).pipe(toShip)
+  val longShip: Ship =
+    List((0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5)).pipe(toShip)
+  val snake: Ship =
+    List((0, 2), (1, 0), (1, 1), (1, 2), (2, 0)).pipe(toShip)
 
   val allShipsList: List[Ship] =
     List[Ship](
@@ -67,10 +83,18 @@ object Ship extends HasGenCodec[Ship] {
       Cruiser,
       Epoch,
       Battleship,
-      MotherShip
-//      Atoll,
-//      Destroyer,
-    )
+      MotherShip,
+      Atoll,
+      HoleStar,
+      SmallStar,
+      StarShip,
+      lShip,
+      missileShip,
+      wShip,
+      arrowShip,
+      longShip,
+      snake
+    ).sortBy(_.piecesSize)
 
   lazy val allShipsFleetMaxX: Fleet =
     Fleet(

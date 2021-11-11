@@ -11,4 +11,17 @@ object GameStyles extends CssBase {
     outline.none
   )
 
+  val flexContainer: CssStyle = style(
+    display.flex,
+    overflowX.hidden,
+    overflowY.hidden,
+    unsafeChild("> *")(
+      overflowY.scroll
+    )
+  )
+
+  val hideScrollX: CssStyle = style(
+    overflowX.hidden
+  )
+
 }

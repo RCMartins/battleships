@@ -11,8 +11,9 @@ import org.scalajs.dom.html.{Canvas, Div, Select}
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
+import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.i18n.Translations
-import pt.rmartins.battleships.shared.model.game.{AttackType, Coordinate, RuleTimeLimit, Ship}
+import pt.rmartins.battleships.shared.model.game._
 import scalatags.JsDom.all._
 
 class PreGameView(
@@ -26,9 +27,9 @@ class PreGameView(
 
   import translationsService._
 
-  private val sqSize = 14
   private val defaultHeight = 332
   private val fleetMaxSize: Coordinate = Ship.allShipsFleetMaxX.size
+  private val sqSize: Int = Math.min(100 / fleetMaxSize.x, 50 / fleetMaxSize.y)
   private val canvasSize: Coordinate = fleetMaxSize * sqSize + Coordinate.square(4)
 
   def createComponents(divElement: Element, nested: NestedInterceptor): Div = {
@@ -62,11 +63,14 @@ class PreGameView(
           role := "tabpanel",
           div(
             `class` := "row mx-0 my-2",
-            height := s"${defaultHeight}px",
+            height := defaultHeight,
             div(
-              `class` := "col-6 px-0",
+              `class` := "col-6 px-0 overflow-auto",
+              GameStyles.flexContainer,
+              height := defaultHeight,
               div(
-                `class` := "d-flex flex-wrap",
+                `class` := "row my-0 mx-1",
+                GameStyles.hideScrollX,
                 createAllShipElems
               )
             ),
@@ -82,7 +86,7 @@ class PreGameView(
           role := "tabpanel",
           div(
             `class` := "row my-2",
-            height := s"${defaultHeight}px",
+            height := defaultHeight,
             createTimeLimitOptions(nested),
             createCustomShots(nested)
           )
@@ -93,9 +97,16 @@ class PreGameView(
 
   private def createAllShipElems: Modifier = {
     def createShipCanvas(ship: Ship): Canvas =
-      viewUtils.createShipCanvas(canvasSize, sqSize, ship, destroyed = false)
+      viewUtils.createShipCanvas(canvasSize, sqSize, ship, destroyed = false, centerInCanvas = true)
+
+    val fleetCoordinateSize = Ship.allShipsFleetMaxX.size
 
     Ship.allShipsFleetMaxX.ships.map { ship =>
+      val bestShipRotation =
+        Some(Ship.getShip(ship.shipId, Rotation.Rotation0))
+          .filter(_.size <= fleetCoordinateSize)
+          .getOrElse(ship)
+
       val shipCountProperty =
         gamePresenter.getPreGameShipProperty(ship.shipId)
 
@@ -115,9 +126,9 @@ class PreGameView(
       minusButton.onclick = _ => shipCountProperty.set(Math.max(0, shipCountProperty.get - 1))
 
       div(
-        `class` := "m-1 row",
+        `class` := "col p-0",
         div(
-          `class` := "ml-2 mr-1 py-2 g-3 btn-group rounded-start",
+          `class` := "mx-2 py-2 g-3 btn-group rounded-start",
           span(
             `class` := "rounded-start bg-primary text-white py-1 px-2",
             style := "user-select: none",
@@ -126,7 +137,13 @@ class PreGameView(
           plusButton,
           minusButton
         ),
-        createShipCanvas(ship)
+        div(
+          `class` := "row m-0",
+          div(
+            `class` := "mx-2",
+            createShipCanvas(bestShipRotation)
+          )
+        )
       )
     }
   }
