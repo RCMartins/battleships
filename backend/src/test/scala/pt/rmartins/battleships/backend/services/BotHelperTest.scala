@@ -7,8 +7,8 @@ import org.scalatest.{Assertion, Inspectors}
 import pt.rmartins.battleships.shared.model.game.AttackType._
 import pt.rmartins.battleships.shared.model.game.Ship._
 import pt.rmartins.battleships.shared.model.game._
-import pt.rmartins.battleships.shared.model.utils.BoardUtils.BoardMarks
 
+import java.util.UUID
 import scala.annotation.tailrec
 
 class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Inspectors {
@@ -28,7 +28,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         turnBonuses = Nil,
         timeLimit = None
       )
-      val botHelper = new BotHelper(rules)
+      val botHelper = createBotHelper(rules)
 
       val turnHistory =
         List(
@@ -52,7 +52,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         turnBonuses = Nil,
         timeLimit = None
       )
-      val botHelper = new BotHelper(rules)
+      val botHelper = createBotHelper(rules)
 
       val turnHistory =
         List(
@@ -76,7 +76,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         turnBonuses = Nil,
         timeLimit = None
       )
-      val botHelper = new BotHelper(rules)
+      val botHelper = createBotHelper(rules)
 
       val turnHistory =
         List(
@@ -100,7 +100,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         turnBonuses = Nil,
         timeLimit = None
       )
-      val botHelper = new BotHelper(rules)
+      val botHelper = createBotHelper(rules)
 
       val turnHistory =
         List(
@@ -124,7 +124,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         turnBonuses = Nil,
         timeLimit = None
       )
-      val botHelper = new BotHelper(rules)
+      val botHelper = createBotHelper(rules)
 
       val turnHistory =
         List(
@@ -157,7 +157,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         turnBonuses = Nil,
         timeLimit = None
       )
-      val botHelper = new BotHelper(rules)
+      val botHelper = createBotHelper(rules)
 
       val turnHistory =
         List(
@@ -182,7 +182,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         turnBonuses = Nil,
         timeLimit = None
       )
-      val botHelper = new BotHelper(rules)
+      val botHelper = createBotHelper(rules)
 
       val turnHistory =
         List(
@@ -214,7 +214,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         turnBonuses = Nil,
         timeLimit = None
       )
-      val botHelper = new BotHelper(rules)
+      val botHelper = createBotHelper(rules)
 
       val turnHistory =
         List(
@@ -251,7 +251,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         turnBonuses = Nil,
         timeLimit = None
       )
-      val botHelper = new BotHelper(rules)
+      val botHelper = createBotHelper(rules)
 
       val turnHistory =
         List(
@@ -267,7 +267,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         Set((3, 3), (6, 6)).map { case (x, y) => Coordinate(x, y) }
 
       val expectedCoordinates2: Set[Coordinate] =
-        Set((1, 0), (1, 0), (2, 1), (1, 2)).map { case (x, y) => Coordinate(x, y) }
+        Set((1, 0), (0, 1), (2, 1), (1, 2)).map { case (x, y) => Coordinate(x, y) }
 
       containsCoordinatesSeq(
         result,
@@ -285,7 +285,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         turnBonuses = Nil,
         timeLimit = None
       )
-      val botHelper = new BotHelper(rules)
+      val botHelper = createBotHelper(rules)
 
       val turnHistory =
         List(
@@ -382,9 +382,35 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
     )
   }
 
+  private def turnPlay(
+      turnNumber: Int,
+      extraTurn: Option[Int],
+      coor: List[(Int, Int)],
+      ships: List[(Ship, Boolean)]
+  ): TurnPlay = {
+    coor should not be empty
+    coor.sizeIs >= ships.size should be(true)
+    TurnPlay(
+      Turn(turnNumber, extraTurn),
+      coor.map { case (x, y) => Attack(AttackType.Simple, Some(Coordinate(x, y))) },
+      ships.map { case (ship, destroyed) => HitHint.ShipHit(ship.shipId, destroyed = destroyed) } ++
+        List.fill(coor.size - ships.size)(HitHint.Water)
+    )
+  }
+
   private def placeAttacks(botHelper: BotHelper, turnHistory: List[TurnPlay]) = {
     turnHistory.foreach(botHelper.updateBotBoardMarks)
     botHelper.placeAttacks(botHelper.rules.defaultTurnAttackTypes)
   }
+
+  private val testLogger: BotHelperLogger =
+    (_: GameId, _: Rules, _: List[TurnPlay]) => ()
+
+  private def createBotHelper(rules: Rules): BotHelper =
+    new BotHelper(
+      gameId = GameId(UUID.randomUUID().toString),
+      rules = rules,
+      logger = testLogger
+    )
 
 }

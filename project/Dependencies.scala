@@ -14,6 +14,7 @@ object Dependencies {
   val jettyVersion = "9.4.40.v20210413"
   val logbackVersion = "1.2.6"
   val typesafeConfigVersion = "1.4.1"
+  val betterFilesVersion = "3.9.1"
 
   // JS dependencies
   val bootstrapVersion = "5.1.1"
@@ -89,7 +90,8 @@ object Dependencies {
       "org.eclipse.jetty.websocket" % "websocket-server" % jettyVersion,
       "com.typesafe" % "config" % typesafeConfigVersion,
       // server logging backend
-      "ch.qos.logback" % "logback-classic" % logbackVersion
+      "ch.qos.logback" % "logback-classic" % logbackVersion,
+      "com.github.pathikrit" %% "better-files" % betterFilesVersion
     )
   )
 

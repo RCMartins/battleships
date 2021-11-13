@@ -59,42 +59,48 @@ object Ship extends HasGenCodec[Ship] {
     List((0, 1), (1, 0), (1, 1), (1, 2), (2, 1)).pipe(toShip)
   val StarShip: Ship =
     List((2, 0), (2, 1), (0, 2), (1, 2), (2, 2), (3, 2), (4, 2), (2, 3), (2, 4)).pipe(toShip)
-  val lShip: Ship =
+  val LShip: Ship =
     List((0, 0), (0, 1), (0, 2), (1, 2)).pipe(toShip)
-  val missileShip: Ship =
+  val MissileShip: Ship =
     List((0, 1), (1, 0), (1, 1), (1, 2), (2, 1), (2, 2), (2, 3), (3, 2), (3, 3)).pipe(toShip)
-  val wShip: Ship =
+  val WShip: Ship =
     List((0, 2), (1, 1), (1, 2), (2, 0), (2, 1)).pipe(toShip)
-  val arrowShip: Ship =
+  val ArrowShip: Ship =
     List((0, 2), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2)).pipe(toShip)
-  val longShip: Ship =
+  val LongShip: Ship =
     List((0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5)).pipe(toShip)
-  val snake: Ship =
+  val SmallSnake: Ship =
     List((0, 2), (1, 0), (1, 1), (1, 2), (2, 0)).pipe(toShip)
 
+  private val allShipsListNames: List[(Ship, String)] =
+    List[(Ship, String)](
+      (Submarine, "Submarine"),
+      (Skeeter, "Skeeter"),
+      (Ranger, "Ranger"),
+      (Conqueror, "Conqueror"),
+      (AircraftCarrier, "AircraftCarrier"),
+      (TorpedoBoat, "TorpedoBoat"),
+      (Cruiser, "Cruiser"),
+      (Epoch, "Epoch"),
+      (Battleship, "Battleship"),
+      (MotherShip, "MotherShip"),
+      (Atoll, "Atoll"),
+      (HoleStar, "HoleStar"),
+      (SmallStar, "SmallStar"),
+      (StarShip, "StarShip"),
+      (LShip, "LShip"),
+      (MissileShip, "MissileShip"),
+      (WShip, "WShip"),
+      (ArrowShip, "ArrowShip"),
+      (LongShip, "LongShip"),
+      (SmallSnake, "SmallSnake")
+    ).sortBy(_._1.piecesSize)
+
   val allShipsList: List[Ship] =
-    List[Ship](
-      Submarine,
-      Skeeter,
-      Ranger,
-      Conqueror,
-      AircraftCarrier,
-      TorpedoBoat,
-      Cruiser,
-      Epoch,
-      Battleship,
-      MotherShip,
-      Atoll,
-      HoleStar,
-      SmallStar,
-      StarShip,
-      lShip,
-      missileShip,
-      wShip,
-      arrowShip,
-      longShip,
-      snake
-    ).sortBy(_.piecesSize)
+    allShipsListNames.map(_._1)
+
+  val shipNames: Map[ShipId, String] =
+    allShipsListNames.map { case (ship, name) => ship.shipId -> name }.toMap
 
   lazy val allShipsFleetMaxX: Fleet =
     Fleet(

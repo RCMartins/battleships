@@ -486,6 +486,8 @@ class GameService(rpcClientsService: RpcClientsService) {
     if (rules.gameFleet.ships.isEmpty)
       None
     else {
+      val gameId = GameId(UUID.randomUUID().toString)
+
       val boardSize = rules.boardSize
       val myBoard: ServerMyBoard = ServerMyBoard(boardSize, Nil)
       val enemyBoard: ServerEnemyBoard =
@@ -514,7 +516,11 @@ class GameService(rpcClientsService: RpcClientsService) {
           botHelper = None
         )
       val (player2Id, player2Username) = player2DataOpt.getOrElse((BotClientId, BotUsername))
-      val botHelper = if (player2DataOpt.nonEmpty) None else Some(new BotHelper(rules))
+      val botHelper: Option[BotHelper] =
+        if (player2DataOpt.nonEmpty)
+          None
+        else
+          Some(new BotHelper(gameId, rules, BotHelperLogger.DefaultLogger))
       val player2: ServerPlayer =
         ServerPlayer(
           clientId = player2Id,
@@ -530,7 +536,6 @@ class GameService(rpcClientsService: RpcClientsService) {
           botHelper = botHelper
         )
 
-      val gameId = GameId(UUID.randomUUID().toString)
       Some(
         Game(
           gameId = gameId,

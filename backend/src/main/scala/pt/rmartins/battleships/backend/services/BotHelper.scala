@@ -3,12 +3,13 @@ package pt.rmartins.battleships.backend.services
 import pt.rmartins.battleships.backend.services.BotHelper.BotBoardMark._
 import pt.rmartins.battleships.backend.services.BotHelper.ShipGuess._
 import pt.rmartins.battleships.backend.services.BotHelper._
+import pt.rmartins.battleships.backend.services.BotHelperLogger.printBotBoardMarks
 import pt.rmartins.battleships.shared.model.game._
 
 import scala.annotation.tailrec
 import scala.util.Random
 
-class BotHelper(val rules: Rules) {
+class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
 
   private val MaxShipSamples = 1000
 
@@ -203,7 +204,7 @@ class BotHelper(val rules: Rules) {
             def filterLoop(
                 remainingPositionsList: List[(List[HitHint], List[Coordinate])],
                 currentPossibilitiesOpt: Option[List[List[Coordinate]]]
-            ): List[List[Coordinate]] = {
+            ): List[List[Coordinate]] =
               remainingPositionsList match {
                 case Nil =>
 //                  println("currentPossibilitiesOpt:")
@@ -229,10 +230,9 @@ class BotHelper(val rules: Rules) {
                       )
                   }
               }
-            }
 
             if (possiblePositionsList.nonEmpty) {
-              println("possiblePositionsList:")
+              println(s"possiblePositionsList: ${possiblePositionsList.size}")
               println(possiblePositionsList.mkString("\n"))
             }
 
@@ -512,16 +512,24 @@ class BotHelper(val rules: Rules) {
 
   }
 
-  def placeAttacks(currentTurnAttackTypes: List[AttackType]): List[Attack] = {
+  def placeAttacks(
+      currentTurnAttackTypes: List[AttackType],
+      randomSeed: Option[Long] = None
+  ): List[Attack] = {
     val turnHistory = cachedTurnPlays
     val botBoardMarks = cachedBotBoardMarks
+
+    logger.logBotGame(gameId = gameId, rules = rules, turnHistory = turnHistory)
 
     println("+" * 80)
     println("+" * 29 + "  " + turnHistory.map(_.turn).maxByOption(_.currentTurn) + "  " + "+" * 29)
     println("+" * 80)
 
+    randomSeed.foreach(value => println(s"Using randomSeed = $value"))
+    val random: Random = randomSeed.map(new Random(_)).getOrElse(Random)
+
     val (updatedBotBoardMarks, attackList) =
-      smarterPlaceAttacks(botBoardMarks, currentTurnAttackTypes)
+      smarterPlaceAttacks(botBoardMarks, currentTurnAttackTypes, random)
 
     val validAttacks: List[Attack] =
       attackList.filter {
@@ -551,7 +559,8 @@ class BotHelper(val rules: Rules) {
 
   private def smarterPlaceAttacks(
       initialBoardMarks: BotBoardMarks,
-      currentTurnAttackTypes: List[AttackType]
+      currentTurnAttackTypes: List[AttackType],
+      random: Random
   ): (BotBoardMarks, List[Attack]) = {
 
     val (boardMarksUpdated, sureAttacks, otherAttacks) = {
@@ -571,7 +580,7 @@ class BotHelper(val rules: Rules) {
             (Some(boardMarks).filter(_ => boardWasUpdated), shotsList1, shotsList2)
           case headGuesser :: nextGuessers =>
             println("-" * 50)
-            println(s"${headGuesser.shipId}:")
+            println(s"${Ship.shipNames(headGuesser.shipId)}:")
             headGuesser.getBestShots(boardMarks, currentTurnAttackTypes) match {
               case (Some(updatedBoardMarks), shotsList1, shotsList2) if resultsSoFar.isEmpty =>
                 calcAllResults(
@@ -622,8 +631,8 @@ class BotHelper(val rules: Rules) {
         }
 
       val zipped = sureAttacks.zip(otherAttacks)
-      val shuffledSure = Random.shuffle(sureAttacks.flatten.distinct)
-      val shuffledOther = Random.shuffle(otherAttacks.flatten.distinct)
+      val shuffledSure = random.shuffle(sureAttacks.flatten.distinct)
+      val shuffledOther = random.shuffle(otherAttacks.flatten.distinct)
 
       val shotsOpt: Option[Iterable[Coordinate]] =
         if (maximumShots == 1) {
@@ -636,6 +645,20 @@ class BotHelper(val rules: Rules) {
         } else if (maximumShots == 2) {
           if (shuffledSure.nonEmpty && shuffledOther.nonEmpty)
             Some(shuffledSure.take(1) ++ shuffledOther.take(1))
+          else if (shuffledOther.sizeIs >= 2)
+            otherAttacks.filter(_.nonEmpty) match {
+              case List(_) if shuffledSure.sizeIs >= 2 =>
+                Some(shuffledOther.take(2))
+              case one :: two :: _ =>
+                val oneDistinctCoors = one -- two
+                val twoDistinctCoors = two -- one
+                if (oneDistinctCoors.nonEmpty && twoDistinctCoors.nonEmpty)
+                  Some(oneDistinctCoors.take(1) ++ twoDistinctCoors.take(1))
+                else
+                  Some(one.take(1) ++ two.take(1))
+              case _ =>
+                None
+            }
           else
             None
         } else {
@@ -817,61 +840,6 @@ object BotHelper {
     }
 
     loopPlaceAllShips(shipsToPlace, Nil)
-  }
-
-  private[BotHelper] def printBotBoardMarks(
-      boardSize: Coordinate,
-      botBoardMarks: BotBoardMarks
-  ): Unit = {
-    def printShipIds(ids: Set[String]): String = {
-      val sorted = ids.toSeq.sorted
-      if (sorted.size == 1)
-        "   " + sorted.mkString(",") + "   "
-      else if (sorted.size == 2)
-        "  " + sorted.mkString(",") + "  "
-      else if (sorted.size == 3)
-        " " + sorted.mkString(",") + " "
-      else
-        sorted.mkString(",")
-    }
-
-    for (y <- 0 until boardSize.y) {
-      val strList =
-        for (x <- 0 until boardSize.x) yield {
-          botBoardMarks(x)(y) match {
-            case (_, Empty)                  => "       "
-            case (_, Water)                  => "   .   "
-            case (_, ShipOrWater(shipIds))   => printShipIds(shipIds.map(_.id.toString) + "W")
-            case (_, ShipExclusive(shipIds)) => printShipIds(shipIds.map(_.id.toString))
-          }
-        }
-      if (y == 0)
-        println(strList.map("-" * _.length).mkString("-", "---", "-"))
-      println(strList.mkString("|", " | ", "|"))
-      if (y < boardSize.y - 1)
-        println(strList.map("-" * _.length).mkString("|", "-|-", "|"))
-      else
-        println(strList.map("-" * _.length).mkString("-", "---", "-"))
-    }
-
-//    for (y <- 0 until boardSize.y) {
-//      val strList =
-//        for (x <- 0 until boardSize.x) yield {
-//          botBoardMarks(x)(y) match {
-//            case (_, Empty)                  => "       "
-//            case (_, Water)                  => "   .   "
-//            case (_, ShipOrWater(shipIds))   => printShipIds(shipIds.map(_.id.toString) + "W")
-//            case (_, ShipExclusive(shipIds)) => printShipIds(shipIds.map(_.id.toString))
-//          }
-//        }
-//      if (y == 0)
-//        println(strList.map("\u2501" * _.length).mkString("\u250F", "\u2533", "\u2513"))
-//      println(strList.mkString("\u2503", "\u2503", "\u2503"))
-//      if (y < boardSize.y - 1)
-//        println(strList.map("\u2501" * _.length).mkString("\u2523", "\u254B", "\u252B"))
-//      else
-//        println(strList.map("\u2501" * _.length).mkString("\u2517", "\u253B", "\u251B"))
-//    }
   }
 
 }
