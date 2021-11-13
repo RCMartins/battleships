@@ -33,12 +33,14 @@ case class Coordinate(x: Int, y: Int) {
 
   def flipCoor: Coordinate = Coordinate(y, x)
 
-  def get8CoorAround: Seq[Coordinate] =
-    for {
-      dx <- -1 to 1
-      dy <- -1 to 1
-      if dx != 0 || dy != 0
-    } yield Coordinate(x + dx, y + dy)
+  def get8CoorAround: List[Coordinate] =
+    (
+      for {
+        dx <- -1 to 1
+        dy <- -1 to 1
+        if dx != 0 || dy != 0
+      } yield Coordinate(x + dx, y + dy)
+    ).toList
 
   def min: Int = Math.min(x, y)
 

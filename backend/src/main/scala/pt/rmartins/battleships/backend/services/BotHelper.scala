@@ -122,7 +122,7 @@ class BotHelper(val rules: Rules) {
     val updatedBotBoardMarks2: BotBoardMarks =
       if (allSubmarineHits)
         turnAttacks
-          .flatMap(_.coordinateOpt.map(_.get8CoorAround).getOrElse(Seq.empty))
+          .flatMap(_.coordinateOpt.map(_.get8CoorAround).getOrElse(Nil))
           .filter(_.isInsideBoard(rules.boardSize))
           .foldLeft(updatedBotBoardMarks) { case (marks, coor) =>
             updateBoardMarksUsing(

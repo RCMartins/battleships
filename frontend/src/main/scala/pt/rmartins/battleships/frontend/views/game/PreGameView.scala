@@ -420,7 +420,7 @@ class PreGameView(
       (0 until missileAmount).foreach { index =>
         drawImageAbs(
           renderingCtx,
-          attackSimple.element,
+          attackSimpleImage.element,
           x = missilesDistance * index,
           y = 0,
           missilesSize.x,

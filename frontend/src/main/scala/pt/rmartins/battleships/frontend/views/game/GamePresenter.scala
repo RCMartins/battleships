@@ -9,6 +9,7 @@ import pt.rmartins.battleships.frontend.ApplicationContext.application
 import pt.rmartins.battleships.frontend.routing.{RoutingInGameState, RoutingLoginPageState}
 import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
 import pt.rmartins.battleships.frontend.services.{TranslationsService, UserContextService}
+import pt.rmartins.battleships.frontend.views.game.BoardView.InGameMarkSelector
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.i18n.Translations
@@ -16,7 +17,8 @@ import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game.BonusReward.ExtraTurn
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game._
-import pt.rmartins.battleships.shared.model.utils.BoardUtils.canPlaceInBoard
+import pt.rmartins.battleships.shared.model.utils.BoardUtils
+import pt.rmartins.battleships.shared.model.utils.BoardUtils.{BoardMarks, canPlaceInBoard}
 import pt.rmartins.battleships.shared.rpc.server.game.GameRPC
 import scalatags.JsDom.all.span
 
@@ -655,13 +657,24 @@ class GamePresenter(
               gameRpc.sendBoardMarks(gameId, List((enemyBoardCoor, BoardMark.Empty)))
             }
           case (Some(enemyBoardCoor), Some(selectedBoardMark), 0) =>
-            val (_, currentBoardMark) = me.enemyBoardMarks(enemyBoardCoor.x)(enemyBoardCoor.y)
+            val boardMarksOpt: Option[BoardMark] =
+              (selectedBoardMark match {
+                case InGameMarkSelector.ManualShipSelector =>
+                  Some(BoardMark.ManualShip)
+                case InGameMarkSelector.ManualWaterSelector =>
+                  Some(BoardMark.ManualWater)
+                case _ =>
+                  None
+              }).filter { boardMark =>
+                val (_, currentBoardMark) = me.enemyBoardMarks(enemyBoardCoor.x)(enemyBoardCoor.y)
+                !currentBoardMark.isPermanent && boardMark != currentBoardMark
+              }
 
-            if (!currentBoardMark.isPermanent && currentBoardMark != selectedBoardMark) {
+            boardMarksOpt.foreach { boardMark =>
               gameStateProperty.set(
-                Some(gameState.copy(me = me.updateBoardMark(enemyBoardCoor, selectedBoardMark)))
+                Some(gameState.copy(me = me.updateBoardMark(enemyBoardCoor, boardMark)))
               )
-              gameRpc.sendBoardMarks(gameId, List((enemyBoardCoor, selectedBoardMark)))
+              gameRpc.sendBoardMarks(gameId, List((enemyBoardCoor, boardMark)))
             }
           case _ =>
         }
@@ -669,8 +682,10 @@ class GamePresenter(
     }
   }
 
-  def mouseLeave(): Unit =
+  def mouseLeave(): Unit = {
     gameModel.subProp(_.mousePosition).set(None)
+    mouseUp()
+  }
 
   def mouseUp(): Unit =
     gameModel.subProp(_.mouseDown).set(None)
@@ -702,14 +717,14 @@ class GamePresenter(
             }
         }
       case (
-            GameModel(Some(_), Some(2), _, _, _, _, _, _),
+            GameModel(Some(_), Some(2), selectedShip, turnAttacks, _, _, _, _),
             Some(
               gameState @ GameState(
                 gameId,
                 _,
                 me,
                 _,
-                PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _, _)
+                mode @ (PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _, _))
               )
             )
           ) =>
@@ -723,7 +738,27 @@ class GamePresenter(
               )
               gameRpc.sendBoardMarks(gameId, List((enemyBoardCoor, BoardMark.Empty)))
             }
-          case _ =>
+
+            if (mode.isPlaying && turnAttacks.exists(_.coordinateOpt.contains(enemyBoardCoor))) {
+              val turnAttackUpdated: List[Attack] =
+                turnAttacks.map {
+                  case Attack(attackType, Some(coordinate)) if coordinate == enemyBoardCoor =>
+                    Attack(attackType, None)
+                  case other =>
+                    other
+                }
+
+              gameModel.subProp(_.turnAttacks).set(turnAttackUpdated)
+            }
+          case None =>
+            (selectedShip, boardView.summaryShipHover.get) match {
+              case (Some(currentSelectedShip), Some(summaryShipHover))
+                  if currentSelectedShip.shipId == summaryShipHover.shipId =>
+                gameModel.subProp(_.selectedShip).set(None)
+              case (Some(_), None) =>
+                gameModel.subProp(_.selectedShip).set(None)
+              case _ =>
+            }
         }
       case (
             GameModel(
@@ -739,7 +774,7 @@ class GamePresenter(
             Some(
               gameState @ GameState(
                 gameId,
-                _,
+                Rules(boardSize, _, _, _, _),
                 me,
                 _,
                 PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _, _)
@@ -751,20 +786,71 @@ class GamePresenter(
           boardView.boardMarkHover.get,
           selectedBoardMarkOpt
         ) match {
-          case (Some(enemyBoardCoor), None, Some(selectedBoardMark)) =>
-            val (_, currentBoardMark) = me.enemyBoardMarks(enemyBoardCoor.x)(enemyBoardCoor.y)
+          case (Some(enemyBoardCoor), None, Some(selectedInGameMark)) =>
+            val updatedBoardMarksList: List[(Coordinate, BoardMark)] =
+              (selectedInGameMark match {
+                case InGameMarkSelector.ManualShipSelector =>
+                  List((enemyBoardCoor, BoardMark.ManualShip))
+                case InGameMarkSelector.ManualWaterSelector =>
+                  List((enemyBoardCoor, BoardMark.ManualWater))
+                case InGameMarkSelector.FillWaterSelector =>
+                  def isShip(coordinate: Coordinate): Boolean =
+                    me.enemyBoardMarks(coordinate.x)(coordinate.y)._2.isShip
 
-            if (!currentBoardMark.isPermanent) {
-              val updatedBoardMark =
-                if (currentBoardMark == selectedBoardMark)
-                  BoardMark.Empty
-                else
-                  selectedBoardMark
+                  @tailrec
+                  def getAllNearShipCoor(
+                      coorToCheck: List[Coordinate],
+                      shipCoors: Set[Coordinate],
+                      seen: Set[Coordinate]
+                  ): Set[Coordinate] =
+                    coorToCheck match {
+                      case Nil => shipCoors
+                      case center :: nextCoors =>
+                        val newCoordinates: List[Coordinate] =
+                          center.get8CoorAround.filterNot(seen).filter(_.isInsideBoard(boardSize))
+                        val newShipCoordinates: List[Coordinate] =
+                          newCoordinates.filter(isShip)
+                        getAllNearShipCoor(
+                          newShipCoordinates ++ nextCoors,
+                          shipCoors ++ Set(center).filter(isShip) ++ newShipCoordinates,
+                          (seen + center) ++ newCoordinates
+                        )
+                    }
+
+                  val shipMarkPositions: Set[Coordinate] =
+                    getAllNearShipCoor(List(enemyBoardCoor).filter(isShip), Set.empty, Set.empty)
+
+                  if (shipMarkPositions.isEmpty)
+                    Nil
+                  else
+                    shipMarkPositions
+                      .flatMap(_.get8CoorAround)
+                      .filter(_.isInsideBoard(boardSize))
+                      .filterNot(shipMarkPositions)
+                      .map { coor =>
+                        coor -> BoardMark.ManualWater
+                      }
+                      .toList
+              }).filter { case (coor, currentBoardMark) =>
+                val boardMark = me.enemyBoardMarks(coor.x)(coor.y)._2
+                !boardMark.isPermanent && boardMark != currentBoardMark
+              }
+
+            if (updatedBoardMarksList.nonEmpty) {
+              val updatedBoardMarks: BoardMarks =
+                updatedBoardMarksList.foldLeft(me.enemyBoardMarks) {
+                  case (enemyBoardMarks, (boardCoor, newBoardMark)) =>
+                    BoardUtils.updateBoardMarksUsing(
+                      enemyBoardMarks,
+                      boardCoor,
+                      { case (turnNumberOpt, _) => (turnNumberOpt, newBoardMark) }
+                    )
+                }
 
               gameStateProperty.set(
-                Some(gameState.copy(me = me.updateBoardMark(enemyBoardCoor, updatedBoardMark)))
+                Some(gameState.copy(me = me.copy(enemyBoardMarks = updatedBoardMarks)))
               )
-              gameRpc.sendBoardMarks(gameId, List((enemyBoardCoor, updatedBoardMark)))
+              gameRpc.sendBoardMarks(gameId, updatedBoardMarksList)
             }
           case (Some(enemyBoardCoor), None, None)
               if gameState.gameMode.isPlaying &&
@@ -794,9 +880,9 @@ class GamePresenter(
             gameModel.subProp(_.turnAttacks).set(turnAttackUpdated)
           case (None, Some(boardMarkClicked), selectedBoardMarkOpt)
               if !selectedBoardMarkOpt.contains(boardMarkClicked) =>
-            gameModel.subProp(_.selectedBoardMarkOpt).set(Some(boardMarkClicked))
+            gameModel.subProp(_.selectedInGameMarkOpt).set(Some(boardMarkClicked))
           case (None, None, Some(_)) =>
-            gameModel.subProp(_.selectedBoardMarkOpt).set(None)
+            gameModel.subProp(_.selectedInGameMarkOpt).set(None)
           case _ =>
         }
 
@@ -872,20 +958,20 @@ class GamePresenter(
           rotateSelectedShip(wheelRotation)
       case Some(GameState(_, _, _, _, _: PlayingMode)) =>
         val nextIndex =
-          gameModel.get.selectedBoardMarkOpt.flatMap(boardMark =>
-            BoardView.BoardMarksSelectorOrder.zipWithIndex.find(_._1 == boardMark)
+          gameModel.get.selectedInGameMarkOpt.flatMap(boardMark =>
+            BoardView.MarksSelectorOrder.zipWithIndex.find(_._1 == boardMark)
           ) match {
             case None if wheelRotation > 0 =>
               Some(0)
             case None if wheelRotation < 0 =>
-              Some(BoardView.BoardMarksSelectorOrder.size - 1)
+              Some(BoardView.MarksSelectorOrder.size - 1)
             case Some((_, currentIndex)) =>
               Some(currentIndex + wheelRotation)
-                .filter(index => index >= 0 && index < BoardView.BoardMarksSelectorOrder.size)
+                .filter(index => index >= 0 && index < BoardView.MarksSelectorOrder.size)
           }
         gameModel
-          .subProp(_.selectedBoardMarkOpt)
-          .set(nextIndex.map(BoardView.BoardMarksSelectorOrder))
+          .subProp(_.selectedInGameMarkOpt)
+          .set(nextIndex.map(BoardView.MarksSelectorOrder))
       case _ =>
     }
   }

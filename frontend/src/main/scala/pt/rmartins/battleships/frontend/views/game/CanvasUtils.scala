@@ -268,8 +268,11 @@ object CanvasUtils {
     element.src = src
   }
 
-  val attackSimple: CanvasImage =
+  val attackSimpleImage: CanvasImage =
     new CanvasImage("icons/missile-simple.png")
+
+  val fillWaterImage: CanvasImage =
+    new CanvasImage("icons/fill-water.png")
 
   def drawImageAbs(
       renderingCtx: CanvasRenderingContext2D,

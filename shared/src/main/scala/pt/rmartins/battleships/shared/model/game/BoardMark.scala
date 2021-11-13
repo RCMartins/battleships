@@ -7,9 +7,10 @@ sealed trait BoardMark {
   def isPermanent: Boolean = false
 
   def isWater: Boolean =
-    this == BoardMark.Water ||
-      this == BoardMark.ManualWater ||
-      this == BoardMark.ManualQuestionWater
+    this == BoardMark.Water || this == BoardMark.ManualWater
+
+  def isShip: Boolean =
+    this == BoardMark.ShipHit || this == BoardMark.ManualShip
 
 }
 
@@ -20,10 +21,6 @@ object BoardMark extends HasGenCodec[BoardMark] {
   case object ManualWater extends BoardMark
 
   case object ManualShip extends BoardMark
-
-  case object ManualQuestionShip extends BoardMark
-
-  case object ManualQuestionWater extends BoardMark
 
   case object Water extends BoardMark {
     override def isPermanent: Boolean = true
