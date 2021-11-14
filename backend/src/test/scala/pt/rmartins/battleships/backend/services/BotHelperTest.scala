@@ -4,6 +4,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{Assertion, Inspectors}
+import pt.rmartins.battleships.backend.services.BotHelper.BotBoardMarks
 import pt.rmartins.battleships.shared.model.game.AttackType._
 import pt.rmartins.battleships.shared.model.game.Ship._
 import pt.rmartins.battleships.shared.model.game._
@@ -312,6 +313,46 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
       )
     }
 
+    "Send a triple kill" in {
+      val rules = Rules(
+        boardSize = Coordinate(8, 8),
+        gameFleet = Fleet.fromShips(
+          List(Submarine, Skeeter, Ranger, Conqueror, Cruiser, AircraftCarrier)
+        ),
+        defaultTurnAttackTypes = turnAttackTypes3,
+        turnBonuses = List(
+          TurnBonus.apply(
+            BonusType.TripleKill,
+            List(BonusReward.ExtraTurn(List.fill(3)(AttackType.Simple)))
+          )
+        ),
+        timeLimit = None
+      )
+      val botHelper = createBotHelper(rules)
+
+      val turnHistory =
+        List(
+          totalMiss(1, (1, 1)),
+          hitTurn(2, hits = List((Skeeter, 0, 0), (Ranger, 7, 0), (Cruiser, 4, 0))),
+          hitTurn(3, hits = List((Ranger, 7, 2), (Cruiser, 2, 2)), water = List((1, 0))),
+          hitTurn(
+            4,
+            hits = List((AircraftCarrier, 3, 5), (AircraftCarrier, 4, 7), (AircraftCarrier, 5, 5))
+          )
+        )
+
+      val result = placeAttacks(botHelper, turnHistory)
+
+      val expectedCoordinates: Set[Coordinate] =
+        Set((0, 1), (3, 1), (7, 1)).map { case (x, y) => Coordinate(x, y) }
+
+      containsCoordinates(
+        result,
+        rules.defaultTurnAttackTypes.size,
+        expectedCoordinates
+      )
+    }
+
   }
 
   private def containsCoordinates(
@@ -360,6 +401,15 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
     findAllExpected(attacksCoordinatesList, expectedCoordinatesSeq)
   }
 
+  private def totalMiss(turnNumber: Int, missCoordinates: (Int, Int)*): TurnPlay = {
+    missCoordinates should not be empty
+    TurnPlay(
+      Turn(turnNumber, None),
+      missCoordinates.map { case (x, y) => Attack(Simple, Some(Coordinate(x, y))) }.toList,
+      missCoordinates.map(_ => HitHint.Water).toList
+    )
+  }
+
   private def hitTurn(
       turnNumber: Int,
       hits: List[(Ship, Int, Int)],
@@ -372,15 +422,6 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
       hits.map { case (ship, _, _) => HitHint.ShipHit(ship.shipId, destroyed = false) } ++
         water.map(_ => HitHint.Water)
     )
-
-  private def totalMiss(turnNumber: Int, missCoordinates: (Int, Int)*): TurnPlay = {
-    missCoordinates should not be empty
-    TurnPlay(
-      Turn(turnNumber, None),
-      missCoordinates.map { case (x, y) => Attack(Simple, Some(Coordinate(x, y))) }.toList,
-      missCoordinates.map(_ => HitHint.Water).toList
-    )
-  }
 
   private def turnPlay(
       turnNumber: Int,
@@ -399,12 +440,20 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
   }
 
   private def placeAttacks(botHelper: BotHelper, turnHistory: List[TurnPlay]) = {
-    turnHistory.foreach(botHelper.updateBotBoardMarks)
+    turnHistory.foreach { turnPlay =>
+      botHelper.updateBotBoardMarks(turnPlay)
+      botHelper.placeAttacks(botHelper.rules.defaultTurnAttackTypes)
+    }
     botHelper.placeAttacks(botHelper.rules.defaultTurnAttackTypes)
   }
 
-  private val testLogger: BotHelperLogger =
-    (_: GameId, _: Rules, _: List[TurnPlay]) => ()
+  private val testLogger: BotHelperLogger = new BotHelperLogger {
+    override def logLine(any: Any): Unit = ()
+
+    override def logBotBoardMarks(boardSize: Coordinate, botBoardMarks: BotBoardMarks): Unit = ()
+
+    override def logBotGame(gameId: GameId, rules: Rules, turnHistory: List[TurnPlay]): Unit = ()
+  }
 
   private def createBotHelper(rules: Rules): BotHelper =
     new BotHelper(

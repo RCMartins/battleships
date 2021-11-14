@@ -3,13 +3,14 @@ package pt.rmartins.battleships.backend.services
 import pt.rmartins.battleships.backend.services.BotHelper.BotBoardMark._
 import pt.rmartins.battleships.backend.services.BotHelper.ShipGuess._
 import pt.rmartins.battleships.backend.services.BotHelper._
-import pt.rmartins.battleships.backend.services.BotHelperLogger.printBotBoardMarks
 import pt.rmartins.battleships.shared.model.game._
 
 import scala.annotation.tailrec
 import scala.util.Random
 
 class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
+
+  import logger._
 
   private val MaxShipSamples = 1000
 
@@ -24,6 +25,12 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
     Nil
   private var cachedBotBoardMarks: BotBoardMarks =
     Vector.fill(boardSize.x)(Vector.fill(boardSize.y)((None, Empty)))
+
+  private val standardTripleKill: Boolean =
+    rules.turnBonuses.exists(turnBonus =>
+      turnBonus.bonusType == BonusType.TripleKill &&
+        turnBonus.bonusReward.contains(BonusReward.ExtraTurn(List.fill(3)(AttackType.Simple)))
+    )
 
   private def getSquare(
       botBoardMarks: BotBoardMarks,
@@ -101,7 +108,14 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
           updateBoardMarksUsing(
             botBoardMarks,
             coor,
-            _ => (Some(turn), ShipExclusive(shipIds))
+            {
+              case (_, ShipExclusive(currentShipIds)) =>
+                (Some(turn), ShipExclusive(currentShipIds.filter(shipIds)))
+              case (_, ShipOrWater(currentShipIds)) =>
+                (Some(turn), ShipExclusive(currentShipIds.filter(shipIds)))
+              case _ =>
+                (Some(turn), ShipExclusive(shipIds))
+            }
           )
         else
           updateBoardMarksUsing(
@@ -150,7 +164,8 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
       } else
         updatedBotBoardMarks
 
-    printBotBoardMarks(boardSize, updatedBotBoardMarks2)
+    logLine("printBotBoard1")
+    logBotBoardMarks(boardSize, updatedBotBoardMarks2)
 
     //TODO check destroyed ships to update positions + water
 
@@ -207,15 +222,15 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
             ): List[List[Coordinate]] =
               remainingPositionsList match {
                 case Nil =>
-//                  println("currentPossibilitiesOpt:")
-//                  println(currentPossibilitiesOpt.getOrElse(Nil).mkString("\n"))
+//                  logLine("currentPossibilitiesOpt:")
+//                  logLine(currentPossibilitiesOpt.getOrElse(Nil).mkString("\n"))
                   currentPossibilitiesOpt.getOrElse(Nil)
                 case (hitHints, coordinates) :: next =>
                   val amount = hitHints.flatMap(_.shipIdOpt).count(_ == shipId)
                   val comb = Utils.combinations(coordinates, amount = amount)
-//                  println(s"comb ($coordinates -> $amount:")
-//                  println(comb.mkString("\n"))
-//                  println("+" * 50)
+//                  logLine(s"comb ($coordinates -> $amount:")
+//                  logLine(comb.mkString("\n"))
+//                  logLine("+" * 50)
                   currentPossibilitiesOpt match {
                     case None =>
                       filterLoop(next, Some(comb))
@@ -232,8 +247,8 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
               }
 
             if (possiblePositionsList.nonEmpty) {
-              println(s"possiblePositionsList: ${possiblePositionsList.size}")
-              println(possiblePositionsList.mkString("\n"))
+              logLine(s"possiblePositionsList: ${possiblePositionsList.size}")
+              logLine(possiblePositionsList.mkString("\n"))
             }
 
             filterLoop(possiblePositionsList, None).map {
@@ -282,7 +297,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
           ship.pieces.flatMap { shipPiece =>
             val diffDist = guessCoor - shipPiece
             if (shipId.id == 4)
-              println(ship.pieces.map(_ + diffDist))
+              logLine(ship.pieces.map(_ + diffDist))
             List(ship.pieces.map(_ + diffDist))
               .filter(shipIsPossible(shipId, _, botBoardMarks, cachedTurnPlays))
           }
@@ -291,8 +306,8 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
       def processShipGuesses(
           shipGuesses: List[ShipGuess]
       ): (Option[BotBoardMarks], Set[Coordinate], Set[Coordinate]) = {
-//        println("shipGuesses:")
-//        println(shipGuesses.mkString("\n"))
+//        logLine("shipGuesses:")
+//        logLine(shipGuesses.mkString("\n"))
 
         val possibleShipPositions: Set[List[Coordinate]] =
           shipGuesses.flatMap {
@@ -309,9 +324,9 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
           }.toSet
 
         if (possibleShipPositions.isEmpty) {
-          println("Bug! possibleShipPositions is empty!")
-          println("shipGuesses:")
-          println(shipGuesses.mkString("\n"))
+          logLine("Bug! possibleShipPositions is empty!")
+          logLine("shipGuesses:")
+          logLine(shipGuesses.mkString("\n"))
           (None, Set.empty, Set.empty)
         } else
           processShipPositions(possibleShipPositions, allShipPossiblePositions = true)
@@ -321,9 +336,9 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
           possibleShipPositions: Set[List[Coordinate]],
           allShipPossiblePositions: Boolean
       ): (Option[BotBoardMarks], Set[Coordinate], Set[Coordinate]) = {
-        println(s"possibleShipPositions: ${possibleShipPositions.size}")
+        logLine(s"possibleShipPositions: ${possibleShipPositions.size}")
         if (possibleShipPositions.size <= 15)
-          println(possibleShipPositions.mkString("\n"))
+          logLine(possibleShipPositions.mkString("\n"))
 
         val allKnownWater = {
           val waterListList: List[Set[Coordinate]] =
@@ -346,8 +361,8 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
             Nil
 
         if (newWaterFound.nonEmpty) {
-          println("All new known water coordinates:")
-          println(newWaterFound.mkString("\n"))
+          logLine("All new known water coordinates:")
+          logLine(newWaterFound.mkString("\n"))
         }
 
         val updatedBoardMarks: BotBoardMarks =
@@ -395,8 +410,16 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
         }
 
         if (updateShipCoordinates.nonEmpty) {
-          println("updateShipCoordinates:")
-          println(updateShipCoordinates.mkString("\n"))
+          val exclusive = updateShipCoordinates.filter(_._2.isExclusive)
+          val shipOrWater = updateShipCoordinates.filter(_._2.isShipOrWater)
+          if (exclusive.nonEmpty) {
+            logLine("updateShipCoordinates Exclusive:")
+            logLine(exclusive.map("  " + _).mkString("\n"))
+          }
+          if (shipOrWater.nonEmpty) {
+            logLine("updateShipCoordinates ShipOrWater:")
+            logLine(shipOrWater.map("  " + _).mkString("\n"))
+          }
         }
 
         val (updatedBotBoardMarks2, marksUpdated2) =
@@ -425,8 +448,10 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
               }
             }
 
-        if (newWaterFound.nonEmpty || marksUpdated2)
-          printBotBoardMarks(boardSize, updatedBotBoardMarks2)
+        if (newWaterFound.nonEmpty || marksUpdated2) {
+          logLine("printBotBoard2")
+          logBotBoardMarks(boardSize, updatedBotBoardMarks2)
+        }
 
         val (updatedBotBoardMarks3, marksUpdated3) =
           if (allShipPossiblePositions)
@@ -479,8 +504,10 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
           else
             (updatedBotBoardMarks2, false)
 
-        if (marksUpdated3)
-          printBotBoardMarks(boardSize, updatedBotBoardMarks3)
+        if (marksUpdated3) {
+          logLine("printBotBoard3")
+          logBotBoardMarks(boardSize, updatedBotBoardMarks3)
+        }
 
         val finalMarksUpdated = newWaterFound.nonEmpty || marksUpdated2 || marksUpdated3
         (
@@ -519,13 +546,13 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
     val turnHistory = cachedTurnPlays
     val botBoardMarks = cachedBotBoardMarks
 
-    logger.logBotGame(gameId = gameId, rules = rules, turnHistory = turnHistory)
+    logBotGame(gameId = gameId, rules = rules, turnHistory = turnHistory)
 
-    println("+" * 80)
-    println("+" * 29 + "  " + turnHistory.map(_.turn).maxByOption(_.currentTurn) + "  " + "+" * 29)
-    println("+" * 80)
+    logLine("+" * 80)
+    logLine("+" * 29 + "  " + turnHistory.map(_.turn).maxByOption(_.currentTurn) + "  " + "+" * 29)
+    logLine("+" * 80)
 
-    randomSeed.foreach(value => println(s"Using randomSeed = $value"))
+    randomSeed.foreach(value => logLine(s"Using randomSeed = $value"))
     val random: Random = randomSeed.map(new Random(_)).getOrElse(Random)
 
     val (updatedBotBoardMarks, attackList) =
@@ -544,7 +571,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
 
     cachedBotBoardMarks = updatedBotBoardMarks
     if (validAttacks.isEmpty) {
-      println(s"smarterPlaceAttacks returned an invalid attack list: $attackList")
+      logLine(s"smarterPlaceAttacks returned an invalid attack list: $attackList")
       shotAllRandom(botBoardMarks, currentTurnAttackTypes)
     } else if (validAttacks.sizeIs == currentTurnAttackTypes.size) {
       validAttacks
@@ -579,8 +606,8 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
             val (shotsList1, shotsList2) = resultsSoFar.unzip
             (Some(boardMarks).filter(_ => boardWasUpdated), shotsList1, shotsList2)
           case headGuesser :: nextGuessers =>
-            println("-" * 50)
-            println(s"${Ship.shipNames(headGuesser.shipId)}:")
+            logLine("-" * 50)
+            logLine(s"${Ship.shipNames(headGuesser.shipId)}:")
             headGuesser.getBestShots(boardMarks, currentTurnAttackTypes) match {
               case (Some(updatedBoardMarks), shotsList1, shotsList2) if resultsSoFar.isEmpty =>
                 calcAllResults(
@@ -614,7 +641,10 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
       )
     }
 
-    boardMarksUpdated.foreach(printBotBoardMarks(boardSize, _))
+    boardMarksUpdated.foreach { boardMarks =>
+      logLine("printBotBoard4")
+      logBotBoardMarks(boardSize, boardMarks)
+    }
 
     val attacks: List[Attack] = {
       val maximumShots = currentTurnAttackTypes.size
@@ -661,8 +691,10 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
             }
           else
             None
-        } else {
-          if (shuffledSure.nonEmpty && shuffledOther.nonEmpty) {
+        } else if (maximumShots == 3) {
+          if (standardTripleKill && sureAttacks.count(_.sizeIs == 1) >= 3) {
+            Some(sureAttacks.filter(_.sizeIs == 1).take(3).flatten)
+          } else if (shuffledSure.nonEmpty && shuffledOther.nonEmpty) {
             otherAttacks.filter(_.nonEmpty) match {
               case List(_) if shuffledSure.sizeIs >= 2 =>
                 Some(shuffledSure.take(2) ++ shuffledOther.take(1))
@@ -677,8 +709,12 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
                 Some(shuffledSure.take(1) ++ shuffledOther.take(2))
             }
 
-          } else
+          } else if (shuffledSure.nonEmpty)
+            Some(shuffledSure.take(3))
+          else
             None
+        } else {
+          None
         }
 
       val finalShots =
@@ -767,7 +803,19 @@ object BotHelper {
 
   }
 
-  sealed trait BotBoardMark
+  sealed trait BotBoardMark {
+
+    def isShipOrWater: Boolean = this match {
+      case ShipOrWater(_) => true
+      case _              => false
+    }
+
+    def isExclusive: Boolean = this match {
+      case ShipExclusive(_) => true
+      case _                => false
+    }
+
+  }
 
   object BotBoardMark {
 

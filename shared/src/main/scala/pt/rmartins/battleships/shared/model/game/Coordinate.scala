@@ -48,6 +48,8 @@ case class Coordinate(x: Int, y: Int) {
 
   override def toString: String = s"Coor($x,$y)"
 
+  def toCodeString: String = s"Coordinate($x, $y)"
+
 }
 
 object Coordinate extends HasGenCodec[Coordinate] {
