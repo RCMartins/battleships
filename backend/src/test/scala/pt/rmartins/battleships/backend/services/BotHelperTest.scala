@@ -353,6 +353,39 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
       )
     }
 
+    "find correct position of all ships #1" in {
+      val rules = Rules(
+        boardSize = Coordinate(5, 5),
+        gameFleet = Fleet.fromShips(List(Submarine, Skeeter, Ranger)),
+        defaultTurnAttackTypes = turnAttackTypes3,
+        turnBonuses = Nil,
+        timeLimit = None
+      )
+      val botHelper = createBotHelper(rules)
+
+      val turnHistory =
+        List(
+          totalMiss(1, (1, 0), (3, 0), (0, 1), (2, 2)),
+          turnPlay(
+            2,
+            None,
+            List((0, 0), (2, 0), (4, 0)),
+            List((Submarine, true), (Skeeter, false), (Ranger, false))
+          )
+        )
+
+      val result = placeAttacks(botHelper, turnHistory)
+
+      val expectedCoordinates: Set[Coordinate] =
+        Set((2, 1), (4, 1), (4, 2)).map { case (x, y) => Coordinate(x, y) }
+
+      containsCoordinates(
+        result,
+        rules.defaultTurnAttackTypes.size,
+        expectedCoordinates
+      )
+    }
+
   }
 
   private def containsCoordinates(
@@ -448,7 +481,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
   }
 
   private val testLogger: BotHelperLogger = new BotHelperLogger {
-    override def logLine(any: Any): Unit = ()
+    override def logLine(any: => Any): Unit = ()
 
     override def logBotBoardMarks(boardSize: Coordinate, botBoardMarks: BotBoardMarks): Unit = ()
 

@@ -7,7 +7,7 @@ import pt.rmartins.battleships.shared.model.game._
 
 trait BotHelperLogger {
 
-  def logLine(any: Any): Unit
+  def logLine(any: => Any): Unit
 
   def logBotBoardMarks(boardSize: Coordinate, botBoardMarks: BotBoardMarks): Unit
 
@@ -20,7 +20,7 @@ object BotHelperLogger {
   object DefaultLogger extends BotHelperLogger {
     private val logFolder = File("log")
 
-    def logLine(any: Any): Unit =
+    def logLine(any: => Any): Unit =
       println(any)
 
     def logBotBoardMarks(boardSize: Coordinate, botBoardMarks: BotBoardMarks): Unit = {
@@ -83,24 +83,28 @@ object BotHelperLogger {
 
       def coorToString(coor: Coordinate): String = s"(${coor.x}, ${coor.y})"
 
-      sb.append(
-        turnHistory.reverse
-          .map { case TurnPlay(turn, turnAttacks, hitHints) =>
-            List(
-              turn.currentTurn.toString,
-              turn.extraTurn.toString,
-              turnAttacks.flatMap(_.coordinateOpt).map(coorToString).mkString("List(", ", ", ")"), {
-                val hits: List[String] =
-                  hitHints.collect { case HitHint.ShipHit(shipId, destroyed) =>
-                    s"(${Ship.shipNames(shipId)}, $destroyed)"
-                  }
-                if (hits.isEmpty) "Nil" else hits.mkString("List(", ", ", ")")
-              }
-            ).mkString("turnPlay(", ", ", ")")
-          }
-          .map("  " + _)
-          .mkString("List(\n", ",\n", "\n)")
-      )
+      if (turnHistory.nonEmpty)
+        sb.append(
+          turnHistory.reverse
+            .map { case TurnPlay(turn, turnAttacks, hitHints) =>
+              List(
+                turn.currentTurn.toString,
+                turn.extraTurn.toString,
+                turnAttacks
+                  .flatMap(_.coordinateOpt)
+                  .map(coorToString)
+                  .mkString("List(", ", ", ")"), {
+                  val hits: List[String] =
+                    hitHints.collect { case HitHint.ShipHit(shipId, destroyed) =>
+                      s"(${Ship.shipNames(shipId)}, $destroyed)"
+                    }
+                  if (hits.isEmpty) "Nil" else hits.mkString("List(", ", ", ")")
+                }
+              ).mkString("turnPlay(", ", ", ")")
+            }
+            .map("  " + _)
+            .mkString("List(\n", ",\n", "\n)")
+        )
 
       val file = logFolder / s"${gameId.id}.log"
 
@@ -109,8 +113,8 @@ object BotHelperLogger {
         file.append(sb.result())
       } else {
         //gameFleet = Fleet.fromShips(List(Skeeter, Ranger, Conqueror)),
-        file.write(s"boardSize = ${rules.boardSize.toCodeString}\n\n")
-        file.write(
+        file.append(s"boardSize = ${rules.boardSize.toCodeString}\n\n")
+        file.append(
           s"gameFleet = Fleet.fromShips(List(${rules.gameFleet.ships.map(ship => Ship.shipNames(ship.shipId)).mkString(", ")}))\n\n"
         )
         file.append(sb.result())

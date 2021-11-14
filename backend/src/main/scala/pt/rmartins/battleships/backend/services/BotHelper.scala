@@ -185,7 +185,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
     def baseShipsHit(boardMarks: BotBoardMarks): Option[List[ShipGuess]] = {
       val destroyedCount: Int =
         turnsWithShip.map { case TurnPlay(_, _, hitHints) =>
-          hitHints.count(_.shipIdDestroyedOpt.nonEmpty)
+          hitHints.count(_.shipIdDestroyedOpt.contains(shipId))
         }.sum
       val aliveShips = shipsCounter - destroyedCount
 
@@ -397,7 +397,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
               (if (possibleShipPositions.sizeIs == 1) possibleShipPositions.flatten else Set.empty)
 
           val aroundMarks =
-            sureMarks.flatMap(_.get8CoorAround) -- sureMarks
+            (sureMarks.flatMap(_.get8CoorAround) -- sureMarks).filter(_.isInsideBoard(boardSize))
 
           sureMarks.map(_ -> (ShipExclusive(Set(shipId)): BotBoardMark)) ++
             aroundMarks.map(_ -> (ShipOrWater(Set(shipId)): BotBoardMark))
@@ -408,11 +408,23 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
           val shipOrWater = updateShipCoordinates.filter(_._2.isShipOrWater)
           if (exclusive.nonEmpty) {
             logLine("updateShipCoordinates Exclusive:")
-            logLine(exclusive.map("  " + _).mkString("\n"))
+            logLine(
+              exclusive
+                .map { case (coor, mark) =>
+                  s"  $coor-$mark  ${getTurn(updatedBoardMarks, coor).nonEmpty}"
+                }
+                .mkString("\n")
+            )
           }
           if (shipOrWater.nonEmpty) {
             logLine("updateShipCoordinates ShipOrWater:")
-            logLine(shipOrWater.map("  " + _).mkString("\n"))
+            logLine(
+              shipOrWater
+                .map { case (coor, mark) =>
+                  s"  $coor-$mark  ${getTurn(updatedBoardMarks, coor).nonEmpty}"
+                }
+                .mkString("\n")
+            )
           }
         }
 
