@@ -956,18 +956,26 @@ class GamePresenter(
       case Some(GameState(_, _, _, _, _: PreGameMode)) =>
         if (wheelRotation != 0)
           rotateSelectedShip(wheelRotation)
-      case Some(GameState(_, _, _, _, _: PlayingMode)) =>
+      case Some(
+            GameState(_, _, _, _, mode @ (PlayingMode(_, _, _, _, _) | GameOverMode(_, _, _, _, _)))
+          ) =>
         val nextIndex =
-          gameModel.get.selectedInGameMarkOpt.flatMap(boardMark =>
-            BoardView.MarksSelectorOrder.zipWithIndex.find(_._1 == boardMark)
+          gameModel.get.selectedInGameMarkOpt.flatMap(selectedInGameMark =>
+            BoardView.MarksSelectorOrder.zipWithIndex.find(_._1 == selectedInGameMark)
           ) match {
             case None if wheelRotation > 0 =>
               Some(0)
             case None if wheelRotation < 0 =>
               Some(BoardView.MarksSelectorOrder.size - 1)
             case Some((_, currentIndex)) =>
-              Some(currentIndex + wheelRotation)
-                .filter(index => index >= 0 && index < BoardView.MarksSelectorOrder.size)
+              if (mode.isPlaying)
+                Some(currentIndex + wheelRotation)
+                  .filter(index => index >= 0 && index < BoardView.MarksSelectorOrder.size)
+              else
+                Some(
+                  (currentIndex + wheelRotation + BoardView.MarksSelectorOrder.size) %
+                    BoardView.MarksSelectorOrder.size
+                )
           }
         gameModel
           .subProp(_.selectedInGameMarkOpt)

@@ -12,6 +12,7 @@ import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit
 import pt.rmartins.battleships.shared.model.game._
+import pt.rmartins.battleships.shared.model.utils.BoardUtils
 import pt.rmartins.battleships.shared.model.utils.BoardUtils.canPlaceInBoard
 import scalatags.JsDom.all._
 
@@ -940,28 +941,31 @@ class BoardView(
 
     enemyBoardMouseCoordinate.get.foreach { enemyBoardCoor =>
       selectedBoardMarkOpt match {
-        case Some(selectedBoardMark) if !boardMarksWithCoor.exists {
-              case (coor, _, currentBoardMark) =>
-                coor == enemyBoardCoor && currentBoardMark.isPermanent
-            } =>
-          if (selectedBoardMark == InGameMarkSelector.FillWaterSelector) {
-            drawImageAbs(
-              renderingCtx,
-              fillWaterImage.element,
-              x = boardPosition.x + enemyBoardCoor.x * squareSize + 2,
-              y = boardPosition.y + enemyBoardCoor.y * squareSize + 2,
-              squareSize - 4,
-              squareSize - 4,
-              useAntiAliasing = true
-            )
-          } else {
-            val canvasColor: CanvasColor =
-              selectedBoardMark match {
-                case InGameMarkSelector.ManualWaterSelector => CanvasColor.Water(alpha = 0.5)
-                case InGameMarkSelector.ManualShipSelector  => CanvasColor.Ship(alpha = 0.5)
-                case _                                      => CanvasColor.White()
-              }
-            drawBoardSquare(renderingCtx, boardPosition, enemyBoardCoor, squareSize, canvasColor)
+        case Some(selectedBoardMark) =>
+          val boardMark = me.enemyBoardMarks(enemyBoardCoor.x)(enemyBoardCoor.y)._2
+          (boardMark, selectedBoardMark) match {
+            case (
+                  BoardMark.ShipHit | BoardMark.ManualShip,
+                  InGameMarkSelector.FillWaterSelector
+                ) =>
+              drawImageAbs(
+                renderingCtx,
+                fillWaterImage.element,
+                x = boardPosition.x + enemyBoardCoor.x * squareSize + 2,
+                y = boardPosition.y + enemyBoardCoor.y * squareSize + 2,
+                squareSize - 4,
+                squareSize - 4,
+                useAntiAliasing = true
+              )
+            case (boardMark, _) if !boardMark.isPermanent =>
+              val canvasColor: CanvasColor =
+                selectedBoardMark match {
+                  case InGameMarkSelector.ManualWaterSelector => CanvasColor.Water(alpha = 0.5)
+                  case InGameMarkSelector.ManualShipSelector  => CanvasColor.Ship(alpha = 0.5)
+                  case _                                      => CanvasColor.White()
+                }
+              drawBoardSquare(renderingCtx, boardPosition, enemyBoardCoor, squareSize, canvasColor)
+            case _ =>
           }
         case None
             if turnAttacks.exists(!_.isPlaced) &&
