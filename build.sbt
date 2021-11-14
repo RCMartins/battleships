@@ -27,7 +27,7 @@ inThisBuild(
       "-language:implicitConversions",
       "-language:existentials",
       "-language:dynamics",
-      "-Xfatal-warnings",
+      "-Werror",
       "-Xlint:-unused,_",
       "-Ybackend-parallelism",
       "4",
@@ -35,7 +35,8 @@ inThisBuild(
       "-Ycache-macro-class-loader:last-modified",
       "-Xnon-strict-patmat-analysis",
       "-Xlint:-strict-unsealed-patmat"
-    )
+    ),
+    scalacOptions -= (if (sys.env.contains("BLINKY")) "-Werror" else "")
   )
 )
 

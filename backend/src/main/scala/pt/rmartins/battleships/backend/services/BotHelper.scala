@@ -1,7 +1,6 @@
 package pt.rmartins.battleships.backend.services
 
 import pt.rmartins.battleships.backend.services.BotHelper.BotBoardMark._
-import pt.rmartins.battleships.backend.services.BotHelper.ShipGuess._
 import pt.rmartins.battleships.backend.services.BotHelper._
 import pt.rmartins.battleships.shared.model.game._
 
@@ -251,12 +250,9 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
               logLine(possiblePositionsList.mkString("\n"))
             }
 
-            filterLoop(possiblePositionsList, None).map {
-              case List(coor) => ShipGuessPos(coor)
-              case list       => ShipGuessMultiple(list)
-            }
+            filterLoop(possiblePositionsList, None).map(ShipGuess)
           } else
-            possiblePositionsList.flatMap(_._2).map(ShipGuessPos)
+            possiblePositionsList.flatMap(_._2).map(coor => ShipGuess(List(coor)))
         )
       }
     }
@@ -311,15 +307,13 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
 
         val possibleShipPositions: Set[List[Coordinate]] =
           shipGuesses.flatMap {
-            case ShipGuessPos(guessCoor) =>
-              getSimplePositions(guessCoor)
-            case ShipGuessMultiple(headPosition :: other) =>
+            case ShipGuess(headPosition :: other) =>
               val otherPositionsSet = other.toSet
               getSimplePositions(headPosition).filter { shipPieces =>
                 val shipPiecesSet = shipPieces.toSet
                 otherPositionsSet.forall(shipPiecesSet)
               }
-            case _ =>
+            case _ => // impossible...
               Nil
           }.toSet
 
@@ -793,15 +787,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
 
 object BotHelper {
 
-  sealed trait ShipGuess
-
-  object ShipGuess {
-
-    case class ShipGuessPos(coor: Coordinate) extends ShipGuess
-
-    case class ShipGuessMultiple(positions: List[Coordinate]) extends ShipGuess
-
-  }
+  case class ShipGuess(positions: List[Coordinate])
 
   sealed trait BotBoardMark {
 

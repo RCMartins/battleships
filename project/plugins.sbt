@@ -4,3 +4,5 @@ addSbtPlugin("org.scala-js" % "sbt-scalajs" % "1.7.1")
 addSbtPlugin("org.scala-js" % "sbt-jsdependencies" % "1.0.2")
 addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.7.6")
 addSbtPlugin("org.jetbrains" % "sbt-ide-settings" % "1.1.0")
+
+addSbtPlugin("ch.epfl.scala" % "sbt-bloop" % "1.4.11")
