@@ -97,7 +97,14 @@ class PreGameView(
 
   private def createAllShipElems: Modifier = {
     def createShipCanvas(ship: Ship): Canvas =
-      viewUtils.createShipCanvas(canvasSize, sqSize, ship, destroyed = false, centerInCanvas = true)
+      viewUtils.createShipCanvas(
+        canvasSize,
+        sqSize,
+        ship,
+        destroyed = false,
+        centerXCanvas = true,
+        centerYCanvas = true
+      )
 
     val fleetCoordinateSize = Ship.allShipsFleetMaxX.size
 

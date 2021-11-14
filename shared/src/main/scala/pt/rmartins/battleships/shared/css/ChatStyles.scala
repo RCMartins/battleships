@@ -8,7 +8,12 @@ object ChatStyles extends CssBase {
   import dsl._
 
   val messagesWindow: CssStyle = style(
-    height :=! "calc(50vh - 270px)",
+    height :=! "calc(50vh - 218px)",
+    overflowY.auto
+  )
+
+  val myMovesWindow: CssStyle = style(
+    height :=! "calc(50vh - 172px)",
     overflowY.auto
   )
 

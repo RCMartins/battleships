@@ -20,16 +20,22 @@ class ViewUtils(canvasUtils: CanvasUtils) {
       sqSize: Int,
       ship: Ship,
       destroyed: Boolean,
-      centerInCanvas: Boolean = false,
+      centerXCanvas: Boolean,
+      centerYCanvas: Boolean,
       margin: Coordinate = Coordinate.square(2)
   ): Canvas = {
     val shipCanvas = canvas.render
-    shipCanvas.setAttribute("width", canvasSize.x.toString)
-    shipCanvas.setAttribute("height", canvasSize.y.toString)
+    val sizeWithMargin = canvasSize + margin
+    shipCanvas.setAttribute("width", sizeWithMargin.x.toString)
+    shipCanvas.setAttribute("height", sizeWithMargin.y.toString)
     val renderingCtx = shipCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
     val realShipSize = ship.size * sqSize
     val initialPosition =
-      margin + (if (centerInCanvas) canvasSize / 2 - realShipSize / 2 else Coordinate.origin)
+      margin / 2 +
+        Coordinate(
+          if (centerXCanvas) canvasSize.x / 2 - realShipSize.x / 2 else 0,
+          if (centerYCanvas) canvasSize.y / 2 - realShipSize.y / 2 else 0
+        )
     ship.pieces.foreach { shipPiece =>
       canvasUtils.drawBoardSquare(
         renderingCtx,
@@ -51,12 +57,24 @@ class ViewUtils(canvasUtils: CanvasUtils) {
     shipCanvas
   }
 
-  def createWaterCanvas(canvasSize: Coordinate, sqSize: Int): Canvas = {
+  def createWaterCanvas(
+      canvasSize: Coordinate,
+      sqSize: Int,
+      centerXCanvas: Boolean,
+      centerYCanvas: Boolean,
+      margin: Coordinate = Coordinate.square(2)
+  ): Canvas = {
     val waterCanvas = canvas.render
-    waterCanvas.setAttribute("width", canvasSize.x.toString)
-    waterCanvas.setAttribute("height", canvasSize.y.toString)
+    val sizeWithMargin = canvasSize + margin
+    waterCanvas.setAttribute("width", sizeWithMargin.x.toString)
+    waterCanvas.setAttribute("height", sizeWithMargin.y.toString)
     val renderingCtx = waterCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
-    val initialPosition = Coordinate(1, canvasSize.y / 2 - (sqSize / 2))
+    val initialPosition =
+      margin / 2 +
+        Coordinate(
+          if (centerXCanvas) canvasSize.x / 2 - sqSize / 2 else 0,
+          if (centerYCanvas) canvasSize.y / 2 - sqSize / 2 else 0
+        )
     canvasUtils.drawBoardSquare(
       renderingCtx,
       initialPosition,

@@ -8,6 +8,7 @@ import io.udash.bootstrap.button.UdashButton
 import io.udash.bootstrap.card.UdashCard
 import io.udash.bootstrap.form.UdashForm.FormEvent
 import io.udash.bootstrap.form.{FormElementsFactory, UdashForm, UdashInputGroup}
+import io.udash.bootstrap.utils.BootstrapStyles
 import io.udash.bootstrap.utils.BootstrapStyles.Color
 import io.udash.bootstrap.utils.UdashIcons.FontAwesome
 import io.udash.component.ComponentId
@@ -479,7 +480,11 @@ class GameView(
             `class` := "input-group-text",
             `for` := "missesMoves-checkbox",
             style := "user-select: none",
-            nested(translatedDynamic(Translations.Game.missesMoves)(_.apply()))
+            span(FontAwesome.Solid.eye),
+            span(
+              `class` := "pl-1",
+              nested(translatedDynamic(Translations.Game.missesMoves)(_.apply()))
+            )
           )
         ),
         div(
@@ -489,14 +494,18 @@ class GameView(
             `class` := "input-group-text",
             `for` := "disabledMoves-checkbox",
             style := "user-select: none",
-            nested(translatedDynamic(Translations.Game.disabledMoves)(_.apply()))
+            span(FontAwesome.Solid.eye),
+            span(
+              `class` := "pl-1",
+              nested(translatedDynamic(Translations.Game.disabledMoves)(_.apply()))
+            )
           )
         )
       )
     )
   }
 
-  private def messagesTabItem(nested: Binding.NestedInterceptor): Div =
+  private def messagesTabItem(nested: Binding.NestedInterceptor): JsDom.TypedTag[Div] =
     div(
       `class` := "tab-pane fade" +
         (if (presenter.selectedTabProperty.get == ScreenModel.chatTab)
@@ -504,20 +513,22 @@ class GameView(
          else ""),
       id := ScreenModel.chatTab,
       role := "tabpanel",
-      ChatStyles.messagesWindow,
-      nested(repeat(presenter.chatMessagesProperty) { msgProperty =>
-        val msg = msgProperty.get
-        div(
-          ChatStyles.msgContainer,
-          strong(msg.author, ": "),
-          span(msg.text),
-          span(ChatStyles.msgDate, msg.created.toString)
-        ).render
-      })
-    ).render
+      div(
+        ChatStyles.messagesWindow,
+        nested(repeat(presenter.chatMessagesProperty) { msgProperty =>
+          val msg = msgProperty.get
+          div(
+            ChatStyles.msgContainer,
+            strong(msg.author, ": "),
+            span(msg.text),
+            span(ChatStyles.msgDate, msg.created.toString)
+          ).render
+        })
+      ),
+      msgForm
+    )
 
   private def turnPlaysToHtml(showCheckbox: Boolean, turnPlay: TurnPlay): Seq[dom.Element] = {
-    val sqSize = 9
     val fleetMaxSize: Coordinate = {
       val size =
         gameStateModel.get.gameState.map(_.rules.gameFleet.size).getOrElse(Coordinate.origin)
@@ -526,7 +537,8 @@ class GameView(
       else
         size
     }
-    val canvasSize: Coordinate = fleetMaxSize * sqSize + Coordinate.square(4)
+    val sqSize = if (fleetMaxSize.y > 4) 7 else if (fleetMaxSize.y > 3) 8 else 10
+    val canvasSize: Coordinate = fleetMaxSize * sqSize
 
     def emptyCanvasDiv: Div = {
       val emptyCanvas: Canvas = canvas(`class` := "mr-3").render
@@ -549,12 +561,24 @@ class GameView(
         turnPlay.hitHints.flatMap {
           case HitHint.Water =>
             Seq[Modifier](
-              viewUtils.createWaterCanvas(canvasSize, sqSize),
+              viewUtils.createWaterCanvas(
+                canvasSize,
+                sqSize,
+                centerXCanvas = false,
+                centerYCanvas = true
+              ),
               viewUtils.createEmptyCanvas(x = sqSize * 2, y = canvasSize.y)
             )
           case HitHint.ShipHit(shipId, destroyed) =>
             Seq[Modifier](
-              viewUtils.createShipCanvas(canvasSize, sqSize, Ship.shipMaxXMap(shipId), destroyed),
+              viewUtils.createShipCanvas(
+                canvasSize,
+                sqSize,
+                Ship.shipMaxXMap(shipId),
+                destroyed,
+                centerXCanvas = false,
+                centerYCanvas = true
+              ),
               viewUtils.createEmptyCanvas(x = sqSize * 2, y = canvasSize.y)
             )
         }
@@ -630,7 +654,7 @@ class GameView(
          else ""),
       id := ScreenModel.myMovesTab,
       role := "tabpanel",
-      ChatStyles.messagesWindow,
+      ChatStyles.myMovesWindow,
       nested(produce(presenter.myMovesHistoryProperty) { turnPlaySeqProperty =>
         turnPlaySeqProperty.flatMap(turnPlay => turnPlaysToHtml(showCheckbox = true, turnPlay))
       })
@@ -644,7 +668,7 @@ class GameView(
          else ""),
       id := ScreenModel.enemyMovesTab,
       role := "tabpanel",
-      ChatStyles.messagesWindow,
+      ChatStyles.myMovesWindow,
       nested(repeat(presenter.enemyMovesHistoryProperty) { turnPlayProperty =>
         turnPlaysToHtml(showCheckbox = false, turnPlayProperty.get)
       })
@@ -663,11 +687,14 @@ class GameView(
   private val msgForm = UdashForm(
     componentId = ComponentId("msg-from")
   )(factory =>
-    factory.disabled(presenter.gameModeProperty.transform(_.isEmpty))(nested =>
-      nested(
-        UdashInputGroup()(
-          UdashInputGroup.input(msgInput.render),
-          UdashInputGroup.appendButton(submitButton)
+    Seq[Modifier](
+      `class` := "my-1",
+      factory.disabled(presenter.gameModeProperty.transform(_.isEmpty))(nested =>
+        nested(
+          UdashInputGroup()(
+            UdashInputGroup.input(msgInput.render),
+            UdashInputGroup.appendButton(submitButton)
+          )
         )
       )
     )
@@ -985,8 +1012,12 @@ class GameView(
           )
         ),
         factory.footer(nested => nested(mainGameForm)),
-        factory.body(messagesTab),
-        factory.footer(nested => nested(msgForm))
+        factory.body(nested =>
+          Seq[Modifier](
+            `class` := "py-1",
+            messagesTab(nested)
+          )
+        )
       )
     )
   )
