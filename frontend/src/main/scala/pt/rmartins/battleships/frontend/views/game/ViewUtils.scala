@@ -8,6 +8,8 @@ import scalatags.JsDom.all._
 
 class ViewUtils(canvasUtils: CanvasUtils) {
 
+  val defaultMargin: Coordinate = Coordinate.square(2)
+
   def createEmptyCanvas(x: Int, y: Int): Canvas = {
     val emptyCanvas = canvas.render
     emptyCanvas.setAttribute("width", x.toString)
@@ -22,7 +24,7 @@ class ViewUtils(canvasUtils: CanvasUtils) {
       destroyed: Boolean,
       centerXCanvas: Boolean,
       centerYCanvas: Boolean,
-      margin: Coordinate = Coordinate.square(2)
+      margin: Coordinate = defaultMargin
   ): Canvas = {
     val shipCanvas = canvas.render
     val sizeWithMargin = canvasSize + margin
@@ -62,7 +64,7 @@ class ViewUtils(canvasUtils: CanvasUtils) {
       sqSize: Int,
       centerXCanvas: Boolean,
       centerYCanvas: Boolean,
-      margin: Coordinate = Coordinate.square(2)
+      margin: Coordinate = defaultMargin
   ): Canvas = {
     val waterCanvas = canvas.render
     val sizeWithMargin = canvasSize + margin

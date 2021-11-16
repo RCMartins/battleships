@@ -28,7 +28,7 @@ class PreGameView(
   import translationsService._
 
   private val defaultHeight = 332
-  private val fleetMaxSize: Coordinate = Ship.allShipsFleetMaxX.size
+  private val fleetMaxSize: Coordinate = Ship.allShipsFleetMaxX.maxSize
   private val sqSize: Int = Math.min(100 / fleetMaxSize.x, 50 / fleetMaxSize.y)
   private val canvasSize: Coordinate = fleetMaxSize * sqSize + Coordinate.square(4)
 
@@ -106,14 +106,7 @@ class PreGameView(
         centerYCanvas = true
       )
 
-    val fleetCoordinateSize = Ship.allShipsFleetMaxX.size
-
     Ship.allShipsFleetMaxX.ships.map { ship =>
-      val bestShipRotation =
-        Some(Ship.getShip(ship.shipId, Rotation.Rotation0))
-          .filter(_.size <= fleetCoordinateSize)
-          .getOrElse(ship)
-
       val shipCountProperty =
         gamePresenter.getPreGameShipProperty(ship.shipId)
 
@@ -148,7 +141,7 @@ class PreGameView(
           `class` := "row m-0",
           div(
             `class` := "mx-2",
-            createShipCanvas(bestShipRotation)
+            createShipCanvas(ship)
           )
         )
       )

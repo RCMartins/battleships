@@ -292,8 +292,6 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
         uniqueRotations.flatMap { ship =>
           ship.pieces.flatMap { shipPiece =>
             val diffDist = guessCoor - shipPiece
-            if (shipId.id == 4)
-              logLine(ship.pieces.map(_ + diffDist))
             List(ship.pieces.map(_ + diffDist))
               .filter(shipIsPossible(shipId, _, botBoardMarks, cachedTurnPlays))
           }
@@ -302,9 +300,6 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
       def processShipGuesses(
           shipGuesses: List[ShipGuess]
       ): (Option[BotBoardMarks], Set[Coordinate], Set[Coordinate]) = {
-//        logLine("shipGuesses:")
-//        logLine(shipGuesses.mkString("\n"))
-
         val possibleShipPositions: Set[List[Coordinate]] =
           shipGuesses.flatMap {
             case ShipGuess(headPosition :: other) =>

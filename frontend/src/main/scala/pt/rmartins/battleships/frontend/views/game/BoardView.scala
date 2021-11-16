@@ -12,7 +12,6 @@ import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
 import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit
 import pt.rmartins.battleships.shared.model.game._
-import pt.rmartins.battleships.shared.model.utils.BoardUtils
 import pt.rmartins.battleships.shared.model.utils.BoardUtils.canPlaceInBoard
 import scalatags.JsDom.all._
 
@@ -211,7 +210,6 @@ class BoardView(
 
   private val SummaryShipsSqSize: ReadableProperty[Int] = SquareSizeMedium
   private val DestructionSummaryHitCountSize: ReadableProperty[Int] = SquareSizeSmall
-  private val DestructionSummaryMargin: ReadableProperty[Int] = SizeSmall
   private val SummaryMaxY: ReadableProperty[Int] =
     combine(BoardSizeProperty, EnemyBoardSqSize, SummaryShipsSqSize).transform {
       case (boardSize, enemyBoardSqSize, summaryShipsSqSize) =>
@@ -223,31 +221,29 @@ class BoardView(
       gamePresenter.modeTypeProperty,
       MissilesInicialPos,
       MissilesSqSize,
-      DestructionSummaryHitCountSize,
-      DestructionSummaryMargin
+      DestructionSummaryHitCountSize
     )
       .transform {
         case (
               Some(modeType @ (PlayingModeType | GameOverModeType)),
               missilesPos,
               missilesSize,
-              destructionSummaryHitCountSize,
-              destructionSummaryMargin
+              destructionSummaryHitCountSize
             ) =>
           missilesPos +
             Coordinate(
               if (modeType == PlayingModeType)
-                missilesSize + destructionSummaryHitCountSize * 2 + destructionSummaryMargin * 3
+                missilesSize + destructionSummaryHitCountSize * 2
               else
-                destructionSummaryHitCountSize * 2 + destructionSummaryMargin * 3,
+                destructionSummaryHitCountSize * 2,
               0
             )
         case _ =>
           Coordinate.origin
       }
 
-  private val DestructionSummaryCombined: ReadableProperty[(Coordinate, Int, Int)] =
-    combine(DestructionSummaryPos, SummaryShipsSqSize, DestructionSummaryMargin)
+  private val DestructionSummaryCombined: ReadableProperty[(Coordinate, Int)] =
+    combine(DestructionSummaryPos, SummaryShipsSqSize)
 
   private val PlaceShipBoardMargin = Coordinate.square(20)
 
@@ -265,7 +261,7 @@ class BoardView(
         ): List[List[ViewShip]] =
           ships match {
             case (ship :: _) :: _ if posY > 0 && posY + ship.pieces.maxBy(_.y).y >= summaryMaxY =>
-              val newColumnX = maxX + 6
+              val newColumnX = maxX + 4
               getShipsToPlacePos(
                 posX = newColumnX,
                 posY = 0,
@@ -321,7 +317,9 @@ class BoardView(
               val size = ships.size
               val fullSizeX = ship.size.x * size + size - 1
               val fullSizeY = ship.size.y * size + size - 1
-              if (Math.max(minX, fullSizeX) * ship.size.y < Math.max(minX, fullSizeY) * ship.size.x)
+              if (
+                Math.max(minX, fullSizeX) * ship.size.y <= Math.max(minX, fullSizeY) * ship.size.x
+              )
                 (shipId, ships)
               else
                 (shipId, ships.map(_.rotateBy(1)))
@@ -411,7 +409,7 @@ class BoardView(
             shipsSummary,
             Some(turnPlayHistory),
             Some(PlayingModeType | GameOverModeType),
-            (destructionSummaryPos, destructionSummarySqSize, destructionSummaryMargin),
+            (destructionSummaryPos, destructionSummarySqSize),
             destructionSummaryHitCountSize
           ) =>
         val shipsDestroyed: Map[ShipId, Int] =
@@ -441,7 +439,7 @@ class BoardView(
               (max + min) / 2 + destructionSummarySqSize / 2 -
                 destructionSummaryHitCountSize / 2 + 1
             Coordinate(
-              minX - destructionSummaryMargin - destructionSummarySqSize,
+              minX,
               centerY
             )
           }
@@ -577,6 +575,35 @@ class BoardView(
           .map(_._1)
       case _ =>
         None
+    }
+
+  val myBoardWaterCoordinatesSeqProperty: ReadableProperty[List[Coordinate]] =
+    gamePresenter.meProperty.transform(_.map(_.myBoard)).transform {
+      case Some(myBoard) =>
+        val boardSize: Coordinate =
+          myBoard.boardSize
+        val water: Array[Array[Boolean]] =
+          Array.fill(boardSize.x, boardSize.y)(false)
+
+        myBoard.ships.foreach { case ShipInBoard(ship, position) =>
+          ship.pieces
+            .map(_ + position)
+            .foreach { case Coordinate(x, y) =>
+              for (dx <- -1 to 1; dy <- -1 to 1)
+                Some(Coordinate(x + dx, y + dy)).filter(_.isInsideBoard(boardSize)).foreach {
+                  case Coordinate(cx, cy) =>
+                    water(cx)(cy) = true
+                }
+            }
+        }
+
+        (for {
+          x <- 0 until boardSize.x
+          y <- 0 until boardSize.y
+          if water(x)(y)
+        } yield Coordinate(x, y)).toList
+      case _ =>
+        Nil
     }
 
   def paint(): Unit = {
@@ -768,31 +795,16 @@ class BoardView(
     }
 
     if (!hideMyBoard) {
-      if (!fillEmptySquares) {
-        val water: Array[Array[Boolean]] =
-          Array.fill(boardSize.x, boardSize.y)(fillEmptySquares) // TODO property & Array->Vector
-
-        me.myBoard.ships.foreach { case ShipInBoard(ship, position) =>
-          ship.pieces
-            .map(_ + position)
-            .foreach { case Coordinate(x, y) =>
-              for (dx <- -1 to 1; dy <- -1 to 1)
-                Some(Coordinate(x + dx, y + dy)).filter(_.isInsideBoard(boardSize)).foreach {
-                  case Coordinate(cx, cy) => water(cx)(cy) = true
-                }
-            }
+      if (!fillEmptySquares)
+        myBoardWaterCoordinatesSeqProperty.get.foreach { case Coordinate(x, y) =>
+          drawBoardSquare(
+            renderingCtx,
+            boardPosition,
+            Coordinate(x, y),
+            squareSize,
+            CanvasColor.Water()
+          )
         }
-
-        for (x <- 0 until boardSize.x; y <- 0 until boardSize.y)
-          if (water(x)(y))
-            drawBoardSquare(
-              renderingCtx,
-              boardPosition,
-              Coordinate(x, y),
-              squareSize,
-              CanvasColor.Water()
-            )
-      }
 
       me.myBoard.ships.foreach { case ShipInBoard(ship, position) =>
         ship.pieces
@@ -1164,14 +1176,12 @@ class BoardView(
     val hitCountSize = DestructionSummaryHitCountSize.get
     allShipsSummaryCoordinates.get.foreach { case (_, summaryCenter, hitCount, summaryShipList) =>
       if (hitCount > 0) {
-        val relCoor = summaryCenter + Coordinate(-4, hitCountSize / 2)
+        val relCoor = summaryCenter + Coordinate(-6, hitCountSize / 2)
         renderingCtx.fillStyle = s"rgb(0, 0, 0)"
         renderingCtx.font = s"bold ${sqSize}px serif"
         renderingCtx.textBaseline = "middle"
         renderingCtx.textAlign = "right"
         renderingCtx.fillText(s"+$hitCount", relCoor.x, relCoor.y)
-
-        drawCrosshairAbs(renderingCtx, summaryCenter, hitCountSize, lineWidth = 2.0, alpha = 1.0)
       }
       summaryShipList.foreach { case SummaryShip(summaryShip, pieces, destroyed) =>
         pieces.foreach { shipPiece =>

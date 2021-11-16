@@ -531,7 +531,7 @@ class GameView(
   private def turnPlaysToHtml(showCheckbox: Boolean, turnPlay: TurnPlay): Seq[dom.Element] = {
     val fleetMaxSize: Coordinate = {
       val size =
-        gameStateModel.get.gameState.map(_.rules.gameFleet.size).getOrElse(Coordinate.origin)
+        gameStateModel.get.gameState.map(_.rules.gameFleet.maxSize).getOrElse(Coordinate.origin)
       if (size.y > size.x)
         size.flipCoor
       else
@@ -542,8 +542,9 @@ class GameView(
 
     def emptyCanvasDiv: Div = {
       val emptyCanvas: Canvas = canvas(`class` := "mr-3").render
-      emptyCanvas.setAttribute("width", canvasSize.x.toString)
-      emptyCanvas.setAttribute("height", canvasSize.y.toString)
+      val sizeWithMargin = canvasSize + viewUtils.defaultMargin
+      emptyCanvas.setAttribute("width", sizeWithMargin.x.toString)
+      emptyCanvas.setAttribute("height", sizeWithMargin.y.toString)
       div(emptyCanvas).render
     }
 
@@ -574,7 +575,7 @@ class GameView(
               viewUtils.createShipCanvas(
                 canvasSize,
                 sqSize,
-                Ship.shipMaxXMap(shipId),
+                Ship.shipMaxXMessagesMap(shipId),
                 destroyed,
                 centerXCanvas = false,
                 centerYCanvas = true

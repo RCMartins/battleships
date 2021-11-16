@@ -6,7 +6,7 @@ case class Fleet(ships: List[Ship]) {
 
   lazy val shipAmount: Int = ships.size
 
-  lazy val size: Coordinate =
+  lazy val maxSize: Coordinate =
     Coordinate(ships.maxBy(_.size.x).size.x, ships.maxBy(_.size.y).size.y)
 
   lazy val shipsCounter: Map[ShipId, Int] =

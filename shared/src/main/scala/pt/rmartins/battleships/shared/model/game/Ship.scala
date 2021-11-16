@@ -102,15 +102,32 @@ object Ship extends HasGenCodec[Ship] {
   val shipNames: Map[ShipId, String] =
     allShipsListNames.map { case (ship, name) => ship.shipId -> name }.toMap
 
-  lazy val allShipsFleetMaxX: Fleet =
+  lazy val allShipsFleetMaxX: Fleet = {
+    val initialFleet =
+      Fleet(
+        allShipsList.map { ship =>
+          if (ship.size.y > ship.size.x) ship.rotateBy(1) else ship
+        }
+      )
+
+    val fleetCoordinateSize = initialFleet.maxSize
+
     Fleet(
-      allShipsList.map { ship =>
-        if (ship.size.y > ship.size.x) ship.rotateBy(1) else ship
+      initialFleet.ships.map { ship =>
+        Some(getShip(ship.shipId, Rotation.Rotation0))
+          .filter(_.size <= fleetCoordinateSize)
+          .getOrElse(ship)
       }
     )
+  }
 
-  lazy val shipMaxXMap: Map[ShipId, Ship] =
-    allShipsFleetMaxX.ships.map(ship => ship.shipId -> ship).toMap
+  lazy val shipMaxXMessagesMap: Map[ShipId, Ship] =
+    allShipsList
+      .map { ship =>
+        if (ship.size.y > ship.size.x) ship.rotateBy(1) else ship
+      }
+      .map(ship => ship.shipId -> ship)
+      .toMap
 
   private val cacheRotations: mutable.Map[(ShipId, Int), Ship] =
     mutable.Map.empty[(ShipId, Int), Ship] ++
@@ -146,15 +163,18 @@ object Ship extends HasGenCodec[Ship] {
       ship.mapPieces(_ + coor)
     }
 
-    val shipRotation0 = cacheRotations((shipId, Rotation0.rIndex))
+    val shipRotation0: Ship = {
+      val ship = cacheRotations((shipId, Rotation0.rIndex))
+      ship.mapPieces(_ - ship.size)
+    }
     moveNegativeCoor(
       rotation match {
         case Rotation1 =>
-          shipRotation0.mapPieces({ case Coordinate(x, y) => Coordinate(y, x) })
-        case Rotation2 =>
-          shipRotation0.mapPieces({ case Coordinate(x, y) => Coordinate(x, -y) })
-        case Rotation3 =>
           shipRotation0.mapPieces({ case Coordinate(x, y) => Coordinate(-y, x) })
+        case Rotation2 =>
+          shipRotation0.mapPieces({ case Coordinate(x, y) => Coordinate(-x, -y) })
+        case Rotation3 =>
+          shipRotation0.mapPieces({ case Coordinate(x, y) => Coordinate(y, -x) })
         case _ =>
           shipRotation0
       }
