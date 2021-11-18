@@ -8,7 +8,6 @@ import io.udash.bootstrap.button.UdashButton
 import io.udash.bootstrap.card.UdashCard
 import io.udash.bootstrap.form.UdashForm.FormEvent
 import io.udash.bootstrap.form.{FormElementsFactory, UdashForm, UdashInputGroup}
-import io.udash.bootstrap.utils.BootstrapStyles
 import io.udash.bootstrap.utils.BootstrapStyles.Color
 import io.udash.bootstrap.utils.UdashIcons.FontAwesome
 import io.udash.component.ComponentId
@@ -16,7 +15,7 @@ import io.udash.css._
 import io.udash.i18n._
 import org.scalajs.dom
 import org.scalajs.dom._
-import org.scalajs.dom.html.{Canvas, Div, LI, Span}
+import org.scalajs.dom.html.{Canvas, Div, Input, LI, Span}
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
@@ -93,7 +92,7 @@ class GameView(
     Seq[Modifier](span(nested(translatedDynamic(Translations.Game.startGameVsPlayer)(_.apply()))))
   )
 
-  private def usernameInput(factory: FormElementsFactory) =
+  private def usernameInput(factory: FormElementsFactory): Element =
     factory.input
       .formGroup(groupId = ComponentId("username")) { nested =>
         factory.input
@@ -111,6 +110,13 @@ class GameView(
       }
       .render
       .tap(_.classList.add("my-0"))
+      .tap { elem =>
+        elem.asInstanceOf[Input].onkeypress = (event: KeyboardEvent) => {
+          if (event.key.equalsIgnoreCase("Enter")) {
+            presenter.startGameWith(preGameModel.subProp(_.enemyUsername).get)
+          }
+        }
+      }
 
   private val confirmShipsButton =
     UdashButton(
