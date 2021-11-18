@@ -144,6 +144,33 @@ class GameView(
       disabled = presenter.gameStateProperty.transform(!_.exists(_.me.shipsLeftToPlace.nonEmpty))
     )(nested => Seq(nested(translatedDynamic(Translations.Game.randomButton)(_.apply()))))
 
+  private val cancelQueuedAttacksButton =
+    UdashButton(
+      buttonStyle = Color.Danger.toProperty,
+      block = true.toProperty,
+      componentId = ComponentId("cancel-queued-attacks-button")
+    )(_ => Seq[Modifier](`class` := "invisible", span(FontAwesome.Solid.times).render))
+
+  gameModel
+    .subProp(_.turnAttacksQueuedStatus)
+    .listen(
+      { attacksQueuedStatus =>
+        val cancelButtonOpt: Option[Element] =
+          Option(document.getElementById(cancelQueuedAttacksButton.componentId.value))
+        cancelButtonOpt.foreach { cancelButton =>
+          attacksQueuedStatus match {
+            case AttacksQueuedStatus.Queued =>
+              cancelButton.classList.remove("invisible")
+              cancelButton.classList.add("visible")
+            case _ =>
+              cancelButton.classList.remove("visible")
+              cancelButton.classList.add("invisible")
+          }
+        }
+      },
+      initUpdate = true
+    )
+
   private val launchAttackButton = {
     val launchAttackIsDisabledProperty =
       gameModel
@@ -255,7 +282,11 @@ class GameView(
         case (Some(PlayingModeType), _) =>
           div(
             `class` := "row justify-content-between",
-            div(`class` := "mx-2", launchAttackButton),
+            div(
+              `class` := "row mx-2",
+              div(`class` := "mx-0", cancelQueuedAttacksButton),
+              div(`class` := "mx-1", launchAttackButton)
+            ),
             div(`class` := "mx-2", hideMyBoardButton)
           ).render
         case (Some(GameOverModeType), _) =>
@@ -292,6 +323,10 @@ class GameView(
 
   randomPlacementButton.listen { _ =>
     presenter.randomPlacement()
+  }
+
+  cancelQueuedAttacksButton.listen { _ =>
+    presenter.cancelQueuedAttacks()
   }
 
   launchAttackButton.listen { _ =>

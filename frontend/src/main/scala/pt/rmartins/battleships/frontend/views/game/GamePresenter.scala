@@ -749,6 +749,12 @@ class GamePresenter(
                 }
 
               gameModel.subProp(_.turnAttacks).set(turnAttackUpdated)
+
+              if (
+                gameModel.get.turnAttacksQueuedStatus == AttacksQueuedStatus.Queued &&
+                turnAttackUpdated.exists(!_.isPlaced)
+              )
+                gameModel.subProp(_.turnAttacksQueuedStatus).set(AttacksQueuedStatus.NotSet)
             }
           case None =>
             (selectedShip, boardView.summaryShipHover.get) match {
@@ -1100,7 +1106,7 @@ class GamePresenter(
                 y <- 0 until me.myBoard.boardSize.y
                 rotation <- Rotation.all
               } yield (Coordinate(x, y), rotation)
-            val result =
+            val result: Option[(Coordinate, Rotation)] =
               Random
                 .shuffle(possibleCoorList)
                 .find { case (coor, rotation) =>
@@ -1111,6 +1117,16 @@ class GamePresenter(
               randomPlacement()
           case Nil =>
         }
+      case _ =>
+    }
+
+  def cancelQueuedAttacks(): Unit =
+    (
+      gameModel.get.turnAttacksQueuedStatus,
+      gameStateProperty.get
+    ) match {
+      case (AttacksQueuedStatus.Queued, Some(GameState(_, _, _, _, _: PlayingMode))) =>
+        gameModel.subProp(_.turnAttacksQueuedStatus).set(AttacksQueuedStatus.NotSet)
       case _ =>
     }
 
