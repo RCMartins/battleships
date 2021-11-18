@@ -163,12 +163,52 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
       } else
         updatedBotBoardMarks
 
+    val updatedBotBoardMarks3: BotBoardMarks =
+      hitHints.flatMap(_.shipIdDestroyedOpt).foldLeft(updatedBotBoardMarks2) {
+        case (botBoardMarks, destroyedShipId) =>
+          val shipGuesser = allShipGuessers(destroyedShipId)
+          shipGuesser.checkPossiblePositions(botBoardMarks) match {
+            case Some(shipGuesses) =>
+              val possibleShipPositionsSet: Set[List[Coordinate]] =
+                shipGuesser.possibleShipPositions(botBoardMarks, shipGuesses)
+
+              if (possibleShipPositionsSet.sizeIs == 1) {
+                val shipPos: Set[Coordinate] =
+                  possibleShipPositionsSet.flatten
+                val water: Set[Coordinate] =
+                  (shipPos.flatMap(_.get8CoorAround) -- shipPos).filter(_.isInsideBoard(boardSize))
+                val outsideTurnCoordinates: Set[Coordinate] =
+                  shipGuesser.getTurnsWithShip.flatMap { case TurnPlay(_, turnAttacks, _) =>
+                    turnAttacks.flatMap(_.coordinateOpt)
+                  }.toSet -- shipPos -- water
+                val updates: Set[(Coordinate, BotBoardMark)] =
+                  shipPos.map(_ -> BotBoardMark.ShipExclusive(Set(destroyedShipId))) ++
+                    water.map(_ -> (BotBoardMark.Water: BotBoardMark)) ++
+                    outsideTurnCoordinates.flatMap { coor =>
+                      getMark(botBoardMarks, coor) match {
+                        case ShipOrWater(shipIds) =>
+                          Some(coor -> shipOrWater(shipIds - destroyedShipId))
+                        case ShipExclusive(shipIds) =>
+                          Some(coor -> ShipExclusive(shipIds - destroyedShipId))
+                        case _ =>
+                          None
+                      }
+                    }
+
+                updates.foldLeft(botBoardMarks) { case (upBoardMarks, (coor, botBoardMark)) =>
+                  forceSetBoardMark(upBoardMarks, coor, botBoardMark)
+                }
+              } else
+                botBoardMarks
+            case _ =>
+              botBoardMarks
+          }
+      }
+
     logLine("printBotBoard1")
-    logBotBoardMarks(boardSize, updatedBotBoardMarks2)
+    logBotBoardMarks(boardSize, updatedBotBoardMarks3)
 
-    //TODO check destroyed ships to update positions + water
-
-    cachedBotBoardMarks = updatedBotBoardMarks2
+    cachedBotBoardMarks = updatedBotBoardMarks3
   }
 
   private class ShipGuesser(val shipId: ShipId) {
@@ -178,9 +218,71 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
 
     private var turnsWithShip: List[TurnPlay] = Nil
 
+    def getTurnsWithShip: List[TurnPlay] = turnsWithShip
+
     def updateTurnPlay(turnPlay: TurnPlay): Unit =
       if (turnPlay.hitHints.exists(_.shipIdOpt.contains(shipId)))
         turnsWithShip = turnPlay :: turnsWithShip
+
+    def checkPossiblePositions(boardMarks: BotBoardMarks): Option[List[ShipGuess]] = {
+      val possiblePositionsList: List[(List[HitHint], List[Coordinate])] =
+        turnsWithShip
+          .map { case TurnPlay(_, turnAttacks, hitHints) =>
+            (
+              hitHints,
+              turnAttacks
+                .filter(_.attackType == AttackType.Simple)
+                .flatMap(_.coordinateOpt)
+                .filter { coor =>
+                  getMark(boardMarks, coor) match {
+                    case Empty                  => true
+                    case Water                  => false
+                    case ShipOrWater(shipIds)   => shipIds.contains(shipId)
+                    case ShipExclusive(shipIds) => shipIds.contains(shipId)
+                  }
+                }
+            )
+          }
+          .filter(_._2.nonEmpty)
+
+      Some(
+        if (shipsCounter == 1) {
+          @tailrec
+          def filterLoop(
+              remainingPositionsList: List[(List[HitHint], List[Coordinate])],
+              currentPossibilitiesOpt: Option[List[List[Coordinate]]]
+          ): List[List[Coordinate]] =
+            remainingPositionsList match {
+              case Nil =>
+                currentPossibilitiesOpt.getOrElse(Nil)
+              case (hitHints, coordinates) :: next =>
+                val amount = hitHints.flatMap(_.shipIdOpt).count(_ == shipId)
+                val comb = Utils.combinations(coordinates, amount = amount)
+                currentPossibilitiesOpt match {
+                  case None =>
+                    filterLoop(next, Some(comb))
+                  case Some(currentPossibilities) =>
+                    filterLoop(
+                      next,
+                      Some(
+                        currentPossibilities.flatMap { list =>
+                          comb.map(list ++ _)
+                        }
+                      )
+                    )
+                }
+            }
+
+          if (possiblePositionsList.nonEmpty) {
+            logLine(s"possiblePositionsList: ${possiblePositionsList.size}")
+            logLine(possiblePositionsList.mkString("\n"))
+          }
+
+          filterLoop(possiblePositionsList, None).map(ShipGuess)
+        } else
+          possiblePositionsList.flatMap(_._2).map(coor => ShipGuess(List(coor)))
+      )
+    }
 
     def baseShipsHit(boardMarks: BotBoardMarks): Option[List[ShipGuess]] = {
       val destroyedCount: Int =
@@ -191,70 +293,8 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
 
       if (aliveShips == 0)
         None
-      else {
-        val possiblePositionsList: List[(List[HitHint], List[Coordinate])] =
-          turnsWithShip
-            .map { case TurnPlay(_, turnAttacks, hitHints) =>
-              (
-                hitHints,
-                turnAttacks
-                  .filter(_.attackType == AttackType.Simple)
-                  .flatMap(_.coordinateOpt)
-                  .filter { coor =>
-                    getMark(boardMarks, coor) match {
-                      case Empty                  => true
-                      case Water                  => false
-                      case ShipOrWater(shipIds)   => shipIds.contains(shipId)
-                      case ShipExclusive(shipIds) => shipIds.contains(shipId)
-                    }
-                  }
-              )
-            }
-            .filter(_._2.nonEmpty)
-
-        Some(
-          if (shipsCounter == 1) {
-            @tailrec
-            def filterLoop(
-                remainingPositionsList: List[(List[HitHint], List[Coordinate])],
-                currentPossibilitiesOpt: Option[List[List[Coordinate]]]
-            ): List[List[Coordinate]] =
-              remainingPositionsList match {
-                case Nil =>
-//                  logLine("currentPossibilitiesOpt:")
-//                  logLine(currentPossibilitiesOpt.getOrElse(Nil).mkString("\n"))
-                  currentPossibilitiesOpt.getOrElse(Nil)
-                case (hitHints, coordinates) :: next =>
-                  val amount = hitHints.flatMap(_.shipIdOpt).count(_ == shipId)
-                  val comb = Utils.combinations(coordinates, amount = amount)
-//                  logLine(s"comb ($coordinates -> $amount:")
-//                  logLine(comb.mkString("\n"))
-//                  logLine("+" * 50)
-                  currentPossibilitiesOpt match {
-                    case None =>
-                      filterLoop(next, Some(comb))
-                    case Some(currentPossibilities) =>
-                      filterLoop(
-                        next,
-                        Some(
-                          currentPossibilities.flatMap { list =>
-                            comb.map(list ++ _)
-                          }
-                        )
-                      )
-                  }
-              }
-
-            if (possiblePositionsList.nonEmpty) {
-              logLine(s"possiblePositionsList: ${possiblePositionsList.size}")
-              logLine(possiblePositionsList.mkString("\n"))
-            }
-
-            filterLoop(possiblePositionsList, None).map(ShipGuess)
-          } else
-            possiblePositionsList.flatMap(_._2).map(coor => ShipGuess(List(coor)))
-        )
-      }
+      else
+        checkPossiblePositions(boardMarks)
     }
 
     private val getBlindShipPositions: (BotBoardMarks, Int) => LazyList[(Ship, Coordinate)] = {
@@ -279,15 +319,10 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
       }
     }
 
-    /* Option[BotBoardMarks] -> Some(BotBoardMarks) or None if there was no update
-     * List[Coordinate]   -> known 100% shots
-     * List[Coordinate]   -> tentative shots
-     */
-    def getBestShots(
+    def possibleShipPositions(
         botBoardMarks: BotBoardMarks,
-        currentTurnAttackTypes: List[AttackType]
-    ): (Option[BotBoardMarks], Set[Coordinate], Set[Coordinate]) = {
-
+        shipGuesses: List[ShipGuess]
+    ): Set[List[Coordinate]] = {
       def getSimplePositions(guessCoor: Coordinate): List[List[Coordinate]] =
         uniqueRotations.flatMap { ship =>
           ship.pieces.flatMap { shipPiece =>
@@ -297,28 +332,40 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
           }
         }
 
+      shipGuesses.flatMap {
+        case ShipGuess(headPosition :: other) =>
+          val otherPositionsSet = other.toSet
+          getSimplePositions(headPosition).filter { shipPieces =>
+            val shipPiecesSet = shipPieces.toSet
+            otherPositionsSet.forall(shipPiecesSet)
+          }
+        case _ => // impossible...
+          Nil
+      }.toSet
+    }
+
+    /* Option[BotBoardMarks] -> Some(BotBoardMarks) or None if there was no update
+     * List[Coordinate]   -> known 100% shots
+     * List[Coordinate]   -> tentative shots
+     */
+    def getBestShots(
+        botBoardMarks: BotBoardMarks,
+        currentTurnAttackTypes: List[AttackType]
+    ): (Option[BotBoardMarks], Set[Coordinate], Set[Coordinate]) = {
+
       def processShipGuesses(
           shipGuesses: List[ShipGuess]
       ): (Option[BotBoardMarks], Set[Coordinate], Set[Coordinate]) = {
-        val possibleShipPositions: Set[List[Coordinate]] =
-          shipGuesses.flatMap {
-            case ShipGuess(headPosition :: other) =>
-              val otherPositionsSet = other.toSet
-              getSimplePositions(headPosition).filter { shipPieces =>
-                val shipPiecesSet = shipPieces.toSet
-                otherPositionsSet.forall(shipPiecesSet)
-              }
-            case _ => // impossible...
-              Nil
-          }.toSet
+        val possibleShipPositionsSet: Set[List[Coordinate]] =
+          possibleShipPositions(botBoardMarks, shipGuesses)
 
-        if (possibleShipPositions.isEmpty) {
+        if (possibleShipPositionsSet.isEmpty) {
           logLine("Bug! possibleShipPositions is empty!")
           logLine("shipGuesses:")
           logLine(shipGuesses.mkString("\n"))
           (None, Set.empty, Set.empty)
         } else
-          processShipPositions(possibleShipPositions, allShipPossiblePositions = true)
+          processShipPositions(possibleShipPositionsSet, allShipPossiblePositions = true)
       }
 
       def processShipPositions(
