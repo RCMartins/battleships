@@ -872,6 +872,10 @@ class GameView(
     case None =>
   }
 
+  screenModel.subProp(_.newTurn).listen { _ =>
+    Option(document.getElementById(ScreenModel.myMovesTab)).foreach(_.scrollTop = 0)
+  }
+
   override def getTemplate: Modifier = div(
     UdashCard(componentId = ComponentId("game-panel"))(factory =>
       Seq(

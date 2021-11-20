@@ -296,6 +296,12 @@ class GamePresenter(
     }
 
     (fromGameMode, to) match {
+      case (Some(_: PlayingMode), Some(GameState(_, _, _, _, _: PlayingMode))) =>
+        screenModel.subProp(_.newTurn).set((), force = true)
+      case _ =>
+    }
+
+    (fromGameMode, to) match {
       case (None, Some(GameState(_, rules, _, _, _))) =>
         val shipCounter = preGameModel.get.shipCounter
         rules.gameFleet.shipsCounter.foreach { case (shipId, counter) =>
