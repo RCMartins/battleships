@@ -1184,4 +1184,11 @@ class GamePresenter(
   def getPreGameShipProperty(shipId: ShipId): Property[Int] =
     preGameModel.get.shipCounter(shipId)
 
+  def addToEnemyTimeSeconds(secondsToAdd: Int): Unit =
+    gameStateProperty.get match {
+      case Some(GameState(gameId, _, _, _, PlayingMode(_, _, _, _, Some(TimeRemaining(_, _))))) =>
+        gameRpc.addToEnemyTimeSeconds(gameId, secondsToAdd)
+      case _ =>
+    }
+
 }

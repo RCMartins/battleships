@@ -30,6 +30,8 @@ trait GameRPC {
 
   def sendBoardMarks(gameId: GameId, updatedBoardMarks: List[(Coordinate, BoardMark)]): Future[Unit]
 
+  def addToEnemyTimeSeconds(gameId: GameId, secondsToAdd: Int): Future[Unit]
+
 }
 
 object GameRPC extends DefaultServerRpcCompanion[GameRPC]

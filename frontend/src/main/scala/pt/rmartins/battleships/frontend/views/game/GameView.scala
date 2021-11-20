@@ -235,6 +235,13 @@ class GameView(
       }))
     )
 
+  private val addEnemyTimeButton =
+    UdashButton(
+      buttonStyle = Color.Primary.toProperty,
+      block = true.toProperty,
+      componentId = ComponentId("add-enemy-time-button")
+    )(_ => Seq[Modifier](`class` := "btn-sm col-4 p-0 ml-2", span(FontAwesome.Solid.plus).render))
+
   private val revealEnemyBoardButton =
     UdashButton(
       buttonStyle = screenModel.subProp(_.revealEnemyBoard).transform {
@@ -349,6 +356,10 @@ class GameView(
 
   revealEnemyBoardButton.listen { _ =>
     screenModel.subProp(_.revealEnemyBoard).set(!screenModel.get.revealEnemyBoard)
+  }
+
+  addEnemyTimeButton.listen { _ =>
+    presenter.addToEnemyTimeSeconds(30)
   }
 
   private val chatTabButton: UdashButton =
@@ -885,7 +896,7 @@ class GameView(
             startGameErrorModal(nested),
             quitGameModal(nested),
             div(
-              `class` := "col-7",
+              `class` := "col-6",
               span(
                 nested(translatedDynamic(Translations.Game.loggedInAs)(_.apply())),
                 " ",
@@ -982,12 +993,13 @@ class GameView(
 
               def showTime(timeRemaining: TimeRemaining): Span =
                 span(
+                  `class` := "px-0",
                   span(b(toTimeStr(timeRemaining.totalTimeRemainingMillis / 1000))),
                   span(b(toShortTimeStr(timeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000))))
                 ).render
 
               div(
-                `class` := "col-3 row",
+                `class` := "col-4 row p-0 m-0",
                 div(
                   `class` := "col px-0",
                   nested(produce(gameModel.subProp(_.timeRemaining).transform(_.nonEmpty)) {
@@ -1015,7 +1027,11 @@ class GameView(
                   br,
                   nested(produce(gameModel.subProp(_.timeRemaining).transform(_.map(_._2))) {
                     case Some(enemyTimeRemaining) =>
-                      showTime(enemyTimeRemaining)
+                      div(
+                        `class` := "row m-0",
+                        showTime(enemyTimeRemaining),
+                        addEnemyTimeButton
+                      ).render
                     case _ =>
                       span.render
                   })

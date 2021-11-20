@@ -65,4 +65,7 @@ class GameEndpoint(implicit
   ): Future[Unit] =
     gameService.sendBoardMarks(gameId, ctx.username, updatedBoardMarksList)
 
+  override def addToEnemyTimeSeconds(gameId: GameId, secondsToAdd: Int): Future[Unit] =
+    gameService.addToEnemyTimeSeconds(gameId, ctx.username, secondsToAdd)
+
 }

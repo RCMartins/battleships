@@ -898,6 +898,35 @@ class GameService(rpcClientsService: RpcClientsService) {
       }
     }
 
+  def addToEnemyTimeSeconds(
+      gameId: GameId,
+      playerUsername: Username,
+      secondsToAdd: Int
+  ): Future[Unit] =
+    Future {
+      activeGames.get(gameId).map(game => (game, game.getPlayerSafe(playerUsername))) match {
+        case None =>
+          sendSystemMessage(playerUsername, "Error finding game!")
+        case Some((game, Some(player))) if game.gameIsActive =>
+          val enemy: ServerPlayer = game.enemyPlayer(player)
+          val updatedEnemy: ServerPlayer =
+            enemy
+              .modify(_.timeRemaining)
+              .using(_.map {
+                case ServerTimeRemaining(totalTimeRemainingNanos, turnTimeRemainingNanosOpt) =>
+                  ServerTimeRemaining(
+                    totalTimeRemainingNanos + secondsToAdd * 1000L * 1000L * 1000L,
+                    turnTimeRemainingNanosOpt
+                  )
+              })
+          val updatedGame: Game = game.updatePlayer(updatedEnemy)
+          updateServerState(updatedGame)
+          updateBothGameState(updatedGame)
+        case _ =>
+          sendSystemMessage(playerUsername, "Invalid request!")
+      }
+    }
+
   private def sendSystemMessage(username: Username, message: String): Unit = {
     if (username != BotUsername)
       rpcClientsService
