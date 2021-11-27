@@ -3,7 +3,7 @@ package pt.rmartins.battleships.frontend.views.game
 import org.scalajs.dom.document
 import pt.rmartins.battleships.shared.model.auth.UserToken
 import pt.rmartins.battleships.shared.model.game.Username
-import sttp.model.Cookie
+import sttp.model.headers.Cookie
 
 object Cookies {
 

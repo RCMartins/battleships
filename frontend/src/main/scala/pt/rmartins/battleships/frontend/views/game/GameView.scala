@@ -17,11 +17,12 @@ import org.scalajs.dom
 import org.scalajs.dom._
 import org.scalajs.dom.html.{Canvas, Div, Input, LI, Span}
 import pt.rmartins.battleships.frontend.services.TranslationsService
+import pt.rmartins.battleships.frontend.views.game.JoinedPreGame.PlayingAgainstPlayer
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.css.ChatStyles
 import pt.rmartins.battleships.shared.i18n.Translations
-import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
+import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game._
 import scalatags.JsDom
 import scalatags.JsDom.all._
@@ -84,19 +85,62 @@ class GameView(
     Seq[Modifier](span(nested(translatedDynamic(Translations.Game.startGameVsBot)(_.apply()))))
   )
 
-  private val startGameVsPlayerButton = UdashButton(
+  private val invitePlayerButton = UdashButton(
     buttonStyle = Color.Primary.toProperty,
     block = true.toProperty,
-    componentId = ComponentId("start-game-player-button")
+    componentId = ComponentId("invite-player-button")
   )(nested =>
-    Seq[Modifier](span(nested(translatedDynamic(Translations.Game.startGameVsPlayer)(_.apply()))))
+    Seq[Modifier](span(nested(translatedDynamic(Translations.Game.invitePlayerButton)(_.apply()))))
   )
+
+  private val confirmRulesButton = UdashButton(
+    buttonStyle = Color.Primary.toProperty,
+    block = true.toProperty,
+    componentId = ComponentId("confirm-rules-button"),
+    disabled = preGameModel.subProp(_.inJoinedPreGame).transform {
+      case Some(PlayingAgainstPlayer(_, true, _, _)) => true
+      case _                                         => false
+    }
+  )(nested =>
+    Seq[Modifier](span(nested(translatedDynamic(Translations.Game.confirmRulesButton)(_.apply()))))
+  )
+
+  private val cancelRulesButton =
+    UdashButton(
+      buttonStyle = Color.Danger.toProperty,
+      block = true.toProperty,
+      componentId = ComponentId("cancel-rules-button")
+    )(_ => Seq[Modifier](`class` := "invisible", span(FontAwesome.Solid.times).render))
+
+  preGameModel
+    .subProp(_.inJoinedPreGame)
+    .transform(_.collect { case PlayingAgainstPlayer(_, confirmed, _, _) =>
+      confirmed
+    })
+    .listen(
+      { confirmedOpt =>
+        val cancelButtonOpt: Option[Element] =
+          Option(document.getElementById(cancelRulesButton.componentId.value))
+        cancelButtonOpt.foreach { cancelButton =>
+          if (confirmedOpt.contains(true)) {
+            cancelButton.classList.remove("invisible")
+            cancelButton.classList.add("visible")
+          } else {
+            cancelButton.classList.remove("visible")
+            cancelButton.classList.add("invisible")
+          }
+        }
+      },
+      initUpdate = true
+    )
 
   private def usernameInput(factory: FormElementsFactory): Element =
     factory.input
       .formGroup(groupId = ComponentId("username")) { nested =>
         factory.input
-          .textInput(preGameModel.subProp(_.enemyUsername).bitransform(_.username)(Username(_)))(
+          .textInput(
+            preGameModel.subProp(_.enemyUsernameText).bitransform(_.username)(Username(_))
+          )(
             Some(nested =>
               nested(
                 translatedAttrDynamic(Translations.Game.chooseEnemyPlaceholder, "placeholder")(
@@ -113,7 +157,7 @@ class GameView(
       .tap { elem =>
         elem.asInstanceOf[Input].onkeypress = (event: KeyboardEvent) => {
           if (event.key.equalsIgnoreCase("Enter")) {
-            presenter.startGameWith(preGameModel.subProp(_.enemyUsername).get)
+            presenter.invitePlayer(preGameModel.subProp(_.enemyUsernameText).get)
           }
         }
       }
@@ -123,7 +167,7 @@ class GameView(
       buttonStyle = Color.Primary.toProperty,
       block = true.toProperty,
       componentId = ComponentId("confirm-button"),
-      disabled = presenter.gameStateProperty.transform(!_.exists(_.me.shipsLeftToPlace.isEmpty))
+      disabled = gameModel.subProp(_.shipsLeftToPlace).transform(_.nonEmpty)
     )(nested => Seq(nested(translatedDynamic(Translations.Game.confirmButton)(_.apply()))))
 
   private val undoButton =
@@ -147,7 +191,7 @@ class GameView(
       buttonStyle = Color.Secondary.toProperty,
       block = true.toProperty,
       componentId = ComponentId("random-button"),
-      disabled = presenter.gameStateProperty.transform(!_.exists(_.me.shipsLeftToPlace.nonEmpty))
+      disabled = gameModel.subProp(_.shipsLeftToPlace).transform(_.isEmpty)
     )(nested => Seq(nested(translatedDynamic(Translations.Game.randomButton)(_.apply()))))
 
   private val cancelQueuedAttacksButton =
@@ -270,47 +314,70 @@ class GameView(
     componentId = ComponentId("main-game-from")
   )(factory =>
     factory.disabled(Property(false))(nested =>
-      nested(produce(combine(presenter.modeTypeProperty, presenter.preGameModeProperty)) {
-        case (None, _) =>
-          div(
-            `class` := "row",
-            div(`class` := "mx-2", startGameVsBotButton),
-            div(`class` := "ml-2", startGameVsPlayerButton),
-            usernameInput(factory)
-          ).render
-        case (_, Some(PreGameMode(false, _))) =>
-          div(
-            `class` := "row",
-            div(`class` := "mx-2", confirmShipsButton),
-            div(`class` := "mx-2", undoButton),
-            div(`class` := "mx-2", resetButton),
-            div(`class` := "mx-2", randomPlacementButton)
-          ).render
-        case (_, Some(PreGameMode(true, _))) =>
-          div(
-            `class` := "row",
-            div(`class` := "mx-2", undoButton),
-            div(`class` := "mx-2", resetButton)
-          ).render
-        case (Some(PlayingModeType), _) =>
-          div(
-            `class` := "row justify-content-between",
+      nested(
+        produceWithNested(
+          combine(
+            preGameModel.subProp(_.inJoinedPreGame),
+            presenter.modeTypeProperty,
+            presenter.placingShipsModeProperty
+          )
+        ) {
+          case ((Some(_), _, _), nested) =>
             div(
               `class` := "row mx-2",
-              div(`class` := "mx-0", cancelQueuedAttacksButton),
-              div(`class` := "mx-1", launchAttackButton)
-            ),
-            div(`class` := "mx-2", hideMyBoardButton)
-          ).render
-        case (Some(GameOverModeType), _) =>
-          div(
-            `class` := "row justify-content-between",
-            div(`class` := "mx-2", rematchButton),
-            div(`class` := "mx-2", revealEnemyBoardButton)
-          ).render
-        case _ =>
-          span.render
-      })
+              div(`class` := "mx-0", cancelRulesButton),
+              div(`class` := "mx-2", confirmRulesButton),
+              nested(produceWithNested(preGameModel.subProp(_.inJoinedPreGame)) {
+                case (Some(PlayingAgainstPlayer(_, _, true, _)), nested) =>
+                  div(
+                    `class` := "mx-3 mt-1",
+                    nested(translatedDynamic(Translations.Game.enemyAcceptedRules)(_.apply()))
+                  ).render
+                case _ =>
+                  div.render
+              })
+            ).render
+          case ((_, None, _), _) =>
+            div(
+              `class` := "row",
+              div(`class` := "mx-2", startGameVsBotButton),
+              div(`class` := "ml-2", invitePlayerButton),
+              usernameInput(factory)
+            ).render
+          case ((_, _, Some(PlacingShipsMode(false, _))), _) =>
+            div(
+              `class` := "row",
+              div(`class` := "mx-2", confirmShipsButton),
+              div(`class` := "mx-2", undoButton),
+              div(`class` := "mx-2", resetButton),
+              div(`class` := "mx-2", randomPlacementButton)
+            ).render
+          case ((_, _, Some(PlacingShipsMode(true, _))), _) =>
+            div(
+              `class` := "row",
+              div(`class` := "mx-2", undoButton),
+              div(`class` := "mx-2", resetButton)
+            ).render
+          case ((_, Some(PlayingModeType), _), _) =>
+            div(
+              `class` := "row justify-content-between",
+              div(
+                `class` := "row mx-2",
+                div(`class` := "mx-0", cancelQueuedAttacksButton),
+                div(`class` := "mx-1", launchAttackButton)
+              ),
+              div(`class` := "mx-2", hideMyBoardButton)
+            ).render
+          case ((_, Some(GameOverModeType), _), _) =>
+            div(
+              `class` := "row justify-content-between",
+              div(`class` := "mx-2", rematchButton),
+              div(`class` := "mx-2", revealEnemyBoardButton)
+            ).render
+          case _ =>
+            span.render
+        }
+      )
     )
   )
 
@@ -318,8 +385,16 @@ class GameView(
     presenter.startGameWithBots()
   }
 
-  startGameVsPlayerButton.listen { _ =>
-    presenter.startGameWith(preGameModel.subProp(_.enemyUsername).get)
+  invitePlayerButton.listen { _ =>
+    presenter.invitePlayer(preGameModel.subProp(_.enemyUsernameText).get)
+  }
+
+  confirmRulesButton.listen { _ =>
+    presenter.confirmRules()
+  }
+
+  cancelRulesButton.listen { _ =>
+    presenter.cancelRules()
   }
 
   confirmShipsButton.listen { _ =>
@@ -508,7 +583,7 @@ class GameView(
     div(
       `class` := "row",
       div(
-        `class` := "col-9",
+        `class` := "col-8",
         ul(
           `class` := "nav nav-tabs",
           `role` := "tablist",
@@ -524,7 +599,7 @@ class GameView(
         )
       ),
       div(
-        `class` := "col-3 px-0",
+        `class` := "col-4 px-0",
         div(
           `class` := "btn-group m-3 mt-5",
           missesMovesCheckbox,
@@ -766,17 +841,25 @@ class GameView(
     componentId = ComponentId("quit-game-button")
   )(nested =>
     Seq[Modifier](
-      nested(produceWithNested(presenter.gameStateProperty.transform(_.isEmpty)) {
-        case (emptyGameState, nested) =>
+      nested(
+        produceWithNested(
+          combine(
+            presenter.gameStateProperty.transform(_.nonEmpty),
+            preGameModel.subProp(_.inJoinedPreGame).transform(_.nonEmpty)
+          )
+        ) { case ((hasGameState, inJoinedPreGame), nested) =>
           span(
             nested(
               translatedDynamic(
-                if (emptyGameState) Translations.Game.logoutButton
-                else Translations.Game.quitGameButton
+                if (hasGameState || inJoinedPreGame)
+                  Translations.Game.quitGameButton
+                else
+                  Translations.Game.logoutButton
               )(_.apply())
             )
           ).render
-      }),
+        }
+      ),
       span(`class` := "pl-2", FontAwesome.Solid.signOutAlt)
     )
   )
@@ -869,12 +952,13 @@ class GameView(
     ).render
 
   quitGameButton.listen { _ =>
-    presenter.gameStateProperty.get match {
-      case None =>
-        presenter.logout()
-      case Some(_) =>
-        Globals.modalToggle(quitGameModalId)
-    }
+    if (
+      presenter.gameStateProperty.transform(_.nonEmpty).get ||
+      preGameModel.subProp(_.inJoinedPreGame).transform(_.nonEmpty).get
+    )
+      Globals.modalToggle(quitGameModalId)
+    else
+      presenter.logout()
   }
 
   screenModel.subProp(_.errorModalType).listen {
@@ -902,7 +986,7 @@ class GameView(
                 " ",
                 b(bind(chatModel.subProp(_.username)))
               ),
-              nested(produceWithNested(presenter.enemyProperty.transform(_.map(_.username))) {
+              nested(produceWithNested(presenter.enemyUsernameProperty) {
                 case (Some(Username(enemyUsername)), nested) =>
                   span(
                     " - ",
@@ -915,7 +999,7 @@ class GameView(
               }),
               br,
               nested(produceWithNested(presenter.gameModeProperty) {
-                case (Some(PreGameMode(iPlacedShips, enemyPlacedShips)), nested) =>
+                case (Some(PlacingShipsMode(iPlacedShips, enemyPlacedShips)), nested) =>
                   val placeShipsBinding =
                     nested(
                       translatedDynamic(

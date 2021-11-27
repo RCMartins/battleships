@@ -7,17 +7,17 @@ object Dependencies {
   val versionOfScala = "2.13.6"
 
   // Udash
-  val udashVersion = "0.9.0-M21"
+  val udashVersion = "0.9.0-M24"
   val udashJQueryVersion = "3.0.4"
 
   // Backend
   val jettyVersion = "9.4.40.v20210413"
-  val logbackVersion = "1.2.6"
+  val logbackVersion = "1.2.7"
   val typesafeConfigVersion = "1.4.1"
   val betterFilesVersion = "3.9.1"
 
   // JS dependencies
-  val bootstrapVersion = "5.1.1"
+  val bootstrapVersion = "5.1.3"
   val highchartsVersion = "9.2.2"
 
   // Testing

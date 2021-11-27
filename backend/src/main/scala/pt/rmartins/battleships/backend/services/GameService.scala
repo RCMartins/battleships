@@ -5,8 +5,9 @@ import io.udash.rpc.ClientId
 import pt.rmartins.battleships.backend.services.GameService.{BotClientId, BotUsername}
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game.BonusReward.ExtraTurn
-import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
+import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game.HitHint.{ShipHit, Water}
+import pt.rmartins.battleships.shared.model.game.RuleTimeLimit.WithRuleTimeLimit
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.BoardUtils
 import pt.rmartins.battleships.shared.model.utils.BoardUtils._
@@ -21,33 +22,34 @@ import scala.util.chaining.scalaUtilChainingOps
 
 class GameService(rpcClientsService: RpcClientsService) {
 
-  private val activeGamesByPlayer: mutable.Map[Username, Game] = mutable.Map.empty
+  private val activeGamesByPlayer: mutable.Map[Username, GameId] = mutable.Map.empty
   private val activeGames: mutable.Map[GameId, Game] = mutable.Map.empty
+  private val activePreGames: mutable.Map[GameId, PreGame] = mutable.Map.empty
 
-  @inline
-  private def updateActiveGamesByPlayer(player: ServerPlayer, game: Game): Unit = {
-    if (player.isHuman)
-      activeGamesByPlayer.update(player.username, game)
-  }
+  private def updatePlayerActiveGames(preGame: PreGame): Unit =
+    clock.synchronized {
+      activeGamesByPlayer.update(preGame.player1.username, preGame.gameId)
+      activeGamesByPlayer.update(preGame.player2.username, preGame.gameId)
+    }
 
-  private def unsafeUpdateServerState(game: Game): Game = {
-    updateActiveGamesByPlayer(game.player1, game)
-    updateActiveGamesByPlayer(game.player2, game)
-    activeGames.update(game.gameId, game)
-    game
-  }
+  private def updatePlayerActiveGames(game: Game): Unit =
+    clock.synchronized {
+      if (game.player1.isHuman)
+        activeGamesByPlayer.update(game.player1.username, game.gameId)
+      if (game.player2.isHuman)
+        activeGamesByPlayer.update(game.player2.username, game.gameId)
+    }
 
-  val clock: Runnable = () => {
+  private val clock: Runnable = () => {
     val cycleTimeMillis: Long = 200L
     while (true) {
       clock.synchronized {
         val initialInstant = Instant.now()
         activeGames.values.toList.filter(game => game.gameIsActive).foreach { game =>
           val updatedGame = updateGameTime(game, initialInstant)
-          unsafeUpdateServerState(updatedGame)
-
+          activeGames.update(updatedGame.gameId, updatedGame)
           if (updatedGame.gameIsOver)
-            updateBothGameState(updatedGame)
+            sendBothGameState(updatedGame)
         }
       }
       Thread.sleep(cycleTimeMillis)
@@ -56,7 +58,7 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   new Thread(clock).start()
 
-  val botUpdater: Runnable = () => {
+  private val botUpdater: Runnable = () => {
     val cycleTimeMillis: Long = 500L
     while (true) {
       clock.synchronized {
@@ -75,7 +77,7 @@ class GameService(rpcClientsService: RpcClientsService) {
                 //  Also needs board size + any specific data
                 BotHelper.placeShipsAtRandom(
                   player.myBoard.boardSize,
-                  game.rules.gameFleet.ships
+                  game.rules.gameFleet.shipsList
                 ) match {
                   case Left(_) =>
                     // Try placing ships in the next botUpdater loop ...
@@ -111,7 +113,7 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   new Thread(botUpdater).start()
 
-  def updateGameTime(game: Game, instant: Instant): Game = {
+  private def updateGameTime(game: Game, instant: Instant): Game = {
     val updatedGame =
       game.getCurrentTurnPlayer.flatMap(serverPlayer =>
         serverPlayer.timeRemaining.map((serverPlayer, _))
@@ -162,18 +164,39 @@ class GameService(rpcClientsService: RpcClientsService) {
     updatedGame.copy(lastUpdateTimeOpt = Some(instant))
   }
 
-  def setGameOver(game: Game, whoWonUsername: Username): Game = {
+  private def setGameOver(game: Game, whoWonUsername: Username): Game = {
     sendSystemMessage(game, s"Game Over! Player '$whoWonUsername' won!")
     game.modify(_.playerWhoWonOpt).setTo(Some(whoWonUsername))
   }
 
-  def updateServerState(game: Game, instantNow: Option[Instant] = Some(Instant.now())): Game =
+  private def updateServerPreGame(preGame: PreGame): Unit =
     clock.synchronized {
-      val updatedGame = instantNow.map(updateGameTime(game, _)).getOrElse(game)
-      unsafeUpdateServerState(updatedGame)
+      activePreGames.update(preGame.gameId, preGame)
     }
 
-  def removeServerGame(game: Game): Unit =
+  private def updateServerState(
+      game: Game,
+      instantNow: Option[Instant] = Some(Instant.now())
+  ): Game =
+    clock.synchronized {
+      val updatedGame = instantNow.map(updateGameTime(game, _)).getOrElse(game)
+      activeGames.update(updatedGame.gameId, updatedGame)
+      updatedGame
+    }
+
+  private def removeServerPreGameOnly(preGame: PreGame): Unit =
+    clock.synchronized {
+      activePreGames.remove(preGame.gameId)
+    }
+
+  private def removeServerPreGameCompletely(preGame: PreGame): Unit =
+    clock.synchronized {
+      activeGamesByPlayer.remove(preGame.player1.username)
+      activeGamesByPlayer.remove(preGame.player2.username)
+      activePreGames.remove(preGame.gameId)
+    }
+
+  private def removeServerGame(game: Game): Unit =
     clock.synchronized {
       activeGamesByPlayer.remove(game.player1.username)
       activeGamesByPlayer.remove(game.player2.username)
@@ -275,14 +298,12 @@ class GameService(rpcClientsService: RpcClientsService) {
     def toPlayer(game: Game): Player =
       if (game.gameStarted)
         Player(
-          Nil,
           Board(myBoard.boardSize, myBoard.ships),
           enemyBoard.boardMarks,
           turnPlayHistory
         )
       else
         Player(
-          game.rules.gameFleet.ships,
           Board(myBoard.boardSize, myBoard.ships),
           Vector.empty,
           Nil
@@ -295,6 +316,98 @@ class GameService(rpcClientsService: RpcClientsService) {
             (totalTimeRemainingNanos / 1000L / 1000L).toInt,
             turnTimeRemainingNanos.map(turnTime => (turnTime / 1000L / 1000L).toInt)
           )
+      }
+
+  }
+
+  case class PreGamePlayer(
+      clientId: ClientId,
+      username: Username,
+      acceptedRules: Boolean
+  )
+
+  case class PreGame(
+      gameId: GameId,
+      messages: List[ChatMessage], // TODO ?
+      rules: Rules,
+      player1: PreGamePlayer,
+      player2: PreGamePlayer
+  ) {
+
+    def getPlayer(playerUsername: Username): Option[PreGamePlayer] =
+      if (player1.username == playerUsername) Some(player1)
+      else if (player2.username == playerUsername) Some(player2)
+      else None
+
+    def getEnemy(player: PreGamePlayer): PreGamePlayer =
+      if (player == player1) player2 else player1
+
+    def getPlayers(playerUsername: Username): Option[(PreGamePlayer, PreGamePlayer)] =
+      getPlayer(playerUsername).map(player => (player, getEnemy(player)))
+
+    def updatePlayer(updatedPlayer: PreGamePlayer): PreGame =
+      if (updatedPlayer.username == player1.username)
+        copy(player1 = updatedPlayer)
+      else
+        copy(player2 = updatedPlayer)
+
+    def receiveRulesPatchBoardSize(
+        boardSizePatch: Coordinate
+    ): (PreGame, Boolean) =
+      rules.boardSize match {
+        case currentBoardSize if currentBoardSize == boardSizePatch =>
+          (this, false)
+        case _ =>
+          (this.modify(_.rules.boardSize).setTo(boardSizePatch), true)
+      }
+
+    def receiveRulesPatchFleet(
+        shipId: ShipId,
+        amountPatch: Int
+    ): (PreGame, Boolean) =
+      rules.gameFleet.shipCounterMap.get(shipId) match {
+        case None if 0 == amountPatch =>
+          (this, false)
+        case Some((currentAmount, _)) if currentAmount == amountPatch =>
+          (this, false)
+        case None =>
+          val updatedFleet: Fleet =
+            Fleet(rules.gameFleet.updateCounter(shipId, amountPatch, Rotation.Rotation0))
+          (this.modify(_.rules.gameFleet).setTo(updatedFleet), true)
+        case Some((_, rotation)) =>
+          val updatedFleet: Fleet =
+            Fleet(rules.gameFleet.updateCounter(shipId, amountPatch, rotation))
+          (this.modify(_.rules.gameFleet).setTo(updatedFleet), true)
+      }
+
+    def receiveRulesPatchDefaultAttacks(
+        defaultTurnAttacksPatch: List[AttackType]
+    ): (PreGame, Boolean) =
+      rules.defaultTurnAttacks match {
+        case currentDefaultTurnAttacks if currentDefaultTurnAttacks == defaultTurnAttacksPatch =>
+          (this, false)
+        case _ =>
+          (this.modify(_.rules.defaultTurnAttacks).setTo(defaultTurnAttacksPatch), true)
+      }
+
+    def receiveRulesPatchTurnBonuses(
+        turnBonusesPatch: List[TurnBonus]
+    ): (PreGame, Boolean) =
+      rules.turnBonuses match {
+        case currentTurnBonuses if currentTurnBonuses == turnBonusesPatch =>
+          (this, false)
+        case _ =>
+          (this.modify(_.rules.turnBonuses).setTo(turnBonusesPatch), true)
+      }
+
+    def receiveRulesPatchTimeLimit(
+        timeLimitPatch: RuleTimeLimit
+    ): (PreGame, Boolean) =
+      rules.timeLimit match {
+        case currentTimeLimit if currentTimeLimit == timeLimitPatch =>
+          (this, false)
+        case _ =>
+          (this.modify(_.rules.timeLimit).setTo(timeLimitPatch), true)
       }
 
   }
@@ -349,7 +462,7 @@ class GameService(rpcClientsService: RpcClientsService) {
           playerWhoWonOpt
         ) match {
           case (None, _) =>
-            PreGameMode(me.myBoard.ships.nonEmpty, enemy.myBoard.ships.nonEmpty)
+            PlacingShipsMode(me.myBoard.ships.nonEmpty, enemy.myBoard.ships.nonEmpty)
           case (Some((turn, currentPlayerUsername)), None) =>
             PlayingMode(
               currentPlayerUsername == me.username,
@@ -423,22 +536,45 @@ class GameService(rpcClientsService: RpcClientsService) {
     }
 
   def reload(clientId: ClientId, playerUsername: Username): Future[Unit] = Future {
-    activeGamesByPlayer.get(playerUsername).foreach { game =>
-      val updatedGame =
-        game.updatePlayerByUsername(playerUsername, _.copy(clientId = clientId))
+    val gameIdOpt: Option[GameId] =
+      activeGamesByPlayer.get(playerUsername)
 
-      updateServerState(updatedGame)
-      updateBothGameState(updatedGame)
-    }
+    gameIdOpt
+      .flatMap(activePreGames.get)
+      .flatMap(preGame => preGame.getPlayer(playerUsername).map((preGame, _)))
+      .foreach { case (preGame, player) =>
+        val updatedPreGame: PreGame =
+          preGame.updatePlayer(player.copy(clientId = clientId, acceptedRules = false))
+
+        updateServerPreGame(updatedPreGame)
+        sendBothPreGameState(updatedPreGame)
+      }
+
+    gameIdOpt
+      .flatMap(activeGames.get)
+      .flatMap(game => game.getPlayerSafe(playerUsername).map((game, _)))
+      .foreach { case (game, player) =>
+        val updatedGame: Game =
+          game.updatePlayer(player.copy(clientId = clientId))
+
+        updateServerState(updatedGame)
+        sendBothGameState(updatedGame)
+      }
   }
 
   def startGameWithBots(playerUsername: Username, rules: Rules): Future[Unit] = Future {
     rpcClientsService.getClientIdByUsername(playerUsername) match {
       case Some(playerId) =>
-        createNewGame((playerId, playerUsername), None, rules) match {
+        createNewGame(
+          GameId(UUID.randomUUID().toString),
+          (playerId, playerUsername),
+          None,
+          rules
+        ) match {
           case Some(game) =>
+            updatePlayerActiveGames(game)
             updateServerState(game, None)
-            updateBothGameState(game)
+            sendBothGameState(game)
           case None =>
             sendSystemMessage(playerUsername, "Error starting game vs bot! (Invalid rules)")
         }
@@ -447,7 +583,7 @@ class GameService(rpcClientsService: RpcClientsService) {
     }
   }
 
-  def startGame(
+  def invitePlayer(
       player1Username: Username,
       player2Username: Username,
       rules: Rules
@@ -457,20 +593,23 @@ class GameService(rpcClientsService: RpcClientsService) {
         rpcClientsService.getClientIdByUsername(player1Username),
         rpcClientsService.getClientIdByUsername(player2Username)
       ) match {
+        case (Some(player1Id), Some(player2Id)) if player1Id == player2Id =>
+          sendSystemMessage(player1Username, "Could not invite itself!")
         case (Some(player1Id), Some(player2Id)) =>
           val player2Username = rpcClientsService.authenticatedClients(player2Id).username
-          createNewGame(
+          createNewPreGame(
             (player1Id, player1Username),
-            Some((player2Id, player2Username)),
+            (player2Id, player2Username),
             rules
           ) match {
-            case Some(game) =>
-              updateServerState(game, None)
-              updateBothGameState(game)
+            case Some(preGame) =>
+              updatePlayerActiveGames(preGame)
+              activePreGames += preGame.gameId -> preGame
+              sendBothPreGameState(preGame)
             case None =>
               sendSystemMessage(
                 player1Username,
-                s"Could not find player '$player2Username' (Invalid rules)"
+                s"Could not invite player with invalid rules"
               )
           }
         case _ =>
@@ -478,16 +617,147 @@ class GameService(rpcClientsService: RpcClientsService) {
       }
     }
 
-  private def createNewGame(
+  def confirmRules(gameId: GameId, playerUsername: Username): Future[Unit] =
+    Future {
+      activePreGames
+        .get(gameId)
+        .flatMap(preGame => preGame.getPlayers(playerUsername).map((preGame, _))) match {
+        case Some((preGame, (player1, player2))) if !player1.acceptedRules =>
+          if (player2.acceptedRules)
+            startGame(preGame)
+          else {
+            val updatedPreGame: PreGame =
+              preGame.updatePlayer(player1.modify(_.acceptedRules).setTo(true))
+            activePreGames.update(gameId, updatedPreGame)
+            sendPreGameConfirmState(updatedPreGame)
+          }
+        case _ =>
+      }
+    }
+
+  def cancelRules(gameId: GameId, playerUsername: Username): Future[Unit] =
+    Future {
+      activePreGames
+        .get(gameId)
+        .flatMap(preGame => preGame.getPlayer(playerUsername).map((preGame, _))) match {
+        case Some((preGame, player)) if player.acceptedRules =>
+          val updatedPreGame: PreGame =
+            preGame.updatePlayer(player.modify(_.acceptedRules).setTo(false))
+          activePreGames.update(gameId, updatedPreGame)
+          sendPreGameConfirmState(updatedPreGame)
+        case _ =>
+      }
+    }
+
+  private def createNewPreGame(
       player1Data: (ClientId, Username),
-      player2DataOpt: Option[(ClientId, Username)],
+      player2Data: (ClientId, Username),
       rules: Rules
-  ): Option[Game] = {
-    if (rules.gameFleet.ships.isEmpty)
+  ): Option[PreGame] =
+    if (rules.gameFleet.shipAmount == 0)
       None
     else {
       val gameId = GameId(UUID.randomUUID().toString)
 
+      val player1: PreGamePlayer =
+        PreGamePlayer(player1Data._1, player1Data._2, acceptedRules = false)
+
+      val player2: PreGamePlayer =
+        PreGamePlayer(player2Data._1, player2Data._2, acceptedRules = false)
+
+      Some(
+        PreGame(
+          gameId,
+          Nil,
+          rules,
+          player1,
+          player2
+        )
+      )
+    }
+
+  def sendRulesPatch(
+      gameId: GameId,
+      playerUsername: Username,
+      preGameRulesPatch: PreGameRulesPatch
+  ): Future[Unit] =
+    Future {
+      activePreGames
+        .get(gameId)
+        .flatMap(preGame => preGame.getPlayer(playerUsername).map((preGame, _))) match {
+        case Some((preGame, player)) if preGameRulesPatch.containsPatch =>
+          def check(patchResult: (PreGame, Boolean), simpleRulesPatch: PreGameRulesPatch): Unit = {
+            patchResult match {
+              case (_, false) =>
+              case (updatedPreGame, true) =>
+                val finalPreGame: PreGame =
+                  updatedPreGame
+                    .modify(_.player1.acceptedRules)
+                    .setTo(false)
+                    .modify(_.player2.acceptedRules)
+                    .setTo(false)
+
+                activePreGames.update(gameId, finalPreGame)
+                sendPreGameConfirmState(finalPreGame)
+                sendPreGameRulesPatch(finalPreGame.getEnemy(player).clientId, simpleRulesPatch)
+            }
+          }
+
+          preGameRulesPatch match {
+            case PreGameRulesPatch(Some(boardSizePatch), _, _, _, _) =>
+              check(
+                preGame.receiveRulesPatchBoardSize(boardSizePatch),
+                PreGameRulesPatch(boardSizePatch = Some(boardSizePatch))
+              )
+            case PreGameRulesPatch(_, Some((shipId, amountPatch)), _, _, _) =>
+              check(
+                preGame.receiveRulesPatchFleet(shipId, amountPatch),
+                PreGameRulesPatch(gameFleetPatch = Some((shipId, amountPatch)))
+              )
+            case PreGameRulesPatch(_, _, Some(defaultTurnAttacksPatch), _, _) =>
+              check(
+                preGame.receiveRulesPatchDefaultAttacks(defaultTurnAttacksPatch),
+                PreGameRulesPatch(defaultTurnAttacksPatch = Some(defaultTurnAttacksPatch))
+              )
+            case PreGameRulesPatch(_, _, _, Some(turnBonusesPatch), _) =>
+              check(
+                preGame.receiveRulesPatchTurnBonuses(turnBonusesPatch),
+                PreGameRulesPatch(turnBonusesPatch = Some(turnBonusesPatch))
+              )
+            case PreGameRulesPatch(_, _, _, _, Some(timeLimitPatch)) =>
+              check(
+                preGame.receiveRulesPatchTimeLimit(timeLimitPatch),
+                PreGameRulesPatch(timeLimitPatch = Some(timeLimitPatch))
+              )
+            case _ =>
+          }
+        case _ =>
+      }
+    }
+
+  private def startGame(preGame: PreGame): Unit =
+    createNewGame(
+      preGame.gameId,
+      (preGame.player1.clientId, preGame.player1.username),
+      Some((preGame.player2.clientId, preGame.player2.username)),
+      preGame.rules
+    ) match {
+      case Some(game) =>
+        removeServerPreGameOnly(preGame)
+        updateServerState(game, None)
+        sendBothGameState(game)
+      case None =>
+    }
+
+  private def createNewGame(
+      gameId: GameId,
+      player1Data: (ClientId, Username),
+      player2DataOpt: Option[(ClientId, Username)],
+      rules: Rules
+  ): Option[Game] = {
+    if (rules.gameFleet.shipAmount == 0)
+      None
+    else {
       val boardSize = rules.boardSize
       val myBoard: ServerMyBoard = ServerMyBoard(boardSize, Nil)
       val enemyBoard: ServerEnemyBoard =
@@ -554,12 +824,15 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   def quitCurrentGame(gameId: GameId, playerUsername: Username): Future[Unit] =
     Future {
-      activeGames.get(gameId) match {
-        case None =>
-          sendSystemMessage(playerUsername, "Error finding game!")
-        case Some(game) =>
+      (activePreGames.get(gameId), activeGames.get(gameId)) match {
+        case (Some(preGame), _) =>
+          removeServerPreGameCompletely(preGame)
+          sendBothQuitGame(preGame)
+        case (_, Some(game)) =>
           removeServerGame(game)
-          updateBothQuitGame(game)
+          sendBothQuitGame(game)
+        case _ =>
+          sendSystemMessage(playerUsername, "Error finding game!")
       }
     }
 
@@ -572,7 +845,7 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   def getAllMessages(playerUsername: Username): Future[Seq[ChatMessage]] =
     Future {
-      activeGamesByPlayer.get(playerUsername) match {
+      activeGamesByPlayer.get(playerUsername).flatMap(activeGames.get) match {
         case None =>
           Seq.empty
         case Some(game) =>
@@ -587,14 +860,14 @@ class GameService(rpcClientsService: RpcClientsService) {
           sendSystemMessage(playerUsername, "Error finding game!")
         case Some(game) =>
           removeServerGame(game)
-          updateBothQuitGame(game)
+          sendBothQuitGame(game)
       }
     }.map {
       case Some(oldGame) =>
         if (!oldGame.player2.isHuman)
           startGameWithBots(oldGame.player1.username, oldGame.rules)
         else
-          startGame(oldGame.player1.username, oldGame.player2.username, oldGame.rules)
+          invitePlayer(oldGame.player1.username, oldGame.player2.username, oldGame.rules)
       case None =>
     }
 
@@ -623,8 +896,8 @@ class GameService(rpcClientsService: RpcClientsService) {
                   gameWithShips.player2.username
 
               val serverTimeRemaining: Option[ServerTimeRemaining] =
-                gameWithShips.rules.timeLimit.map {
-                  case RuleTimeLimit(initialTotalTimeSeconds, additionalTurnTimeSeconds) =>
+                gameWithShips.rules.timeLimit.toOption.map {
+                  case WithRuleTimeLimit(initialTotalTimeSeconds, additionalTurnTimeSeconds) =>
                     ServerTimeRemaining(
                       initialTotalTimeSeconds.toLong * 1000L * 1000L * 1000L,
                       additionalTurnTimeSeconds.map(_._1 * 1000L * 1000L * 1000L)
@@ -635,7 +908,7 @@ class GameService(rpcClientsService: RpcClientsService) {
                 .modifyAll(_.player1.currentTurnOpt, _.player2.currentTurnOpt)
                 .setTo(Some(Turn(1, None)))
                 .modifyAll(_.player1.currentTurnAttackTypes, _.player2.currentTurnAttackTypes)
-                .setTo(gameWithShips.rules.defaultTurnAttackTypes)
+                .setTo(gameWithShips.rules.defaultTurnAttacks)
                 .modifyAll(_.player1.timeRemaining, _.player2.timeRemaining)
                 .setTo(serverTimeRemaining)
                 .modify(_.currentTurnPlayer)
@@ -647,9 +920,9 @@ class GameService(rpcClientsService: RpcClientsService) {
           updateServerState(gameWithUpdatedMode.copy(lastUpdateTimeOpt = Some(instantNow)), None)
 
           if (readyToStart)
-            updateBothGameState(gameWithUpdatedMode)
+            sendBothGameState(gameWithUpdatedMode)
           else
-            updateBothGameMode(gameWithUpdatedMode)
+            sendBothGameMode(gameWithUpdatedMode)
         case _ =>
           sendSystemMessage(playerUsername, "Invalid request!")
       }
@@ -668,7 +941,7 @@ class GameService(rpcClientsService: RpcClientsService) {
           val updatedGame = game.updatePlayer(updatedPlayer)
 
           updateServerState(updatedGame)
-          updateBothGameMode(updatedGame)
+          sendBothGameMode(updatedGame)
         case _ =>
           sendSystemMessage(playerUsername, "Invalid request!")
       }
@@ -815,7 +1088,7 @@ class GameService(rpcClientsService: RpcClientsService) {
                   .modify(_.currentTurnOpt)
                   .using(_.map { case Turn(currentTurn, _) => Turn(currentTurn + 1, None) })
                   .modify(_.currentTurnAttackTypes)
-                  .setTo(updatedGameWithPlayer.rules.defaultTurnAttackTypes)
+                  .setTo(updatedGameWithPlayer.rules.defaultTurnAttacks)
 
               updatedGameWithPlayer
                 .updatePlayer(updatedPlayerWithExtraTurns)
@@ -828,7 +1101,7 @@ class GameService(rpcClientsService: RpcClientsService) {
             updatedGameWithNextTurn
           case Some(serverPlayer) =>
             updatedGameWithNextTurn.rules.timeLimit match {
-              case Some(RuleTimeLimit(_, Some((additionalTurnTimeSeconds, _)))) =>
+              case WithRuleTimeLimit(_, Some((additionalTurnTimeSeconds, _))) =>
                 updatedGameWithNextTurn.updatePlayer(
                   serverPlayer.modify(_.timeRemaining).using {
                     _.map { serverTimeRemaining =>
@@ -846,7 +1119,7 @@ class GameService(rpcClientsService: RpcClientsService) {
 
     val finalGameUpdated = updateGameTime(updatedGameWithTurnTime, Instant.now())
     updateServerState(finalGameUpdated)
-    updateBothGameState(finalGameUpdated)
+    sendBothGameState(finalGameUpdated)
   }
 
   private def rewardExtraTurns(gameBeforeHits: Game, turnPlay: TurnPlay): List[BonusReward] = {
@@ -921,7 +1194,7 @@ class GameService(rpcClientsService: RpcClientsService) {
               })
           val updatedGame: Game = game.updatePlayer(updatedEnemy)
           updateServerState(updatedGame)
-          updateBothGameState(updatedGame)
+          sendBothGameState(updatedGame)
         case _ =>
           sendSystemMessage(playerUsername, "Invalid request!")
       }
@@ -953,7 +1226,7 @@ class GameService(rpcClientsService: RpcClientsService) {
       rpcClientsService.sendMessage(game.player2.clientId, chatMessage)
   }
 
-  private def updateBothGameState(game: Game): Unit = {
+  private def sendBothGameState(game: Game): Unit = {
     if (game.player1.isHuman)
       rpcClientsService.sendGameState(
         game.player1.clientId,
@@ -966,7 +1239,7 @@ class GameService(rpcClientsService: RpcClientsService) {
       )
   }
 
-  private def updateBothGameMode(game: Game): Unit = {
+  private def sendBothGameMode(game: Game): Unit = {
     if (game.player1.isHuman)
       rpcClientsService.sendGameMode(
         game.player1.clientId,
@@ -979,11 +1252,62 @@ class GameService(rpcClientsService: RpcClientsService) {
       )
   }
 
-  private def updateBothQuitGame(game: Game): Unit = {
+  private def sendBothQuitGame(preGame: PreGame): Unit = {
+    rpcClientsService.sendQuitGame(preGame.player1.clientId)
+    rpcClientsService.sendQuitGame(preGame.player2.clientId)
+  }
+
+  private def sendBothQuitGame(game: Game): Unit = {
     if (game.player1.isHuman)
       rpcClientsService.sendQuitGame(game.player1.clientId)
     if (game.player2.isHuman)
       rpcClientsService.sendQuitGame(game.player2.clientId)
+  }
+
+  private def sendBothPreGameState(preGame: PreGame): Unit = {
+    rpcClientsService.sendPreGameState(
+      preGame.player1.clientId,
+      PreGameState(
+        preGame.gameId,
+        preGame.player2.username,
+        preGame.player1.acceptedRules,
+        preGame.player2.acceptedRules,
+        preGame.rules
+      )
+    )
+    rpcClientsService.sendPreGameState(
+      preGame.player2.clientId,
+      PreGameState(
+        preGame.gameId,
+        preGame.player1.username,
+        preGame.player2.acceptedRules,
+        preGame.player1.acceptedRules,
+        preGame.rules
+      )
+    )
+  }
+
+  private def sendPreGameConfirmState(preGame: PreGame): Unit = {
+    rpcClientsService.sendPreGameConfirmStates(
+      preGame.player1.clientId,
+      preGame.player1.acceptedRules,
+      preGame.player2.acceptedRules
+    )
+    rpcClientsService.sendPreGameConfirmStates(
+      preGame.player2.clientId,
+      preGame.player2.acceptedRules,
+      preGame.player1.acceptedRules
+    )
+  }
+
+  private def sendPreGameRulesPatch(
+      clientId: ClientId,
+      preGameRulesPatch: PreGameRulesPatch
+  ): Unit = {
+    rpcClientsService.sendPreGameRulesPatch(
+      clientId,
+      preGameRulesPatch
+    )
   }
 
 }

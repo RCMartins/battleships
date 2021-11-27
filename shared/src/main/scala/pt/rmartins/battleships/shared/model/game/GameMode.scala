@@ -4,7 +4,7 @@ import com.avsystem.commons.serialization.HasGenCodec
 
 sealed trait GameMode {
 
-  def isPreGame: Boolean = false
+  def isPlacingShips: Boolean = false
 
   def isPlaying: Boolean = false
 
@@ -14,12 +14,12 @@ sealed trait GameMode {
 
 object GameMode extends HasGenCodec[GameMode] {
 
-  case class PreGameMode(
+  case class PlacingShipsMode(
       iPlacedShips: Boolean,
       enemyPlacedShips: Boolean
   ) extends GameMode {
 
-    override def isPreGame: Boolean = true
+    override def isPlacingShips: Boolean = true
 
   }
 

@@ -10,12 +10,12 @@ import pt.rmartins.battleships.frontend.routing.{RoutingInGameState, RoutingLogi
 import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
 import pt.rmartins.battleships.frontend.services.{TranslationsService, UserContextService}
 import pt.rmartins.battleships.frontend.views.game.BoardView.InGameMarkSelector
+import pt.rmartins.battleships.frontend.views.game.JoinedPreGame.PlayingAgainstPlayer
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
-import pt.rmartins.battleships.shared.model.game.BonusReward.ExtraTurn
-import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
+import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.BoardUtils
 import pt.rmartins.battleships.shared.model.utils.BoardUtils.{BoardMarks, canPlaceInBoard}
@@ -43,11 +43,22 @@ class GamePresenter(
 
   import translationsService._
 
+  val preGameRulesProperty: Property[Rules] =
+    preGameModel.subProp(_.rules)
+
   val gameStateProperty: Property[Option[GameState]] =
     gameStateModel.bitransform(_.gameState)(GameStateModel(_))
 
   val enemyProperty: ReadableProperty[Option[SimplePlayer]] =
     gameStateModel.transform(_.gameState.map(_.enemy))
+
+  val enemyUsernameProperty: ReadableProperty[Option[Username]] =
+    combine(
+      preGameModel.subProp(_.inJoinedPreGame).transform(_.flatMap(_.enemyUsernameOpt)),
+      gameStateModel.transform(_.gameState.map(_.enemy.username))
+    ).transform { case (preGameEnemy, inGameEnemy) =>
+      preGameEnemy.orElse(inGameEnemy)
+    }
 
   val gameModeProperty: Property[Option[GameMode]] =
     gameStateProperty.bitransform[Option[GameMode]](_.map(_.gameMode)) {
@@ -58,15 +69,15 @@ class GamePresenter(
     }
   val modeTypeProperty: ReadableProperty[Option[ModeType]] =
     gameModeProperty.transform(_.map {
-      case _: PreGameMode  => PreGameModeType
-      case _: PlayingMode  => PlayingModeType
-      case _: GameOverMode => GameOverModeType
+      case _: PlacingShipsMode => PreGameModeType
+      case _: PlayingMode      => PlayingModeType
+      case _: GameOverMode     => GameOverModeType
     })
 
-  val preGameModeProperty: Property[Option[PreGameMode]] =
-    gameModeProperty.bitransform[Option[PreGameMode]] {
-      case Some(preGameMode: PreGameMode) => Some(preGameMode)
-      case _                              => None
+  val placingShipsModeProperty: Property[Option[PlacingShipsMode]] =
+    gameModeProperty.bitransform[Option[PlacingShipsMode]] {
+      case Some(placingShipsMode: PlacingShipsMode) => Some(placingShipsMode)
+      case _                                        => None
     }(identity)
 
   val playingModeProperty: Property[Option[PlayingMode]] =
@@ -78,10 +89,10 @@ class GamePresenter(
   val rulesProperty: ReadableProperty[Option[Rules]] =
     gameStateProperty.transform(_.map(_.rules))
 
-  val inPreGameMode: ReadableProperty[Boolean] =
-    gameModeProperty.transform(_.exists(_.isPreGame))
+  val inPlacingShipsMode: ReadableProperty[Boolean] =
+    gameModeProperty.transform(_.exists(_.isPlacingShips))
 
-  val playingMode: ReadableProperty[Boolean] =
+  val inPlayingMode: ReadableProperty[Boolean] =
     gameModeProperty.transform(_.exists(_.isPlaying))
 
   val inGameOverMode: ReadableProperty[Boolean] =
@@ -106,23 +117,97 @@ class GamePresenter(
     chatModel.subSeq(_.msgs).append(msg)
   }
 
+  private val onUpdatePreGameCallback = notificationsCenter.onUpdatePreGameState {
+    case PreGameState(gameId, enemyUsername, confirmRules, enemyConfirmedRules, updateRules) =>
+      preGameModel
+        .subProp(_.inJoinedPreGame)
+        .set(
+          Some(
+            PlayingAgainstPlayer(
+              gameId,
+              confirmed = confirmRules,
+              enemyConfirmed = enemyConfirmedRules,
+              enemyUsername
+            )
+          )
+        )
+      preGameModel.subProp(_.rules).set(updateRules)
+  }
+
+  private val onPreGameRulesPatchCallback = notificationsCenter.onPreGameRulesPatch {
+    case PreGameRulesPatch(Some(boardSizePatch), _, _, _, _) =>
+      preGameRulesProperty.set(preGameRulesProperty.get.copy(boardSize = boardSizePatch))
+    case PreGameRulesPatch(_, Some((shipId, counter)), _, _, _) =>
+      preGameRulesProperty.set(
+        preGameRulesProperty.get
+          .modify(_.gameFleet)
+          .using(fleet =>
+            Fleet(fleet.shipCounterMap.updated(shipId, (counter, Rotation.Rotation0)).toList)
+          )
+      )
+    case PreGameRulesPatch(_, _, Some(defaultTurnAttacksPatch), _, _) =>
+      preGameRulesProperty.set(
+        preGameRulesProperty.get.copy(defaultTurnAttacks = defaultTurnAttacksPatch)
+      )
+    case PreGameRulesPatch(_, _, _, Some(turnBonusesPatch), _) =>
+      preGameRulesProperty.set(preGameRulesProperty.get.copy(turnBonuses = turnBonusesPatch))
+    case PreGameRulesPatch(_, _, _, _, Some(timeLimitPatch)) =>
+      preGameRulesProperty.set(preGameRulesProperty.get.copy(timeLimit = timeLimitPatch))
+    case _ =>
+  }
+
+  private val onPreGameConfirmStateCallback =
+    notificationsCenter.onPreGameConfirmState { case (confirmState, enemyConfirmState) =>
+      preGameModel.subProp(_.inJoinedPreGame).get match {
+        case Some(playingAgainstPlayer @ PlayingAgainstPlayer(_, _, _, _)) =>
+          preGameModel
+            .subProp(_.inJoinedPreGame)
+            .set(
+              Some(
+                playingAgainstPlayer.copy(
+                  confirmed = confirmState,
+                  enemyConfirmed = enemyConfirmState
+                )
+              )
+            )
+        case _ =>
+      }
+    }
+
   private val onQuitGameCallback = notificationsCenter.onQuitGame { case _ =>
-    val updatedGameState = None
-    updateGameMode(gameStateProperty.get.map(_.gameMode), updatedGameState)
-    gameModel.set(GameModel.default)
-    gameStateProperty.set(updatedGameState)
-    screenModel.set(ScreenModel.resetScreenModel(screenModel.get))
+    if (preGameModel.get.inJoinedPreGame.nonEmpty)
+      clearPreGame()
+    else {
+      val updatedGameState = None
+      updateGameState(gameStateProperty.get.map(_.gameMode), updatedGameState)
+      gameModel.set(GameModel.default)
+      gameStateProperty.set(updatedGameState)
+      screenModel.set(ScreenModel.resetScreenModel(screenModel.get))
+    }
   }
 
   private val onGameStateCallback = notificationsCenter.onGameState { case updatedGameState =>
-    updateGameMode(gameStateProperty.get.map(_.gameMode), Some(updatedGameState))
-    gameStateProperty.set(Some(updatedGameState))
+    val currentGameState = gameStateProperty.get
+    val mergedGameState: GameState = mergeGameState(currentGameState, updatedGameState)
+    updateGameState(currentGameState.map(_.gameMode), Some(mergedGameState))
+    gameStateProperty.set(Some(mergedGameState))
   }
 
   private val onGameModeCallback = notificationsCenter.onGameMode { case updatedGameMode =>
-    val updatedGameState = gameStateProperty.get.map(_.copy(gameMode = updatedGameMode))
-    updateGameMode(gameStateProperty.get.map(_.gameMode), updatedGameState)
-    gameStateProperty.set(updatedGameState)
+    val currentGameState = gameStateProperty.get
+    val updatedGameState: Option[GameState] =
+      currentGameState.map(_.copy(gameMode = updatedGameMode))
+    val finalGameState: Option[GameState] =
+      updatedGameState match {
+        case None =>
+          updateGameState(currentGameState.map(_.gameMode), None)
+          None
+        case Some(updatedGameState) =>
+          val mergedGameState: GameState = mergeGameState(currentGameState, updatedGameState)
+          updateGameState(currentGameState.map(_.gameMode), Some(mergedGameState))
+          Some(mergedGameState)
+      }
+    gameStateProperty.set(finalGameState)
   }
 
   val chatMessagesProperty: ReadableSeqProperty[ChatMessage] =
@@ -181,6 +266,21 @@ class GamePresenter(
         .filter(_ > 0 && selectedTab != ScreenModel.enemyMovesTab)
     }
 
+  val shipCounter: Map[ShipId, Property[Int]] =
+    Ship.allShipsList.map(_.shipId -> Property(0)).toMap
+
+  preGameModel
+    .subProp(_.rules)
+    .transform(_.gameFleet.shipCounterList)
+    .listen(
+      {
+        _.map { case (shipId, (amount, _)) =>
+          shipCounter(shipId).set(amount)
+        }
+      },
+      initUpdate = true
+    )
+
   private var lineDashOffsetIntervalHandle: Option[Int] = None
   private val lineDashOffsetIntervalMillis: Int = 200
 
@@ -200,10 +300,37 @@ class GamePresenter(
   private var timeRemainingIntervalHandle: Option[Int] = None
   private val timeRemainingIntervalMillis: Int = 100
 
-  def updateGameMode(fromGameMode: Option[GameMode], to: Option[GameState]): Unit = {
-    (fromGameMode, to) match {
-      case (None, Some(GameState(_, _, me, _, _: PreGameMode))) =>
-        me.shipsLeftToPlace.headOption.foreach { headShip =>
+  private def clearPreGame(): Unit = {
+    preGameModel.subProp(_.inJoinedPreGame).set(None)
+  }
+
+  private def mergeGameState(
+      currentGameStateOpt: Option[GameState],
+      updatedGameState: GameState
+  ): GameState =
+    (currentGameStateOpt, updatedGameState) match {
+      case (
+            Some(GameState(_, _, me, _, _: PlacingShipsMode)),
+            GameState(_, _, _, _, _: PlacingShipsMode)
+          ) =>
+        updatedGameState.modify(_.me.myBoard).setTo(me.myBoard)
+      case _ =>
+        updatedGameState
+    }
+
+  private def updateGameState(
+      fromGameState: Option[GameMode],
+      toGameState: Option[GameState]
+  ): Unit = {
+    (fromGameState, toGameState) match {
+      case (None, Some(GameState(_, rules, _, _, _: PlacingShipsMode))) =>
+        clearPreGame()
+        val shipsToPlace: List[Ship] =
+          rules.gameFleet.shipsList.sortBy(_.shipBiggestToSmallestOrder)
+        gameModel
+          .subProp(_.shipsLeftToPlace)
+          .set(shipsToPlace)
+        shipsToPlace.headOption.foreach { headShip =>
           gameModel.subProp(_.selectedShip).set(Some(headShip))
         }
         timeRemainingIntervalHandle.foreach(window.clearTimeout)
@@ -214,7 +341,7 @@ class GamePresenter(
         screenModel.subProp(_.lastSeenMessagesChat).set(chatMessagesSizeProperty.get)
         screenModel.subProp(_.screenResized).set((), force = true)
       case (
-            None | Some(_: PreGameMode),
+            None | Some(_: PlacingShipsMode),
             Some(GameState(_, _, me, enemy, PlayingMode(_, _, turnAttackTypes, _, _)))
           ) =>
         selectedTabProperty.set(ScreenModel.myMovesTab)
@@ -286,7 +413,7 @@ class GamePresenter(
       case _ =>
     }
 
-    to.map(_.gameMode) match {
+    toGameState.map(_.gameMode) match {
       case Some(PlayingMode(_, _, _, Some(myTimeRemaining), Some(enemyTimeRemaining))) =>
         gameModel.subProp(_.timeRemaining).set(Some((myTimeRemaining, enemyTimeRemaining)))
       case Some(GameOverMode(_, _, Some(myTimeRemaining), Some(enemyTimeRemaining), _)) =>
@@ -295,21 +422,21 @@ class GamePresenter(
         gameModel.subProp(_.timeRemaining).set(None)
     }
 
-    (fromGameMode, to) match {
+    (fromGameState, toGameState) match {
       case (Some(_: PlayingMode), Some(GameState(_, _, _, _, _: PlayingMode))) =>
         screenModel.subProp(_.newTurn).set((), force = true)
       case _ =>
     }
 
-    (fromGameMode, to) match {
+    (fromGameState, toGameState) match {
       case (None, Some(GameState(_, rules, _, _, _))) =>
-        val shipCounter = preGameModel.get.shipCounter
-        rules.gameFleet.shipsCounter.foreach { case (shipId, counter) =>
-          shipCounter(shipId).set(counter)
+        preGameModel.subProp(_.rules).set(rules)
+        Ship.allShipsList.foreach { ship =>
+          val shipId = ship.shipId
+          shipCounter(shipId).set(
+            rules.gameFleet.shipCounterMap.get(shipId).map(_._1).getOrElse(0)
+          )
         }
-        preGameModel.subProp(_.boardSize).set(rules.boardSize)
-        preGameModel.subProp(_.timeLimit).set(rules.timeLimit)
-        preGameModel.subProp(_.defaultTurnAttackTypes).set(rules.defaultTurnAttackTypes)
       case _ =>
     }
   }
@@ -400,28 +527,70 @@ class GamePresenter(
   }
 
   private def initializePreGameModel(): Unit = {
-    val (boardSize, fleet) = Fleet.default10By10
-    preGameModel.subProp(_.boardSize).set(boardSize)
-    val shipCounter = preGameModel.get.shipCounter
-    fleet.shipsCounter.foreach { case (shipId, counter) =>
-      shipCounter(shipId).set(counter)
-    }
-    preGameModel
-      .subProp(_.timeLimit)
-      .set(
-        Some(
-          RuleTimeLimit(
-            initialTotalTimeSeconds = 600,
-            additionalTurnTimeSeconds = Some((10, false))
-          )
-        )
-      )
-    preGameModel.subProp(_.defaultTurnAttackTypes).set(List.fill(3)(AttackType.Simple))
-
     val allShipCounters = shipCounter.toList
     val combinedShipCounters = allShipCounters.map(_._2).combineToSeqProperty
 
-    combine(combinedShipCounters, preGameModel.subProp(_.boardSize)).listen(
+    val gameIdOpt: ReadableProperty[Option[GameId]] =
+      preGameModel.subProp(_.inJoinedPreGame).transform {
+        case Some(PlayingAgainstPlayer(gameId, _, _, _)) => Some(gameId)
+        case _                                           => None
+      }
+
+    combinedShipCounters.listen { _ =>
+      val gameFleet: Fleet =
+        Fleet.fromShipIds(
+          allShipCounters.map { case (shipId, countProperty) =>
+            shipId -> countProperty.get
+          }
+        )
+      preGameRulesProperty.set(preGameRulesProperty.get.copy(gameFleet = gameFleet))
+    }
+
+    preGameRulesProperty.transform(_.boardSize).listen { updatedBoardSize =>
+      gameIdOpt.get.foreach { gameId =>
+        gameRpc.sendRulesPatch(gameId, PreGameRulesPatch(boardSizePatch = Some(updatedBoardSize)))
+      }
+    }
+
+    allShipCounters.foreach { case (shipId, counterProperty) =>
+      counterProperty.listen { counter =>
+        gameIdOpt.get.foreach { gameId =>
+          gameRpc.sendRulesPatch(
+            gameId,
+            PreGameRulesPatch(gameFleetPatch = Some((shipId, counter)))
+          )
+        }
+      }
+    }
+
+    preGameRulesProperty.transform(_.defaultTurnAttacks).listen { updatedDefaultTurnAttacks =>
+      gameIdOpt.get.foreach { gameId =>
+        gameRpc.sendRulesPatch(
+          gameId,
+          PreGameRulesPatch(defaultTurnAttacksPatch = Some(updatedDefaultTurnAttacks))
+        )
+      }
+    }
+
+    preGameRulesProperty.transform(_.timeLimit).listen { updatedTimeLimit =>
+      gameIdOpt.get.foreach { gameId =>
+        gameRpc.sendRulesPatch(
+          gameId,
+          PreGameRulesPatch(timeLimitPatch = Some(updatedTimeLimit))
+        )
+      }
+    }
+
+    preGameRulesProperty.transform(_.turnBonuses).listen { updatedTurnBonuses =>
+      gameIdOpt.get.foreach { gameId =>
+        gameRpc.sendRulesPatch(
+          gameId,
+          PreGameRulesPatch(turnBonusesPatch = Some(updatedTurnBonuses))
+        )
+      }
+    }
+
+    combine(combinedShipCounters, preGameRulesProperty.transform(_.boardSize)).listen(
       { case (_, boardSize) =>
         val possibleCoorLazyList: LazyList[(Coordinate, Rotation)] =
           LazyList.from(
@@ -540,6 +709,9 @@ class GamePresenter(
     // remove callbacks from NotificationsCenter before exit
     msgCallback.cancel()
 
+    onUpdatePreGameCallback.cancel()
+    onPreGameRulesPatchCallback.cancel()
+    onPreGameConfirmStateCallback.cancel()
     onQuitGameCallback.cancel()
     onGameStateCallback.cancel()
     onGameModeCallback.cancel()
@@ -561,32 +733,10 @@ class GamePresenter(
     val preGame = preGameModel.get
     if (preGame.previewBoardOpt.exists(_._2 < PreGameModel.MinPreviewTries))
       Left(ErrorModalType.SmallBoardError)
-    else if (preGame.shipCounter.forall(_._2.get == 0))
+    else if (preGame.rules.gameFleet.shipAmount == 0)
       Left(ErrorModalType.EmptyFleetError)
     else {
-      val turnBonuses: List[TurnBonus] =
-        List(
-          TurnBonus(BonusType.FirstBlood, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
-          TurnBonus(BonusType.DoubleKill, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
-          TurnBonus(BonusType.TripleKill, List(ExtraTurn(List.fill(3)(AttackType.Simple))))
-        )
-
-      val gameFleet: Fleet =
-        Fleet.fromShips(
-          preGame.shipCounter.toList.flatMap { case (shipId, counterProperty) =>
-            List.fill(counterProperty.get)(Ship.allShipsMap(shipId))
-          }
-        )
-
-      Right(
-        Rules(
-          boardSize = preGame.boardSize,
-          gameFleet = gameFleet,
-          defaultTurnAttackTypes = preGame.defaultTurnAttackTypes,
-          turnBonuses = turnBonuses,
-          timeLimit = preGame.timeLimit
-        )
-      )
+      Right(preGame.rules)
     }
   }
 
@@ -601,12 +751,32 @@ class GamePresenter(
     }
   }
 
-  def startGameWith(otherPlayerUsername: Username): Unit =
+  def invitePlayer(otherPlayerUsername: Username): Unit =
     if (otherPlayerUsername.username.nonEmpty)
       createCurrentRules match {
         case Left(errorModalType) => showErrorModal(errorModalType)
-        case Right(rules)         => gameRpc.startGameWith(otherPlayerUsername, rules)
+        case Right(rules)         => gameRpc.invitePlayer(otherPlayerUsername, rules)
       }
+
+  def confirmRules(): Unit =
+    preGameModel.subProp(_.inJoinedPreGame).get match {
+      case Some(playingAgainstPlayer @ PlayingAgainstPlayer(gameId, false, _, _)) =>
+        preGameModel
+          .subProp(_.inJoinedPreGame)
+          .set(Some(playingAgainstPlayer.copy(confirmed = true)))
+        gameRpc.confirmRules(gameId)
+      case _ =>
+    }
+
+  def cancelRules(): Unit =
+    preGameModel.subProp(_.inJoinedPreGame).get match {
+      case Some(playingAgainstPlayer @ PlayingAgainstPlayer(gameId, true, _, _)) =>
+        preGameModel
+          .subProp(_.inJoinedPreGame)
+          .set(Some(playingAgainstPlayer.copy(confirmed = false)))
+        gameRpc.cancelRules(gameId)
+      case _ =>
+    }
 
   def rematchGame(): Unit =
     gameStateProperty.get match {
@@ -627,8 +797,10 @@ class GamePresenter(
     }
 
   def quitCurrentGame(): Unit =
-    gameStateProperty.get match {
-      case Some(GameState(gameId, _, _, _, _)) =>
+    preGameModel.get.inJoinedPreGame
+      .flatMap(_.gameIdOpt)
+      .orElse(gameStateProperty.get.map(_.gameId)) match {
+      case Some(gameId) =>
         gameRpc.quitCurrentGame(gameId)
       case _ =>
     }
@@ -641,7 +813,7 @@ class GamePresenter(
 
     (gameModel.get, gameStateProperty.get) match {
       case (
-            GameModel(Some(_), Some(button @ (0 | 2)), _, _, _, selectedBoardMarkOpt, _, _),
+            GameModel(_, Some(_), Some(button @ (0 | 2)), _, _, _, selectedBoardMarkOpt, _, _),
             Some(
               gameState @ GameState(
                 gameId,
@@ -704,8 +876,8 @@ class GamePresenter(
 
     (gameModel.get, gameStateProperty.get) match {
       case (
-            GameModel(Some(_), Some(0), selectedShipOpt, _, _, _, _, _),
-            Some(gameState @ GameState(_, _, me, _, _: PreGameMode))
+            GameModel(_, Some(_), Some(0), selectedShipOpt, _, _, _, _, _),
+            Some(gameState @ GameState(_, _, me, _, _: PlacingShipsMode))
           ) =>
         boardView.shipToPlaceHover.get.map(_.ship) match {
           case Some(ship) =>
@@ -723,7 +895,7 @@ class GamePresenter(
             }
         }
       case (
-            GameModel(Some(_), Some(2), selectedShip, turnAttacks, _, _, _, _),
+            GameModel(_, Some(_), Some(2), selectedShip, turnAttacks, _, _, _, _),
             Some(
               gameState @ GameState(
                 gameId,
@@ -774,6 +946,7 @@ class GamePresenter(
         }
       case (
             GameModel(
+              _,
               Some(_),
               Some(0),
               selectedShip,
@@ -924,24 +1097,24 @@ class GamePresenter(
       coordinate: Coordinate
   ): Boolean =
     if (
-      me.shipsLeftToPlace.exists(_.shipId == ship.shipId) &&
+      gameModel.subProp(_.shipsLeftToPlace).get.exists(_.shipId == ship.shipId) &&
       canPlaceInBoard(me.myBoard, ship, coordinate)
     ) {
-      val playerUpdated =
+      val playerUpdated: Player =
         me
-          .modify(_.shipsLeftToPlace)
-          .using(removeOneShip(ship.shipId, _))
           .modify(_.myBoard)
           .using(_.addShip(ShipInBoard(ship, coordinate)))
-
       gameStateProperty.set(Some(gameState.copy(me = playerUpdated)))
 
-      val nextShipOpt =
-        if (playerUpdated.shipsLeftToPlace.exists(_.shipId == ship.shipId))
+      val updatedShipsLeftToPlace: List[Ship] =
+        removeOneShip(ship.shipId, gameModel.subProp(_.shipsLeftToPlace).get)
+      gameModel.subProp(_.shipsLeftToPlace).set(updatedShipsLeftToPlace)
+
+      val nextShipOpt: Option[Ship] =
+        if (updatedShipsLeftToPlace.exists(_.shipId == ship.shipId))
           Some(ship)
         else
-          playerUpdated.shipsLeftToPlace.headOption
-
+          updatedShipsLeftToPlace.headOption
       gameModel.subProp(_.selectedShip).set(nextShipOpt)
 
       true
@@ -950,7 +1123,7 @@ class GamePresenter(
 
   def keyDown(key: String): Unit = {
     gameStateProperty.get match {
-      case Some(GameState(_, _, _, _, _: PreGameMode)) =>
+      case Some(GameState(_, _, _, _, _: PlacingShipsMode)) =>
         if (key.equalsIgnoreCase("R"))
           rotateSelectedShip(1)
       case Some(GameState(_, _, _, _, _: PlayingMode)) =>
@@ -965,7 +1138,7 @@ class GamePresenter(
     boardView.myBoardCanvas.focus()
 
     gameStateProperty.get match {
-      case Some(GameState(_, _, _, _, _: PreGameMode)) =>
+      case Some(GameState(_, _, _, _, _: PlacingShipsMode)) =>
         if (wheelRotation != 0)
           rotateSelectedShip(wheelRotation)
       case Some(
@@ -1028,7 +1201,7 @@ class GamePresenter(
 
   def cancelShipsPlacement(): Unit =
     gameStateProperty.get match {
-      case Some(GameState(gameId, _, _, _, PreGameMode(true, _))) =>
+      case Some(GameState(gameId, _, _, _, PlacingShipsMode(true, _))) =>
         gameRpc.cancelShipsPlacement(gameId)
       case _ =>
     }
@@ -1051,21 +1224,13 @@ class GamePresenter(
               Some(headShip)
           }
 
-        gameStateProperty.set(
-          Some(
-            undoShip match {
-              case None =>
-                gameState
-              case Some(headShip) =>
-                gameState.copy(me =
-                  me.modify(_.shipsLeftToPlace)
-                    .using(headShip :: _)
-                    .modify(_.myBoard)
-                    .using(_.removeLastShip)
-                )
-            }
+        undoShip.foreach { headShip =>
+          val shipsLeftToPlaceProperty = gameModel.subProp(_.shipsLeftToPlace)
+          shipsLeftToPlaceProperty.set(headShip :: shipsLeftToPlaceProperty.get)
+          gameStateProperty.set(
+            Some(gameState.copy(me = me.modify(_.myBoard).using(_.removeLastShip)))
           )
-        )
+        }
 
         gameModel.subProp(_.selectedShip).set(undoShip)
 
@@ -1078,22 +1243,19 @@ class GamePresenter(
       case Some(
             gameState @ GameState(
               _,
-              Rules(_, Fleet(shipsInThisGame), _, _, _),
+              Rules(_, fleet: Fleet, _, _, _),
               me,
               _,
-              _: PreGameMode
+              _: PlacingShipsMode
             )
           ) if me.myBoard.ships.nonEmpty =>
-        val meUpdated: Player =
-          me.modify(_.shipsLeftToPlace)
-            .setTo(shipsInThisGame)
-            .modify(_.myBoard)
-            .using(_.resetBoard)
-
-        gameStateProperty.set(Some(gameState.copy(me = meUpdated)))
+        val initialShips: List[Ship] =
+          fleet.shipsList.sortBy(_.shipBiggestToSmallestOrder)
+        gameModel.subProp(_.shipsLeftToPlace).set(initialShips)
+        gameStateProperty.set(Some(gameState.copy(me = me.modify(_.myBoard).using(_.resetBoard))))
         gameModel.get.selectedShip match {
           case None =>
-            gameModel.subProp(_.selectedShip).set(meUpdated.shipsLeftToPlace.headOption)
+            gameModel.subProp(_.selectedShip).set(initialShips.headOption)
           case Some(_) =>
         }
 
@@ -1103,8 +1265,8 @@ class GamePresenter(
 
   def randomPlacement(): Unit =
     gameStateProperty.get match {
-      case Some(gameState @ GameState(_, _, me, _, _: PreGameMode)) =>
-        me.shipsLeftToPlace match {
+      case Some(gameState @ GameState(_, _, me, _, _: PlacingShipsMode)) =>
+        gameModel.subProp(_.shipsLeftToPlace).get match {
           case headShip :: _ =>
             val possibleCoorList =
               for {
@@ -1182,7 +1344,7 @@ class GamePresenter(
   }
 
   def getPreGameShipProperty(shipId: ShipId): Property[Int] =
-    preGameModel.get.shipCounter(shipId)
+    shipCounter(shipId)
 
   def addToEnemyTimeSeconds(secondsToAdd: Int): Unit =
     gameStateProperty.get match {

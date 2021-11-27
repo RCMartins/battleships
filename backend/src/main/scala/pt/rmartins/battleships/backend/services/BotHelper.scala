@@ -16,7 +16,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
   private val boardSize: Coordinate = rules.boardSize
 
   private val allShipGuessers: Map[ShipId, ShipGuesser] = {
-    val allShipIds = rules.gameFleet.shipsCounter.keys.toList
+    val allShipIds: List[ShipId] = rules.gameFleet.shipCounterList.map(_._1)
     allShipIds.map(shipId => shipId -> new ShipGuesser(shipId)).toMap
   }
 
@@ -213,7 +213,8 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
 
   private class ShipGuesser(val shipId: ShipId) {
 
-    private val shipsCounter: Int = rules.gameFleet.shipsCounter(shipId)
+    private val shipsCounter: Int =
+      rules.gameFleet.shipCounterList.find(_._1 == shipId).map(_._2._1).getOrElse(0)
     private val uniqueRotations = Ship.allShipsUniqueRotations(shipId)
 
     private var turnsWithShip: List[TurnPlay] = Nil

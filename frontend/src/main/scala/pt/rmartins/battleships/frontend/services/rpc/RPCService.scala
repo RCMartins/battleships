@@ -8,6 +8,9 @@ class RPCService(notificationsCenter: NotificationsCenter) extends MainClientRPC
 
   override def game(): GameNotificationsRPC =
     new GameService(
+      notificationsCenter.preGameStateListeners,
+      notificationsCenter.preGameConfirmStateListeners,
+      notificationsCenter.preGameEnemyRulesPatchListeners,
       notificationsCenter.gameStateListeners,
       notificationsCenter.gameModeListeners,
       notificationsCenter.quitGameListeners

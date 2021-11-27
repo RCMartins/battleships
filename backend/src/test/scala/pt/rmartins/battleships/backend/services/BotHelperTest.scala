@@ -25,8 +25,8 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
     "find Ranger ship with only 1 possible position" in {
       val rules = Rules(
         boardSize = Coordinate(3, 3),
-        gameFleet = Fleet.fromShips(List.fill(1)(Ranger)),
-        defaultTurnAttackTypes = turnAttackTypes2,
+        gameFleet = Fleet.fromShips(List(Ranger -> 1)),
+        defaultTurnAttacks = turnAttackTypes2,
         turnBonuses = Nil,
         timeLimit = None
       )
@@ -43,14 +43,14 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
       val expectedCoordinates: Set[Coordinate] =
         Set((0, 2), (1, 2)).map { case (x, y) => Coordinate(x, y) }
 
-      containsCoordinates(result, rules.defaultTurnAttackTypes.size, expectedCoordinates)
+      containsCoordinates(result, rules.defaultTurnAttacks.size, expectedCoordinates)
     }
 
     "find AircraftCarrier ship with only 1 possible position" in {
       val rules = Rules(
         boardSize = Coordinate(5, 5),
-        gameFleet = Fleet.fromShips(List.fill(1)(AircraftCarrier)),
-        defaultTurnAttackTypes = turnAttackTypes3,
+        gameFleet = Fleet.fromShips(List(AircraftCarrier -> 1)),
+        defaultTurnAttacks = turnAttackTypes3,
         turnBonuses = Nil,
         timeLimit = None
       )
@@ -67,14 +67,14 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
       val expectedCoordinates: Set[Coordinate] =
         Set((2, 1), (1, 1), (1, 3), (1, 2)).map { case (x, y) => Coordinate(x, y) }
 
-      containsCoordinates(result, rules.defaultTurnAttackTypes.size, expectedCoordinates)
+      containsCoordinates(result, rules.defaultTurnAttacks.size, expectedCoordinates)
     }
 
     "find Conqueror ship with only 1 possible position (2 turns match)" in {
       val rules = Rules(
         boardSize = Coordinate(6, 6),
-        gameFleet = Fleet.fromShips(List.fill(1)(Conqueror)),
-        defaultTurnAttackTypes = turnAttackTypes2,
+        gameFleet = Fleet.fromShips(List(Conqueror -> 1)),
+        defaultTurnAttacks = turnAttackTypes2,
         turnBonuses = Nil,
         timeLimit = None
       )
@@ -91,14 +91,14 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
       val expectedCoordinates: Set[Coordinate] =
         Set((3, 1), (3, 2)).map { case (x, y) => Coordinate(x, y) }
 
-      containsCoordinates(result, rules.defaultTurnAttackTypes.size, expectedCoordinates)
+      containsCoordinates(result, rules.defaultTurnAttacks.size, expectedCoordinates)
     }
 
     "find 2 ships at once (Ranger & Conqueror) #1" in {
       val rules = Rules(
         boardSize = Coordinate(6, 6),
-        gameFleet = Fleet.fromShips(List.fill(1)(Ranger) ++ List.fill(1)(Conqueror)),
-        defaultTurnAttackTypes = turnAttackTypes3,
+        gameFleet = Fleet.fromShips(List(Ranger -> 1, Conqueror -> 1)),
+        defaultTurnAttacks = turnAttackTypes3,
         turnBonuses = Nil,
         timeLimit = None
       )
@@ -115,14 +115,14 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
       val expectedCoordinates: Set[Coordinate] =
         Set((0, 2), (3, 2), (3, 3)).map { case (x, y) => Coordinate(x, y) }
 
-      containsCoordinates(result, rules.defaultTurnAttackTypes.size, expectedCoordinates)
+      containsCoordinates(result, rules.defaultTurnAttacks.size, expectedCoordinates)
     }
 
     "find correct position of Conqueror #1" in {
       val rules = Rules(
         boardSize = Coordinate(4, 4),
-        gameFleet = Fleet.fromShips(List.fill(1)(Skeeter) ++ List.fill(1)(Conqueror)),
-        defaultTurnAttackTypes = turnAttackTypes3,
+        gameFleet = Fleet.fromShips(List(Skeeter -> 1, Conqueror -> 1)),
+        defaultTurnAttacks = turnAttackTypes3,
         turnBonuses = Nil,
         timeLimit = None
       )
@@ -144,7 +144,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
 
       containsCoordinatesSeq(
         result,
-        rules.defaultTurnAttackTypes.size,
+        rules.defaultTurnAttacks.size,
         expectedCoordinatesSure,
         expectedCoordinatesSure,
         expectedCoordinatesOther
@@ -154,8 +154,8 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
     "find correct position of Conqueror #2" in {
       val rules = Rules(
         boardSize = Coordinate(5, 5),
-        gameFleet = Fleet.fromShips(List.fill(1)(Skeeter) ++ List.fill(1)(Conqueror)),
-        defaultTurnAttackTypes = turnAttackTypes4,
+        gameFleet = Fleet.fromShips(List(Skeeter -> 1, Conqueror -> 1)),
+        defaultTurnAttacks = turnAttackTypes4,
         turnBonuses = Nil,
         timeLimit = None
       )
@@ -173,14 +173,14 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
       val expectedCoordinates: Set[Coordinate] =
         Set((3, 0), (3, 2), (3, 3), (0, 4)).map { case (x, y) => Coordinate(x, y) }
 
-      containsCoordinates(result, rules.defaultTurnAttackTypes.size, expectedCoordinates)
+      containsCoordinates(result, rules.defaultTurnAttacks.size, expectedCoordinates)
     }
 
     "find AircraftCarrier ship with few remaining possible spots" in {
       val rules = Rules(
         boardSize = Coordinate(4, 4),
-        gameFleet = Fleet.fromShips(List.fill(1)(AircraftCarrier)),
-        defaultTurnAttackTypes = turnAttackTypes3,
+        gameFleet = Fleet.fromShips(List(AircraftCarrier -> 1)),
+        defaultTurnAttacks = turnAttackTypes3,
         turnBonuses = Nil,
         timeLimit = None
       )
@@ -201,7 +201,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
 
       containsCoordinatesSeq(
         result,
-        rules.defaultTurnAttackTypes.size,
+        rules.defaultTurnAttacks.size,
         expectedCoordinatesSure,
         expectedCoordinatesSure,
         expectedCoordinatesOther
@@ -211,8 +211,8 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
     "find correct position of TorpedoBoat #1" in {
       val rules = Rules(
         boardSize = Coordinate(8, 8),
-        gameFleet = Fleet.fromShips(List.fill(1)(AircraftCarrier) ++ List.fill(1)(TorpedoBoat)),
-        defaultTurnAttackTypes = turnAttackTypes2,
+        gameFleet = Fleet.fromShips(List(AircraftCarrier -> 1, TorpedoBoat -> 1)),
+        defaultTurnAttacks = turnAttackTypes2,
         turnBonuses = Nil,
         timeLimit = None
       )
@@ -242,14 +242,14 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
       val expectedCoordinates: Set[Coordinate] =
         Set((4, 6), (7, 0)).map { case (x, y) => Coordinate(x, y) }
 
-      containsCoordinates(result, rules.defaultTurnAttackTypes.size, expectedCoordinates)
+      containsCoordinates(result, rules.defaultTurnAttacks.size, expectedCoordinates)
     }
 
     "find correct position of Cruiser #1" in {
       val rules = Rules(
         boardSize = Coordinate(7, 7),
-        gameFleet = Fleet.fromShips(List.fill(1)(Ranger) ++ List.fill(1)(Cruiser)),
-        defaultTurnAttackTypes = turnAttackTypes2,
+        gameFleet = Fleet.fromShips(List(Ranger -> 1, Cruiser -> 1)),
+        defaultTurnAttacks = turnAttackTypes2,
         turnBonuses = Nil,
         timeLimit = None
       )
@@ -273,7 +273,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
 
       containsCoordinatesSeq(
         result,
-        rules.defaultTurnAttackTypes.size,
+        rules.defaultTurnAttacks.size,
         expectedCoordinates1,
         expectedCoordinates2
       )
@@ -282,8 +282,8 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
     "find correct position of Conqueror #3" in {
       val rules = Rules(
         boardSize = Coordinate(7, 7),
-        gameFleet = Fleet.fromShips(List(Skeeter, Ranger, Conqueror)),
-        defaultTurnAttackTypes = turnAttackTypes3,
+        gameFleet = Fleet.fromShips(List(Skeeter -> 1, Ranger -> 1, Conqueror -> 1)),
+        defaultTurnAttacks = turnAttackTypes3,
         turnBonuses = Nil,
         timeLimit = None
       )
@@ -307,7 +307,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
 
       containsCoordinatesSeq(
         result,
-        rules.defaultTurnAttackTypes.size,
+        rules.defaultTurnAttacks.size,
         expectedCoordinatesSure,
         expectedCoordinatesOther,
         expectedCoordinatesOther
@@ -318,9 +318,9 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
       val rules = Rules(
         boardSize = Coordinate(8, 8),
         gameFleet = Fleet.fromShips(
-          List(Submarine, Skeeter, Ranger, Conqueror, Cruiser, AircraftCarrier)
+          List(Submarine, Skeeter, Ranger, Conqueror, Cruiser, AircraftCarrier).map(_ -> 1)
         ),
-        defaultTurnAttackTypes = turnAttackTypes3,
+        defaultTurnAttacks = turnAttackTypes3,
         turnBonuses = List(
           TurnBonus.apply(
             BonusType.TripleKill,
@@ -349,7 +349,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
 
       containsCoordinates(
         result,
-        rules.defaultTurnAttackTypes.size,
+        rules.defaultTurnAttacks.size,
         expectedCoordinates
       )
     }
@@ -357,8 +357,8 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
     "find correct position of all ships #1" in {
       val rules = Rules(
         boardSize = Coordinate(5, 5),
-        gameFleet = Fleet.fromShips(List(Submarine, Skeeter, Ranger)),
-        defaultTurnAttackTypes = turnAttackTypes3,
+        gameFleet = Fleet.fromShips(List(Submarine, Skeeter, Ranger).map(_ -> 1)),
+        defaultTurnAttacks = turnAttackTypes3,
         turnBonuses = Nil,
         timeLimit = None
       )
@@ -382,7 +382,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
 
       containsCoordinates(
         result,
-        rules.defaultTurnAttackTypes.size,
+        rules.defaultTurnAttacks.size,
         expectedCoordinates
       )
     }
@@ -390,8 +390,8 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
     "find correct position of LongShip ship #1" in {
       val rules = Rules(
         boardSize = Coordinate(6, 6),
-        gameFleet = Fleet.fromShips(List(LongShip, TorpedoBoat)),
-        defaultTurnAttackTypes = turnAttackTypes5,
+        gameFleet = Fleet.fromShips(List(LongShip -> 1, TorpedoBoat -> 1)),
+        defaultTurnAttacks = turnAttackTypes5,
         turnBonuses = Nil,
         timeLimit = None
       )
@@ -413,7 +413,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
 
       containsCoordinates(
         result,
-        rules.defaultTurnAttackTypes.size,
+        rules.defaultTurnAttacks.size,
         expectedCoordinates
       )
     }
@@ -507,9 +507,9 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
   private def placeAttacks(botHelper: BotHelper, turnHistory: List[TurnPlay]) = {
     turnHistory.foreach { turnPlay =>
       botHelper.updateBotBoardMarks(turnPlay)
-      botHelper.placeAttacks(botHelper.rules.defaultTurnAttackTypes)
+      botHelper.placeAttacks(botHelper.rules.defaultTurnAttacks)
     }
-    botHelper.placeAttacks(botHelper.rules.defaultTurnAttackTypes)
+    botHelper.placeAttacks(botHelper.rules.defaultTurnAttacks)
   }
 
   private val testLogger: BotHelperLogger = new BotHelperLogger {

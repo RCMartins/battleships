@@ -5,9 +5,9 @@ import com.avsystem.commons.serialization.HasGenCodec
 case class Rules(
     boardSize: Coordinate,
     gameFleet: Fleet,
-    defaultTurnAttackTypes: List[AttackType],
+    defaultTurnAttacks: List[AttackType],
     turnBonuses: List[TurnBonus],
-    timeLimit: Option[RuleTimeLimit]
+    timeLimit: RuleTimeLimit
 )
 
 object Rules extends HasGenCodec[Rules]

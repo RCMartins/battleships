@@ -112,11 +112,13 @@ object BotHelperLogger {
         file.append("\n\n\n")
         file.append(sb.result())
       } else {
-        //gameFleet = Fleet.fromShips(List(Skeeter, Ranger, Conqueror)),
+        val shipsStr: String =
+          rules.gameFleet.shipCounterList
+            .map { case (shipId, (amount, _)) => s"(${Ship.shipNames(shipId)}, $amount)" }
+            .mkString(", ")
+
         file.append(s"boardSize = ${rules.boardSize.toCodeString}\n\n")
-        file.append(
-          s"gameFleet = Fleet.fromShips(List(${rules.gameFleet.ships.map(ship => Ship.shipNames(ship.shipId)).mkString(", ")}))\n\n"
-        )
+        file.append(s"gameFleet = Fleet.fromShips(List($shipsStr))\n\n")
         file.append(sb.result())
       }
     }

@@ -5,6 +5,7 @@ import pt.rmartins.battleships.frontend.views.game.BoardView.InGameMarkSelector
 import pt.rmartins.battleships.shared.model.game._
 
 case class GameModel(
+    shipsLeftToPlace: List[Ship],
     mousePosition: Option[Coordinate],
     mouseDown: Option[Int],
     selectedShip: Option[Ship],
@@ -19,6 +20,7 @@ object GameModel extends HasModelPropertyCreator[GameModel] {
 
   val default: GameModel =
     GameModel(
+      shipsLeftToPlace = Nil,
       mousePosition = None,
       mouseDown = None,
       selectedShip = None,

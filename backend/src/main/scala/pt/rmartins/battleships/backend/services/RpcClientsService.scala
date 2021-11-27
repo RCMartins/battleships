@@ -1,15 +1,13 @@
 package pt.rmartins.battleships.backend.services
 
-import com.softwaremill.quicklens.ModifyPimp
 import io.udash.rpc.{ClientId, ClientRPCTarget, DefaultClientRPC}
 import pt.rmartins.battleships.shared.model.auth.UserContext
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
-import pt.rmartins.battleships.shared.model.game.{GameMode, GameState, Username}
+import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.rpc.client.MainClientRPC
 
 import java.util.Date
 import scala.collection.mutable
-import scala.concurrent.Future
 
 /** Helper object for server -> client calls. */
 class RpcClientsService(sendToClientFactory: ClientRPCTarget => MainClientRPC) {
@@ -58,6 +56,31 @@ class RpcClientsService(sendToClientFactory: ClientRPCTarget => MainClientRPC) {
     clients -= clientId
     authClients.remove(clientId).foreach(ctx => clientUsernames.remove(ctx.username.toLowerCase))
   }
+
+  def sendPreGameState(clientId: ClientId, preGameState: PreGameState): Unit =
+    authClients.get(clientId) match {
+      case Some(_) =>
+        sendToClient(clientId).game().sendPreGameState(preGameState)
+      case _ =>
+    }
+
+  def sendPreGameConfirmStates(
+      clientId: ClientId,
+      acceptedRules: Boolean,
+      enemyAcceptedRules: Boolean
+  ): Unit =
+    authClients.get(clientId) match {
+      case Some(_) =>
+        sendToClient(clientId).game().sendPreGameConfirmState(acceptedRules, enemyAcceptedRules)
+      case _ =>
+    }
+
+  def sendPreGameRulesPatch(clientId: ClientId, preGameRulesPatch: PreGameRulesPatch): Unit =
+    authClients.get(clientId) match {
+      case Some(_) =>
+        sendToClient(clientId).game().sendPreGameRulesPatch(preGameRulesPatch)
+      case _ =>
+    }
 
   def sendGameState(clientId: ClientId, gameState: GameState): Unit =
     authClients.get(clientId) match {

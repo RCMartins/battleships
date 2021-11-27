@@ -22,6 +22,9 @@ case class Ship(shipId: ShipId, pieces: List[Coordinate], rotation: Rotation) {
   private[Ship] def mapPieces(f: Coordinate => Coordinate): Ship =
     Ship(shipId, pieces.map(f), rotation)
 
+  def shipBiggestToSmallestOrder: (Int, Int) =
+    (-piecesSize, shipId.id)
+
 }
 
 object Ship extends HasGenCodec[Ship] {
@@ -99,6 +102,9 @@ object Ship extends HasGenCodec[Ship] {
   val allShipsList: List[Ship] =
     allShipsListNames.map(_._1)
 
+  val allShipIdsSet: Set[ShipId] =
+    allShipsList.map(_.shipId).toSet
+
   val shipNames: Map[ShipId, String] =
     allShipsListNames.map { case (ship, name) => ship.shipId -> name }.toMap
 
@@ -106,17 +112,19 @@ object Ship extends HasGenCodec[Ship] {
     val initialFleet =
       Fleet(
         allShipsList.map { ship =>
-          if (ship.size.y > ship.size.x) ship.rotateBy(1) else ship
+          ship.shipId -> ((1, if (ship.size.y > ship.size.x) Rotation1 else Rotation0))
         }
       )
 
     val fleetCoordinateSize = initialFleet.maxSize
 
     Fleet(
-      initialFleet.ships.map { ship =>
-        Some(getShip(ship.shipId, Rotation.Rotation0))
-          .filter(_.size <= fleetCoordinateSize)
-          .getOrElse(ship)
+      initialFleet.shipsList.map { ship =>
+        val finalShip =
+          Some(getShip(ship.shipId, Rotation.Rotation0))
+            .filter(_.size <= fleetCoordinateSize)
+            .getOrElse(ship)
+        finalShip.shipId -> ((1, ship.rotation))
       }
     )
   }

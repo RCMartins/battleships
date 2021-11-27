@@ -9,7 +9,7 @@ import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.css.GameStyles
-import pt.rmartins.battleships.shared.model.game.GameMode.{GameOverMode, PlayingMode, PreGameMode}
+import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.BoardUtils.canPlaceInBoard
@@ -299,7 +299,7 @@ class BoardView(
           }
 
         val shipsGrouped: List[(ShipId, List[Ship])] =
-          shipsInThisGame.ships
+          shipsInThisGame.shipsList
             .groupBy(_.shipId)
             .toList
 
@@ -324,9 +324,7 @@ class BoardView(
               else
                 (shipId, ships.map(_.rotateBy(1)))
             }
-            .sortBy { case (shipId, list) =>
-              (-list.head.piecesSize, shipId.id)
-            }
+            .sortBy(_._2.head.shipBiggestToSmallestOrder)
             .map(_._2)
 
         getShipsToPlacePos(
@@ -345,14 +343,14 @@ class BoardView(
   private val allShipsToPlaceCoordinates: ReadableProperty[List[ToPlaceShip]] =
     combine(
       shipsSummaryRelCoordinates,
-      gamePresenter.meProperty.transform(_.map(_.shipsLeftToPlace)),
+      gameModel.subProp(_.shipsLeftToPlace),
       gamePresenter.modeTypeProperty,
       PlaceShipsPos,
       SummaryShipsSqSize
     ).transform {
       case (
             shipsSummary,
-            Some(shipsLeftToPlace),
+            shipsLeftToPlace,
             Some(PreGameModeType),
             placeShipsPos,
             placeShipsSqSize
@@ -608,6 +606,7 @@ class BoardView(
 
   def paint(): Unit = {
     val GameModel(
+      _,
       mousePositionOpt,
       _,
       selectedShipOpt,
@@ -625,7 +624,7 @@ class BoardView(
     renderingCtx.clearRect(0, 0, myBoardCanvas.width, myBoardCanvas.height)
 
     gamePresenter.gameStateProperty.get match {
-      case Some(GameState(_, _, me, enemy, _: PreGameMode)) =>
+      case Some(GameState(_, _, me, enemy, _: PlacingShipsMode)) =>
         drawMyBoard(
           renderingCtx,
           screenModelData.myBoardTitle.innerText,

@@ -5,7 +5,7 @@ import io.udash.bindings.modifiers.Binding.NestedInterceptor
 import io.udash.bootstrap.utils.UdashIcons.FontAwesome
 import io.udash.css._
 import io.udash.i18n.translatedDynamic
-import io.udash.{ModelProperty, bind, produce, toAttrPairOps}
+import io.udash._
 import org.scalajs.dom._
 import org.scalajs.dom.html.{Canvas, Div, Select}
 import pt.rmartins.battleships.frontend.services.TranslationsService
@@ -13,6 +13,7 @@ import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.i18n.Translations
+import pt.rmartins.battleships.shared.model.game.RuleTimeLimit._
 import pt.rmartins.battleships.shared.model.game._
 import scalatags.JsDom.all._
 
@@ -31,6 +32,24 @@ class PreGameView(
   private val fleetMaxSize: Coordinate = Ship.allShipsFleetMaxX.maxSize
   private val sqSize: Int = Math.min(100 / fleetMaxSize.x, 50 / fleetMaxSize.y)
   private val canvasSize: Coordinate = fleetMaxSize * sqSize + Coordinate.square(4)
+
+  private val MinBoardSize = 4
+  private val MaxBoardSize = 20
+
+  private val boardSizeProperty: Property[Coordinate] =
+    gamePresenter.preGameRulesProperty.bitransform(_.boardSize)(boardSize =>
+      gamePresenter.preGameRulesProperty.get.copy(boardSize = boardSize)
+    )
+
+  private val defaultTurnAttacksProperty: Property[List[AttackType]] =
+    gamePresenter.preGameRulesProperty.bitransform(_.defaultTurnAttacks)(defaultTurnAttacks =>
+      gamePresenter.preGameRulesProperty.get.copy(defaultTurnAttacks = defaultTurnAttacks)
+    )
+
+  private val timeLimitProperty: Property[RuleTimeLimit] =
+    gamePresenter.preGameRulesProperty.bitransform(_.timeLimit)(timeLimit =>
+      gamePresenter.preGameRulesProperty.get.copy(timeLimit = timeLimit)
+    )
 
   def createComponents(divElement: Element, nested: NestedInterceptor): Div = {
     div(
@@ -106,7 +125,7 @@ class PreGameView(
         centerYCanvas = true
       )
 
-    Ship.allShipsFleetMaxX.ships.map { ship =>
+    Ship.allShipsFleetMaxX.shipsList.map { ship =>
       val shipCountProperty =
         gamePresenter.getPreGameShipProperty(ship.shipId)
 
@@ -152,7 +171,7 @@ class PreGameView(
     nested(
       produce(
         combine(
-          preGameModel.subProp(_.boardSize),
+          preGameModel.subProp(_.rules).transform(_.boardSize),
           preGameModel.subProp(_.previewBoardOpt),
           screenModel.subProp(_.previewBoardTitle),
           screenModel.subProp(_.screenResized)
@@ -228,35 +247,29 @@ class PreGameView(
               s"$perc%"
             ).render
 
-          val maxBoardSize = 20
-          val minBoardSize = 6
           val plusButton =
             button(
               `class` := "btn btn-primary p-2 mx-1",
               span(style := "width: 1rem; height: 1rem;", FontAwesome.Solid.plus)
             ).render
-          if (boardSize.x == maxBoardSize)
+          if (boardSize.x == MaxBoardSize)
             plusButton.disabled = true
           plusButton.onclick = _ =>
-            preGameModel
-              .subProp(_.boardSize)
-              .set(
-                Coordinate.square(Math.min(maxBoardSize, boardSize.x + 1))
-              )
+            boardSizeProperty.set(
+              Coordinate.square(Math.min(MaxBoardSize, boardSize.x + 1))
+            )
 
           val minusButton =
             button(
               `class` := "btn btn-primary p-2 mx-1",
               span(style := "width: 1rem; height: 1rem;", FontAwesome.Solid.minus)
             ).render
-          if (boardSize.x == minBoardSize)
+          if (boardSize.x == MinBoardSize)
             minusButton.disabled = true
           minusButton.onclick = _ =>
-            preGameModel
-              .subProp(_.boardSize)
-              .set(
-                Coordinate.square(Math.max(minBoardSize, boardSize.x - 1))
-              )
+            boardSizeProperty.set(
+              Coordinate.square(Math.max(MinBoardSize, boardSize.x - 1))
+            )
 
           Seq[Node](
             div(
@@ -295,8 +308,10 @@ class PreGameView(
         checked
       ).render
 
+    val timeLimitOpt: Option[WithRuleTimeLimit] = timeLimitProperty.get.toOption
+
     val totalTimeLimitOptions: List[Int] =
-      (preGameModel.get.timeLimit.map(_.initialTotalTimeSeconds).toList ++
+      (timeLimitOpt.map(_.initialTotalTimeSeconds).toList ++
         List(1, 3, 5, 10, 15, 20, 30, 60).map(_ * 60)).distinct.sorted
     val totalTimeLimit: Select =
       select(
@@ -306,7 +321,7 @@ class PreGameView(
     totalTimeLimitOptions.foreach(seconds =>
       totalTimeLimit.appendChild(option(selectSecondsToString(seconds)).render)
     )
-    preGameModel.get.timeLimit
+    timeLimitOpt
       .map(_.initialTotalTimeSeconds)
       .foreach(seconds => totalTimeLimit.value = selectSecondsToString(seconds))
 
@@ -319,7 +334,7 @@ class PreGameView(
       ).render
 
     val turnTimeLimitOptions: List[Int] =
-      (preGameModel.get.timeLimit.flatMap(_.additionalTurnTimeSeconds.map(_._1)).toList ++
+      (timeLimitOpt.flatMap(_.additionalTurnTimeSeconds.map(_._1)).toList ++
         List(1, 3, 5, 10, 15, 20, 30, 60)).distinct.sorted
     val turnTimeLimit: Select =
       select(
@@ -329,28 +344,43 @@ class PreGameView(
     turnTimeLimitOptions.foreach(seconds =>
       turnTimeLimit.appendChild(option(selectSecondsToString(seconds)).render)
     )
-    preGameModel.get.timeLimit
+    timeLimitOpt
       .flatMap(_.additionalTurnTimeSeconds.map(_._1))
       .foreach(seconds => turnTimeLimit.value = selectSecondsToString(seconds))
 
-    def generateRuleTimeLimitOpt: Option[RuleTimeLimit] =
+    def generateRuleTimeLimitOpt: RuleTimeLimit =
       if (totalTimeLimitCheckBox.checked)
-        Some(
-          RuleTimeLimit(
-            selectOptionToSeconds(totalTimeLimit.value),
-            if (turnTimeLimitCheckBox.checked)
-              Some((selectOptionToSeconds(turnTimeLimit.value), false))
-            else
-              None
-          )
+        WithRuleTimeLimit(
+          selectOptionToSeconds(totalTimeLimit.value),
+          if (turnTimeLimitCheckBox.checked)
+            Some((selectOptionToSeconds(turnTimeLimit.value), false))
+          else
+            None
         )
       else
-        None
+        WithoutRuleTimeLimit
 
     def updateRuleTimeLimit(): Unit =
-      preGameModel
-        .subProp(_.timeLimit)
-        .set(generateRuleTimeLimitOpt)
+      timeLimitProperty.set(generateRuleTimeLimitOpt)
+
+    timeLimitProperty.listen {
+      case WithoutRuleTimeLimit =>
+        totalTimeLimitCheckBox.checked = false
+        totalTimeLimit.disabled = true
+        turnTimeLimitCheckBox.checked = false
+        turnTimeLimitCheckBox.disabled = true
+        turnTimeLimit.disabled = true
+      case WithRuleTimeLimit(initialTotalTimeSeconds, additionalTurnTimeSecondsOpt) =>
+        totalTimeLimitCheckBox.checked = true
+        totalTimeLimit.disabled = false
+        totalTimeLimit.value = selectSecondsToString(initialTotalTimeSeconds)
+        turnTimeLimitCheckBox.checked = additionalTurnTimeSecondsOpt.nonEmpty
+        turnTimeLimitCheckBox.disabled = false
+        turnTimeLimit.disabled = additionalTurnTimeSecondsOpt.isEmpty
+        additionalTurnTimeSecondsOpt.foreach { case (additionalTurnTimeSeconds, _) =>
+          turnTimeLimit.value = selectSecondsToString(additionalTurnTimeSeconds)
+        }
+    }
 
     totalTimeLimitCheckBox.onchange = _ => {
       totalTimeLimit.disabled = !totalTimeLimitCheckBox.checked
@@ -441,23 +471,19 @@ class PreGameView(
 
     amountCustomShots.onchange = _ => {
       val missileAmount = amountCustomShots.value.toInt
-      preGameModel
-        .subProp(_.defaultTurnAttackTypes)
-        .set(List.fill(missileAmount)(AttackType.Simple))
+      defaultTurnAttacksProperty.set(List.fill(missileAmount)(AttackType.Simple))
     }
-    preGameModel
-      .subProp(_.defaultTurnAttackTypes)
-      .listen(
-        { defaultTurnAttackTypes =>
-          amountCustomShots.value = defaultTurnAttackTypes.size.toString
-          redrawCanvas(amountCustomShots.value.toInt)
-        },
-        initUpdate = true
-      )
+    defaultTurnAttacksProperty.listen(
+      { defaultTurnAttacks =>
+        amountCustomShots.value = defaultTurnAttacks.size.toString
+        redrawCanvas(amountCustomShots.value.toInt)
+      },
+      initUpdate = true
+    )
 
     // TODO how to fix this?
     window.setTimeout(
-      () => redrawCanvas(preGameModel.get.defaultTurnAttackTypes.size),
+      () => redrawCanvas(defaultTurnAttacksProperty.get.size),
       100
     )
 
@@ -471,7 +497,7 @@ class PreGameView(
           label(
             `class` := "input-group-text",
             `for` := amountCustomShots.id,
-            nested(translatedDynamic(Translations.Game.timeLimit)(_.apply()))
+            nested(translatedDynamic(Translations.Game.amountOfShots)(_.apply()))
           ),
           amountCustomShots
         )

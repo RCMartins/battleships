@@ -23,8 +23,17 @@ class GameEndpoint(implicit
   override def startGameWithBots(rules: Rules): Future[Unit] =
     gameService.startGameWithBots(ctx.username, rules)
 
-  override def startGameWith(otherPlayerUsername: Username, rules: Rules): Future[Unit] =
-    gameService.startGame(ctx.username, otherPlayerUsername, rules)
+  override def invitePlayer(otherPlayerUsername: Username, rules: Rules): Future[Unit] =
+    gameService.invitePlayer(ctx.username, otherPlayerUsername, rules)
+
+  override def confirmRules(gameId: GameId): Future[Unit] =
+    gameService.confirmRules(gameId, ctx.username)
+
+  override def cancelRules(gameId: GameId): Future[Unit] =
+    gameService.cancelRules(gameId, ctx.username)
+
+  def sendRulesPatch(gameId: GameId, preGameRulesPatch: PreGameRulesPatch): Future[Unit] =
+    gameService.sendRulesPatch(gameId, ctx.username, preGameRulesPatch)
 
   override def quitCurrentGame(gameId: GameId): Future[Unit] =
     gameService.quitCurrentGame(gameId, ctx.username)

@@ -44,7 +44,8 @@ object Translations {
     val enemyTime = key("game.header.enemy_time")
 
     val startGameVsBot = key("game.buttons.start_game_bot")
-    val startGameVsPlayer = key("game.buttons.start_game_player")
+    val invitePlayerButton = key("game.buttons.invite_player")
+    val confirmRulesButton = key("game.buttons.confirm_rules")
     val rematchButton = key("game.buttons.rematch")
     val quitGameButton = key("game.buttons.quitGame")
     val logoutButton = key("game.buttons.logout")
@@ -84,5 +85,7 @@ object Translations {
     val previewBoardTitle = key("game.pregame.previewBoardTitle")
     val timeLimit = key("game.pregame.timeLimit")
     val turnTimeLimit = key("game.pregame.turnTimeLimit")
+    val amountOfShots = key("game.pregame.amountOfShots")
+    val enemyAcceptedRules = key("game.pregame.enemy_accepted_rules")
   }
 }

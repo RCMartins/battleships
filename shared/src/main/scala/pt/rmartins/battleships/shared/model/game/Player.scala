@@ -5,7 +5,6 @@ import pt.rmartins.battleships.shared.model.utils.BoardUtils
 import pt.rmartins.battleships.shared.model.utils.BoardUtils.BoardMarks
 
 case class Player(
-    shipsLeftToPlace: List[Ship], // TODO remove this from here to GameModel?
     myBoard: Board,
     enemyBoardMarks: BoardMarks,
     turnPlayHistory: List[TurnPlay]
