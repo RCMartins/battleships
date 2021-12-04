@@ -758,14 +758,19 @@ class GameService(rpcClientsService: RpcClientsService) {
     if (rules.gameFleet.shipAmount == 0)
       None
     else {
-      val boardSize = rules.boardSize
+      val simplifiedRules =
+        rules.modify(_.gameFleet).using { case Fleet(shipCounterList) =>
+          Fleet(shipCounterList.filterNot(_._2._1 == 0))
+        }
+
+      val boardSize = simplifiedRules.boardSize
       val myBoard: ServerMyBoard = ServerMyBoard(boardSize, Nil)
       val enemyBoard: ServerEnemyBoard =
         ServerEnemyBoard(
           boardSize,
           BoardUtils.createEmptyBoardMarks(boardSize),
-          rules.gameFleet.shipAmount,
-          rules.gameFleet.shipAmount
+          simplifiedRules.gameFleet.shipAmount,
+          simplifiedRules.gameFleet.shipAmount
         )
 
       val player1First: Boolean = Random.nextBoolean()
@@ -790,7 +795,7 @@ class GameService(rpcClientsService: RpcClientsService) {
         if (player2DataOpt.nonEmpty)
           None
         else
-          Some(new BotHelper(gameId, rules, BotHelperLogger.DefaultLogger))
+          Some(new BotHelper(gameId, simplifiedRules, BotHelperLogger.DefaultLogger))
       val player2: ServerPlayer =
         ServerPlayer(
           clientId = player2Id,
@@ -811,7 +816,7 @@ class GameService(rpcClientsService: RpcClientsService) {
           gameId = gameId,
           messages = Nil,
           boardSize = boardSize,
-          rules = rules,
+          rules = simplifiedRules,
           player1 = player1,
           player2 = player2,
           playerWhoWonOpt = None,
