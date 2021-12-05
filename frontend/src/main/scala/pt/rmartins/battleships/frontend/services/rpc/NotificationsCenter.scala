@@ -18,6 +18,11 @@ class NotificationsCenter {
     new CallbacksHandler[(Boolean, Boolean)]
   private[rpc] val preGameEnemyRulesPatchListeners: CallbacksHandler[PreGameRulesPatch] =
     new CallbacksHandler[PreGameRulesPatch]
+  private[rpc] val gamePlayerRequestListeners: CallbacksHandler[PlayerRequestType] =
+    new CallbacksHandler[PlayerRequestType]
+  private[rpc] val gamePlayerRequestAnswerListeners
+      : CallbacksHandler[(PlayerRequestType, Boolean)] =
+    new CallbacksHandler[(PlayerRequestType, Boolean)]
   private[rpc] val gameStateListeners: CallbacksHandler[GameState] =
     new CallbacksHandler[GameState]
   private[rpc] val gameModeListeners: CallbacksHandler[GameMode] =
@@ -47,6 +52,16 @@ class NotificationsCenter {
       callback: preGameEnemyRulesPatchListeners.CallbackType
   ): Registration =
     preGameEnemyRulesPatchListeners.register(callback)
+
+  def onPlayerRequest(
+      callback: gamePlayerRequestListeners.CallbackType
+  ): Registration =
+    gamePlayerRequestListeners.register(callback)
+
+  def onPlayerRequestAnswer(
+      callback: gamePlayerRequestAnswerListeners.CallbackType
+  ): Registration =
+    gamePlayerRequestAnswerListeners.register(callback)
 
   def onQuitGame(
       callback: quitGameListeners.CallbackType

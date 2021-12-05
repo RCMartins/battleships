@@ -27,7 +27,8 @@ case class ScreenModel(
     showDisabledMoves: Boolean,
     disabledMovesSet: Set[Turn],
     hoverMove: Option[Turn],
-    tick: Int
+    tick: Int,
+    receiveEditRequest: Option[Unit]
 )
 
 object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
@@ -59,7 +60,8 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
       showDisabledMoves = true,
       disabledMovesSet = Set.empty,
       hoverMove = None,
-      tick = 0
+      tick = 0,
+      receiveEditRequest = None
     )
 
   def resetScreenModel(model: ScreenModel): ScreenModel = {
@@ -75,7 +77,8 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
       errorModalType = None,
       disabledMovesSet = Set.empty,
       hoverMove = None,
-      tick = 0
+      tick = 0,
+      receiveEditRequest = None
     )
   }
 

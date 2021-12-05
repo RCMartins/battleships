@@ -194,6 +194,13 @@ class GameView(
       disabled = gameModel.subProp(_.shipsLeftToPlace).transform(_.isEmpty)
     )(nested => Seq(nested(translatedDynamic(Translations.Game.randomButton)(_.apply()))))
 
+  private val editRulesButton =
+    UdashButton(
+      buttonStyle = Color.Secondary.toProperty,
+      block = true.toProperty,
+      componentId = ComponentId("edit-rules-button")
+    )(nested => Seq(nested(translatedDynamic(Translations.Game.editRulesButton)(_.apply()))))
+
   private val cancelQueuedAttacksButton =
     UdashButton(
       buttonStyle = Color.Danger.toProperty,
@@ -324,8 +331,8 @@ class GameView(
         ) {
           case ((Some(_), _, _), nested) =>
             div(
-              `class` := "row mx-2",
-              div(`class` := "mx-0", cancelRulesButton),
+              `class` := "row mx-0",
+              div(`class` := "ml-2", cancelRulesButton),
               div(`class` := "mx-2", confirmRulesButton),
               nested(produceWithNested(preGameModel.subProp(_.inJoinedPreGame)) {
                 case (Some(PlayingAgainstPlayer(_, _, true, _)), nested) =>
@@ -339,38 +346,42 @@ class GameView(
             ).render
           case ((_, None, _), _) =>
             div(
-              `class` := "row",
+              `class` := "row mx-0",
               div(`class` := "mx-2", startGameVsBotButton),
               div(`class` := "ml-2", invitePlayerButton),
               usernameInput(factory)
             ).render
           case ((_, _, Some(PlacingShipsMode(false, _))), _) =>
             div(
-              `class` := "row",
-              div(`class` := "mx-2", confirmShipsButton),
-              div(`class` := "mx-2", undoButton),
-              div(`class` := "mx-2", resetButton),
-              div(`class` := "mx-2", randomPlacementButton)
+              `class` := "row justify-content-between mx-0",
+              div(
+                `class` := "row mx-0",
+                div(`class` := "mx-2", confirmShipsButton),
+                div(`class` := "mx-2", undoButton),
+                div(`class` := "mx-2", resetButton),
+                div(`class` := "mx-2", randomPlacementButton)
+              ),
+              div(`class` := "mx-2", editRulesButton)
             ).render
           case ((_, _, Some(PlacingShipsMode(true, _))), _) =>
             div(
-              `class` := "row",
+              `class` := "row mx-0",
               div(`class` := "mx-2", undoButton),
               div(`class` := "mx-2", resetButton)
             ).render
           case ((_, Some(PlayingModeType), _), _) =>
             div(
-              `class` := "row justify-content-between",
+              `class` := "row justify-content-between mx-0",
               div(
-                `class` := "row mx-2",
-                div(`class` := "mx-0", cancelQueuedAttacksButton),
+                `class` := "row mx-0",
+                div(`class` := "ml-2", cancelQueuedAttacksButton),
                 div(`class` := "mx-1", launchAttackButton)
               ),
               div(`class` := "mx-2", hideMyBoardButton)
             ).render
           case ((_, Some(GameOverModeType), _), _) =>
             div(
-              `class` := "row justify-content-between",
+              `class` := "row justify-content-between mx-0",
               div(`class` := "mx-2", rematchButton),
               div(`class` := "mx-2", revealEnemyBoardButton)
             ).render
@@ -411,6 +422,10 @@ class GameView(
 
   randomPlacementButton.listen { _ =>
     presenter.randomPlacement()
+  }
+
+  editRulesButton.listen { _ =>
+    presenter.requestEditRules()
   }
 
   cancelQueuedAttacksButton.listen { _ =>
@@ -910,6 +925,57 @@ class GameView(
       )
     ).render
 
+  private val editRulesModalId: String = "edit-rules-modal"
+  def acceptEditRulesModal(nested: NestedInterceptor): Div =
+    div(
+      `class` := "modal fade",
+      id := editRulesModalId,
+      div(
+        `class` := "modal-dialog",
+        div(
+          `class` := "modal-content",
+          div(
+            `class` := "modal-header",
+            h5(nested(translatedDynamic(Translations.Game.editRulesModalTitle)(_.apply())))
+          ),
+          div(
+            `class` := "modal-body",
+            nested(produceWithNested(presenter.enemyUsernameProperty) {
+              case (Some(enemyUsername), nested) =>
+                span(
+                  nested(translatedDynamic(Translations.Game.editRulesModalBodyStart)(_.apply())),
+                  " ",
+                  b(enemyUsername.username),
+                  " ",
+                  nested(translatedDynamic(Translations.Game.editRulesModalBody)(_.apply()))
+                ).render
+              case _ =>
+                span.render
+            })
+          ),
+          div(
+            `class` := "modal-footer",
+            button(
+              `class` := "btn btn-danger",
+              `type` := "button",
+              attr("data-bs-dismiss") := "modal",
+              nested(translatedDynamic(Translations.Game.modalDecline)(_.apply()))
+            ).render,
+            button(
+              `class` := "btn btn-success",
+              `type` := "button",
+              attr("data-bs-dismiss") := "modal",
+              nested(translatedDynamic(Translations.Game.modalAccept)(_.apply()))
+            ).render.tap {
+              _.onclick = _ => {
+                presenter.answerEditRulesRequest(true)
+              }
+            }
+          )
+        )
+      )
+    ).render
+
   private val quitGameModalId: String = "quit-game-modal"
   def quitGameModal(nested: NestedInterceptor): Div =
     div(
@@ -971,6 +1037,13 @@ class GameView(
     Option(document.getElementById(ScreenModel.myMovesTab)).foreach(_.scrollTop = 0)
   }
 
+  screenModel.subProp(_.receiveEditRequest).listen {
+    case None =>
+      Globals.modalHide(editRulesModalId)
+    case Some(()) =>
+      Globals.modalToggle(editRulesModalId)
+  }
+
   override def getTemplate: Modifier = div(
     UdashCard(componentId = ComponentId("game-panel"))(factory =>
       Seq(
@@ -979,6 +1052,15 @@ class GameView(
             `class` := "row justify-content-between",
             startGameErrorModal(nested),
             quitGameModal(nested),
+            acceptEditRulesModal(nested).tap {
+              _.addEventListener(
+                "hidden.bs.modal",
+                (_: Event) => {
+                  screenModel.subProp(_.receiveEditRequest).set(None)
+                  presenter.answerEditRulesRequest(false)
+                }
+              )
+            },
             div(
               `class` := "col-6",
               span(

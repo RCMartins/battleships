@@ -11,6 +11,8 @@ class RPCService(notificationsCenter: NotificationsCenter) extends MainClientRPC
       notificationsCenter.preGameStateListeners,
       notificationsCenter.preGameConfirmStateListeners,
       notificationsCenter.preGameEnemyRulesPatchListeners,
+      notificationsCenter.gamePlayerRequestListeners,
+      notificationsCenter.gamePlayerRequestAnswerListeners,
       notificationsCenter.gameStateListeners,
       notificationsCenter.gameModeListeners,
       notificationsCenter.quitGameListeners

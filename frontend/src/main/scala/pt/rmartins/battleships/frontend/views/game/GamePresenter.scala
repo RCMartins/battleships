@@ -67,6 +67,7 @@ class GamePresenter(
       case Some(gameMode) =>
         gameStateModel.get.gameState.map(_.copy(gameMode = gameMode))
     }
+
   val modeTypeProperty: ReadableProperty[Option[ModeType]] =
     gameModeProperty.transform(_.map {
       case _: PlacingShipsMode => PreGameModeType
@@ -132,6 +133,9 @@ class GamePresenter(
           )
         )
       preGameModel.subProp(_.rules).set(updateRules)
+      val beforeGameState: Option[GameState] = gameStateProperty.get
+      gameStateProperty.set(None)
+      updateGameState(beforeGameState.map(_.gameMode), None)
   }
 
   private val onPreGameRulesPatchCallback = notificationsCenter.onPreGameRulesPatch {
@@ -174,6 +178,21 @@ class GamePresenter(
       }
     }
 
+  private val onPlayerRequestCallback =
+    notificationsCenter.onPlayerRequest { case playerRequestType: PlayerRequestType =>
+      playerRequestType match {
+        case PlayerRequestType.EditRules =>
+          screenModel.subProp(_.receiveEditRequest).set(Some(()))
+      }
+    }
+
+  private val onPlayerRequestAnswerCallback =
+    notificationsCenter.onPlayerRequestAnswer { case (playerRequestType, _) =>
+      playerRequestType match {
+        case PlayerRequestType.EditRules =>
+      }
+    }
+
   private val onQuitGameCallback = notificationsCenter.onQuitGame { case _ =>
     if (preGameModel.get.inJoinedPreGame.nonEmpty)
       clearPreGame()
@@ -198,15 +217,10 @@ class GamePresenter(
     val updatedGameState: Option[GameState] =
       currentGameState.map(_.copy(gameMode = updatedGameMode))
     val finalGameState: Option[GameState] =
-      updatedGameState match {
-        case None =>
-          updateGameState(currentGameState.map(_.gameMode), None)
-          None
-        case Some(updatedGameState) =>
-          val mergedGameState: GameState = mergeGameState(currentGameState, updatedGameState)
-          updateGameState(currentGameState.map(_.gameMode), Some(mergedGameState))
-          Some(mergedGameState)
+      updatedGameState.map { updatedGameState =>
+        mergeGameState(currentGameState, updatedGameState)
       }
+    updateGameState(currentGameState.map(_.gameMode), finalGameState)
     gameStateProperty.set(finalGameState)
   }
 
@@ -271,11 +285,14 @@ class GamePresenter(
 
   preGameModel
     .subProp(_.rules)
-    .transform(_.gameFleet.shipCounterList)
+    .transform(_.gameFleet.shipCounterMap)
     .listen(
-      {
-        _.map { case (shipId, (amount, _)) =>
-          shipCounter(shipId).set(amount)
+      { shipCounterMap =>
+        Ship.allShipsList.foreach { ship =>
+          val shipId = ship.shipId
+          shipCounter(shipId).set(
+            shipCounterMap.get(shipId).map(_._1).getOrElse(0)
+          )
         }
       },
       initUpdate = true
@@ -431,10 +448,11 @@ class GamePresenter(
     (fromGameState, toGameState) match {
       case (None, Some(GameState(_, rules, _, _, _))) =>
         preGameModel.subProp(_.rules).set(rules)
+        val shipCounterMap: Map[ShipId, (Int, Rotation)] = rules.gameFleet.shipCounterMap
         Ship.allShipsList.foreach { ship =>
           val shipId = ship.shipId
           shipCounter(shipId).set(
-            rules.gameFleet.shipCounterMap.get(shipId).map(_._1).getOrElse(0)
+            shipCounterMap.get(shipId).map(_._1).getOrElse(0)
           )
         }
       case _ =>
@@ -712,6 +730,8 @@ class GamePresenter(
     onUpdatePreGameCallback.cancel()
     onPreGameRulesPatchCallback.cancel()
     onPreGameConfirmStateCallback.cancel()
+    onPlayerRequestCallback.cancel()
+    onPlayerRequestAnswerCallback.cancel()
     onQuitGameCallback.cancel()
     onGameStateCallback.cancel()
     onGameModeCallback.cancel()
@@ -1350,6 +1370,20 @@ class GamePresenter(
     gameStateProperty.get match {
       case Some(GameState(gameId, _, _, _, PlayingMode(_, _, _, _, Some(TimeRemaining(_, _))))) =>
         gameRpc.addToEnemyTimeSeconds(gameId, secondsToAdd)
+      case _ =>
+    }
+
+  def requestEditRules(): Unit =
+    gameStateProperty.get match {
+      case Some(GameState(gameId, _, _, _, _: PlacingShipsMode)) =>
+        gameRpc.sendPlayerRequest(gameId, PlayerRequestType.EditRules)
+      case _ =>
+    }
+
+  def answerEditRulesRequest(answer: Boolean): Unit =
+    gameStateProperty.get match {
+      case Some(GameState(gameId, _, _, _, _: PlacingShipsMode)) =>
+        gameRpc.sendPlayerRequestAnswer(gameId, PlayerRequestType.EditRules, answer)
       case _ =>
     }
 

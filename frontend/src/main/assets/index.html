@@ -21,6 +21,18 @@
   function modalToggle(id) {
     $('#' + id).modal('toggle')
   }
+
+  function modalHide(id) {
+    $('#' + id).modal('hide')
+  }
+
+  function modalToggleWithoutDismiss(id) {
+    $('#' + id).modal({
+      backdrop: 'static',
+      keyboard: false
+    });
+  }
+
 </script>
 
 </html>

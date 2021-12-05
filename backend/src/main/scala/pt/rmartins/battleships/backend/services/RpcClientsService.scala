@@ -82,6 +82,24 @@ class RpcClientsService(sendToClientFactory: ClientRPCTarget => MainClientRPC) {
       case _ =>
     }
 
+  def sendPlayerRequest(clientId: ClientId, playerRequestType: PlayerRequestType): Unit =
+    authClients.get(clientId) match {
+      case Some(_) =>
+        sendToClient(clientId).game().sendPlayerRequest(playerRequestType)
+      case _ =>
+    }
+
+  def sendPlayerRequestAnswer(
+      clientId: ClientId,
+      playerRequestType: PlayerRequestType,
+      answer: Boolean
+  ): Unit =
+    authClients.get(clientId) match {
+      case Some(_) =>
+        sendToClient(clientId).game().sendPlayerRequestAnswer(playerRequestType, answer)
+      case _ =>
+    }
+
   def sendGameState(clientId: ClientId, gameState: GameState): Unit =
     authClients.get(clientId) match {
       case Some(_) =>

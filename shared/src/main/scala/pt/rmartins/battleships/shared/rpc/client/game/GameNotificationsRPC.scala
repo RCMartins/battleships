@@ -11,6 +11,10 @@ trait GameNotificationsRPC {
 
   def sendPreGameRulesPatch(preGameRulesPatch: PreGameRulesPatch): Unit
 
+  def sendPlayerRequest(playerRequestType: PlayerRequestType): Unit
+
+  def sendPlayerRequestAnswer(playerRequestType: PlayerRequestType, answer: Boolean): Unit
+
   def gameStateUpdate(gameState: GameState): Unit
 
   def gameModeUpdate(gameMode: GameMode): Unit

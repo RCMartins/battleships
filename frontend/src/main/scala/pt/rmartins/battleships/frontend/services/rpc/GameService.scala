@@ -8,6 +8,8 @@ class GameService(
     preGameStateListeners: CallbacksHandler[PreGameState],
     preGameConfirmStateListeners: CallbacksHandler[(Boolean, Boolean)],
     preGameEnemyRulesPatchListeners: CallbacksHandler[PreGameRulesPatch],
+    gamePlayerRequestListeners: CallbacksHandler[PlayerRequestType],
+    gamePlayerRequestAnswerListeners: CallbacksHandler[(PlayerRequestType, Boolean)],
     gameStateListeners: CallbacksHandler[GameState],
     gameModeListeners: CallbacksHandler[GameMode],
     quitGameListeners: CallbacksHandler[Unit]
@@ -21,6 +23,15 @@ class GameService(
 
   override def sendPreGameRulesPatch(preGameRulesPatch: PreGameRulesPatch): Unit =
     preGameEnemyRulesPatchListeners.fire(preGameRulesPatch)
+
+  override def sendPlayerRequest(playerRequestType: PlayerRequestType): Unit =
+    gamePlayerRequestListeners.fire(playerRequestType)
+
+  override def sendPlayerRequestAnswer(
+      playerRequestType: PlayerRequestType,
+      answer: Boolean
+  ): Unit =
+    gamePlayerRequestAnswerListeners.fire((playerRequestType, answer))
 
   override def gameStateUpdate(gameState: GameState): Unit =
     gameStateListeners.fire(gameState)

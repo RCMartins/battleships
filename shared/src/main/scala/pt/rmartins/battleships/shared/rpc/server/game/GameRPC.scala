@@ -20,6 +20,14 @@ trait GameRPC {
 
   def sendRulesPatch(gameId: GameId, preGameRulesPatch: PreGameRulesPatch): Future[Unit]
 
+  def sendPlayerRequest(gameId: GameId, playerRequestType: PlayerRequestType): Future[Unit]
+
+  def sendPlayerRequestAnswer(
+      gameId: GameId,
+      playerRequestType: PlayerRequestType,
+      answer: Boolean
+  ): Future[Unit]
+
   def quitCurrentGame(gameId: GameId): Future[Unit]
 
   def logout(): Future[Unit]

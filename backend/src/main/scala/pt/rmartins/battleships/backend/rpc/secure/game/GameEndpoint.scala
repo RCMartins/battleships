@@ -35,6 +35,16 @@ class GameEndpoint(implicit
   def sendRulesPatch(gameId: GameId, preGameRulesPatch: PreGameRulesPatch): Future[Unit] =
     gameService.sendRulesPatch(gameId, ctx.username, preGameRulesPatch)
 
+  def sendPlayerRequest(gameId: GameId, playerRequestType: PlayerRequestType): Future[Unit] =
+    gameService.sendPlayerRequest(gameId, ctx.username, playerRequestType)
+
+  def sendPlayerRequestAnswer(
+      gameId: GameId,
+      playerRequestType: PlayerRequestType,
+      answer: Boolean
+  ): Future[Unit] =
+    gameService.sendPlayerRequestAnswer(gameId, ctx.username, playerRequestType, answer)
+
   override def quitCurrentGame(gameId: GameId): Future[Unit] =
     gameService.quitCurrentGame(gameId, ctx.username)
 
