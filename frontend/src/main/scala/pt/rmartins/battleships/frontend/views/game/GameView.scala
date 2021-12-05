@@ -1178,7 +1178,7 @@ class GameView(
                   nested(produce(gameModel.subProp(_.timeRemaining).transform(_.map(_._1))) {
                     case Some(myTimeRemaining) =>
                       showTime(myTimeRemaining)
-                    case _ =>
+                    case None =>
                       span.render
                   })
                 ),
@@ -1191,14 +1191,22 @@ class GameView(
                       span.render
                   }),
                   br,
-                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.map(_._2))) {
-                    case Some(enemyTimeRemaining) =>
+                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.nonEmpty)) {
+                    case true =>
                       div(
                         `class` := "row m-0",
-                        showTime(enemyTimeRemaining),
+                        nested(produce(gameModel.subProp(_.timeRemaining).transform(_.map(_._2))) {
+                          case Some(enemyTimeRemaining) =>
+                            div(
+                              `class` := "m-0",
+                              showTime(enemyTimeRemaining)
+                            ).render
+                          case None =>
+                            span.render
+                        }),
                         addEnemyTimeButton
                       ).render
-                    case _ =>
+                    case false =>
                       span.render
                   })
                 )
