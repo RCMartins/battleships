@@ -46,6 +46,7 @@ object Ship extends HasGenCodec[Ship] {
   val AircraftCarrier: Ship = List((0, 0), (1, 0), (2, 0), (1, 1), (1, 2)).pipe(toShip)
   val TorpedoBoat: Ship = List((1, 0), (0, 1), (0, 2), (2, 1), (2, 2)).pipe(toShip)
   val Cruiser: Ship = List((0, 0), (1, 1), (2, 2)).pipe(toShip)
+  val MiniCruiser: Ship = List((0, 0), (1, 1)).pipe(toShip)
   val Epoch: Ship =
     List((0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1), (1, 2)).pipe(toShip)
   val Battleship: Ship =
@@ -74,6 +75,24 @@ object Ship extends HasGenCodec[Ship] {
     List((0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5)).pipe(toShip)
   val SmallSnake: Ship =
     List((0, 2), (1, 0), (1, 1), (1, 2), (2, 0)).pipe(toShip)
+  val LongArrow: Ship =
+    List((0, 0), (1, 1), (2, 2), (2, 4), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)).pipe(toShip)
+  val Plane: Ship =
+    List((0, 2), (1, 0), (1, 1), (1, 2), (1, 3), (1, 4), (2, 1), (2, 3)).pipe(toShip)
+  val HoledMissile: Ship =
+    List((0, 1), (1, 0), (1, 2), (2, 1), (2, 3), (3, 2), (3, 3)).pipe(toShip)
+  val StaffShip: Ship =
+    List((0, 1), (1, 0), (1, 2), (1, 3), (1, 4), (2, 1)).pipe(toShip)
+  val Butterfly: Ship =
+    List((0, 1), (1, 0), (1, 1), (2, 2), (2, 3), (3, 2)).pipe(toShip)
+  val HammerHead: Ship =
+    List((0, 0), (0, 2), (1, 1), (2, 0), (2, 1), (2, 2)).pipe(toShip)
+  val CornerShip: Ship =
+    List((0, 0), (0, 1), (0, 2), (1, 0), (2, 0)).pipe(toShip)
+  val MiniCorner: Ship =
+    List((0, 0), (0, 1), (1, 0)).pipe(toShip)
+  val SmallC: Ship =
+    List((0, 0), (0, 1), (0, 2), (1, 0), (1, 2)).pipe(toShip)
 
   private val allShipsListNames: List[(Ship, String)] =
     List[(Ship, String)](
@@ -84,6 +103,7 @@ object Ship extends HasGenCodec[Ship] {
       (AircraftCarrier, "AircraftCarrier"),
       (TorpedoBoat, "TorpedoBoat"),
       (Cruiser, "Cruiser"),
+      (MiniCruiser, "MiniCruiser"),
       (Epoch, "Epoch"),
       (Battleship, "Battleship"),
       (MotherShip, "MotherShip"),
@@ -93,10 +113,19 @@ object Ship extends HasGenCodec[Ship] {
       (StarShip, "StarShip"),
       (LShip, "LShip"),
       (MissileShip, "MissileShip"),
+      (HoledMissile, "HoledMissile"),
       (WShip, "WShip"),
       (ArrowShip, "ArrowShip"),
       (LongShip, "LongShip"),
-      (SmallSnake, "SmallSnake")
+      (SmallSnake, "SmallSnake"),
+      (LongArrow, "LongArrow"),
+      (Plane, "Plane"),
+      (StaffShip, "StaffShip"),
+      (Butterfly, "Butterfly"),
+      (HammerHead, "HammerHead"),
+      (CornerShip, "CornerShip"),
+      (MiniCorner, "MiniCorner"),
+      (SmallC, "SmallC")
     ).sortBy(_._1.piecesSize)
 
   val allShipsList: List[Ship] =
