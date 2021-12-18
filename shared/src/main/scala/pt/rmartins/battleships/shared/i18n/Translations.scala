@@ -91,7 +91,17 @@ object Translations {
     val previewBoardTitle = key("game.pregame.previewBoardTitle")
     val timeLimit = key("game.pregame.timeLimit")
     val turnTimeLimit = key("game.pregame.turnTimeLimit")
+    val withTimeLimit = key("game.pregame.withTimeLimit")
+    val withoutTimeLimit = key("game.pregame.withoutTimeLimit")
+    val seconds = key("game.pregame.seconds")
+    val totalTime = key("game.pregame.totalTime")
+    val eachTurn = key("game.pregame.eachTurn")
     val amountOfShots = key("game.pregame.amountOfShots")
     val enemyAcceptedRules = key("game.pregame.enemy_accepted_rules")
+    val bonuses = key("game.pregame.bonuses")
+    val bonusFirstBlood = key("game.pregame.bonusFirstBlood")
+    val bonusDoubleKill = key("game.pregame.bonusDoubleKill")
+    val bonusTripleKill = key("game.pregame.bonusTripleKill")
+    val shots = key("game.pregame.shots")
   }
 }

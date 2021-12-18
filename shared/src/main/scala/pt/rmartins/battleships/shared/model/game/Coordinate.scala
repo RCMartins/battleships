@@ -46,6 +46,8 @@ case class Coordinate(x: Int, y: Int) {
 
   def max: Int = Math.max(x, y)
 
+  def map(f: Coordinate => Coordinate): Coordinate = f(this)
+
   override def toString: String = s"Coor($x,$y)"
 
   def toCodeString: String = s"Coordinate($x, $y)"

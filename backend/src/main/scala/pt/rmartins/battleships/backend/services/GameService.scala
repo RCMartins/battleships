@@ -505,6 +505,7 @@ class GameService(rpcClientsService: RpcClientsService) {
         me.toPlayer(this),
         SimplePlayer(
           enemy.username,
+          enemy.isHuman,
           enemy.enemyBoard.boardSize,
           enemy.turnPlayHistory
         ),

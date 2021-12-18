@@ -32,6 +32,7 @@ class GamePresenter(
     gameStateModel: ModelProperty[GameStateModel],
     chatModel: ModelProperty[ChatModel],
     screenModel: ModelProperty[ScreenModel],
+    translationsModel: ModelProperty[TranslationsModel],
     gameRpc: GameRPC,
     userService: UserContextService,
     translationsService: TranslationsService,
@@ -525,21 +526,54 @@ class GamePresenter(
         chatModel.subProp(_.msgs).set(chatMessages)
     }
 
-    screenModel
+    translationsModel
       .subProp(_.extraTurnText)
       .set(span(translatedDynamic(Translations.Game.extraTurnPopup)(_.apply())).render)
-    screenModel
+    translationsModel
       .subProp(_.myBoardTitle)
       .set(span(translatedDynamic(Translations.Game.myBoardTitle)(_.apply())).render)
-    screenModel
+    translationsModel
       .subProp(_.enemyBoardTitle)
       .set(span(translatedDynamic(Translations.Game.enemyBoardTitle)(_.apply())).render)
-    screenModel
+    translationsModel
       .subProp(_.realEnemyBoardTitle)
       .set(span(translatedDynamic(Translations.Game.realEnemyBoardTitle)(_.apply())).render)
-    screenModel
+    translationsModel
       .subProp(_.previewBoardTitle)
       .set(span(translatedDynamic(Translations.Game.previewBoardTitle)(_.apply())).render)
+    translationsModel
+      .subProp(_.withoutRuleTimeLimit)
+      .set(span(translatedDynamic(Translations.Game.withoutTimeLimit)(_.apply())).render)
+    translationsModel
+      .subProp(_.withRuleTimeLimit)
+      .set(span(translatedDynamic(Translations.Game.withTimeLimit)(_.apply())).render)
+    translationsModel
+      .subProp(_.seconds)
+      .set(span(translatedDynamic(Translations.Game.seconds)(_.apply())).render)
+    translationsModel
+      .subProp(_.totalTime)
+      .set(span(translatedDynamic(Translations.Game.totalTime)(_.apply())).render)
+    translationsModel
+      .subProp(_.eachTurn)
+      .set(span(translatedDynamic(Translations.Game.eachTurn)(_.apply())).render)
+    translationsModel
+      .subProp(_.amountOfShots)
+      .set(span(translatedDynamic(Translations.Game.amountOfShots)(_.apply())).render)
+    translationsModel
+      .subProp(_.bonuses)
+      .set(span(translatedDynamic(Translations.Game.bonuses)(_.apply())).render)
+    translationsModel
+      .subProp(_.bonusFirstBlood)
+      .set(span(translatedDynamic(Translations.Game.bonusFirstBlood)(_.apply())).render)
+    translationsModel
+      .subProp(_.bonusDoubleKill)
+      .set(span(translatedDynamic(Translations.Game.bonusDoubleKill)(_.apply())).render)
+    translationsModel
+      .subProp(_.bonusTripleKill)
+      .set(span(translatedDynamic(Translations.Game.bonusTripleKill)(_.apply())).render)
+    translationsModel
+      .subProp(_.shots)
+      .set(span(translatedDynamic(Translations.Game.shots)(_.apply())).render)
 
     initializePreGameModel()
   }
@@ -1375,7 +1409,9 @@ class GamePresenter(
 
   def requestEditRules(): Unit =
     gameStateProperty.get match {
-      case Some(GameState(gameId, _, _, _, _: PlacingShipsMode)) =>
+      case Some(GameState(_, _, _, SimplePlayer(_, false, _, _), _: PlacingShipsMode)) =>
+        quitCurrentGame()
+      case Some(GameState(gameId, _, _, SimplePlayer(_, true, _, _), _: PlacingShipsMode)) =>
         gameRpc.sendPlayerRequest(gameId, PlayerRequestType.EditRules)
       case _ =>
     }

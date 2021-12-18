@@ -6,6 +6,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{Assertion, Inspectors}
 import pt.rmartins.battleships.backend.services.BotHelper.BotBoardMarks
 import pt.rmartins.battleships.shared.model.game.AttackType._
+import pt.rmartins.battleships.shared.model.game.RuleTimeLimit.WithoutRuleTimeLimit
 import pt.rmartins.battleships.shared.model.game.Ship._
 import pt.rmartins.battleships.shared.model.game._
 
@@ -14,7 +15,6 @@ import scala.annotation.tailrec
 
 class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Inspectors {
 
-  private val turnAttackTypes1: List[AttackType] = List.fill(1)(Simple)
   private val turnAttackTypes2: List[AttackType] = List.fill(2)(Simple)
   private val turnAttackTypes3: List[AttackType] = List.fill(3)(Simple)
   private val turnAttackTypes4: List[AttackType] = List.fill(4)(Simple)
@@ -28,7 +28,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         gameFleet = Fleet.fromShips(List(Ranger -> 1)),
         defaultTurnAttacks = turnAttackTypes2,
         turnBonuses = Nil,
-        timeLimit = None
+        timeLimit = WithoutRuleTimeLimit
       )
       val botHelper = createBotHelper(rules)
 
@@ -52,7 +52,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         gameFleet = Fleet.fromShips(List(AircraftCarrier -> 1)),
         defaultTurnAttacks = turnAttackTypes3,
         turnBonuses = Nil,
-        timeLimit = None
+        timeLimit = WithoutRuleTimeLimit
       )
       val botHelper = createBotHelper(rules)
 
@@ -76,7 +76,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         gameFleet = Fleet.fromShips(List(Conqueror -> 1)),
         defaultTurnAttacks = turnAttackTypes2,
         turnBonuses = Nil,
-        timeLimit = None
+        timeLimit = WithoutRuleTimeLimit
       )
       val botHelper = createBotHelper(rules)
 
@@ -100,7 +100,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         gameFleet = Fleet.fromShips(List(Ranger -> 1, Conqueror -> 1)),
         defaultTurnAttacks = turnAttackTypes3,
         turnBonuses = Nil,
-        timeLimit = None
+        timeLimit = WithoutRuleTimeLimit
       )
       val botHelper = createBotHelper(rules)
 
@@ -124,7 +124,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         gameFleet = Fleet.fromShips(List(Skeeter -> 1, Conqueror -> 1)),
         defaultTurnAttacks = turnAttackTypes3,
         turnBonuses = Nil,
-        timeLimit = None
+        timeLimit = WithoutRuleTimeLimit
       )
       val botHelper = createBotHelper(rules)
 
@@ -157,7 +157,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         gameFleet = Fleet.fromShips(List(Skeeter -> 1, Conqueror -> 1)),
         defaultTurnAttacks = turnAttackTypes4,
         turnBonuses = Nil,
-        timeLimit = None
+        timeLimit = WithoutRuleTimeLimit
       )
       val botHelper = createBotHelper(rules)
 
@@ -182,7 +182,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         gameFleet = Fleet.fromShips(List(AircraftCarrier -> 1)),
         defaultTurnAttacks = turnAttackTypes3,
         turnBonuses = Nil,
-        timeLimit = None
+        timeLimit = WithoutRuleTimeLimit
       )
       val botHelper = createBotHelper(rules)
 
@@ -214,7 +214,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         gameFleet = Fleet.fromShips(List(AircraftCarrier -> 1, TorpedoBoat -> 1)),
         defaultTurnAttacks = turnAttackTypes2,
         turnBonuses = Nil,
-        timeLimit = None
+        timeLimit = WithoutRuleTimeLimit
       )
       val botHelper = createBotHelper(rules)
 
@@ -251,7 +251,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         gameFleet = Fleet.fromShips(List(Ranger -> 1, Cruiser -> 1)),
         defaultTurnAttacks = turnAttackTypes2,
         turnBonuses = Nil,
-        timeLimit = None
+        timeLimit = WithoutRuleTimeLimit
       )
       val botHelper = createBotHelper(rules)
 
@@ -285,7 +285,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         gameFleet = Fleet.fromShips(List(Skeeter -> 1, Ranger -> 1, Conqueror -> 1)),
         defaultTurnAttacks = turnAttackTypes3,
         turnBonuses = Nil,
-        timeLimit = None
+        timeLimit = WithoutRuleTimeLimit
       )
       val botHelper = createBotHelper(rules)
 
@@ -327,7 +327,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
             List(BonusReward.ExtraTurn(List.fill(3)(AttackType.Simple)))
           )
         ),
-        timeLimit = None
+        timeLimit = WithoutRuleTimeLimit
       )
       val botHelper = createBotHelper(rules)
 
@@ -360,7 +360,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         gameFleet = Fleet.fromShips(List(Submarine, Skeeter, Ranger).map(_ -> 1)),
         defaultTurnAttacks = turnAttackTypes3,
         turnBonuses = Nil,
-        timeLimit = None
+        timeLimit = WithoutRuleTimeLimit
       )
       val botHelper = createBotHelper(rules)
 
@@ -393,7 +393,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
         gameFleet = Fleet.fromShips(List(LongShip -> 1, TorpedoBoat -> 1)),
         defaultTurnAttacks = turnAttackTypes5,
         turnBonuses = Nil,
-        timeLimit = None
+        timeLimit = WithoutRuleTimeLimit
       )
       val botHelper = createBotHelper(rules)
 

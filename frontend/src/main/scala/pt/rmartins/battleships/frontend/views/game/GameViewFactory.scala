@@ -21,6 +21,7 @@ class GameViewFactory(
     val gameStateModel = ModelProperty[GameStateModel](GameStateModel(None))
     val chatModel = ModelProperty[ChatModel](ChatModel.default)
     val screenModel = ModelProperty[ScreenModel](ScreenModel.default)
+    val translationsModel = ModelProperty[TranslationsModel](TranslationsModel.default)
 
     val rpcOpt: Option[SecureRPC] = userService.secureRpc()
     if (rpcOpt.isEmpty) throw SharedExceptions.UnauthorizedException()
@@ -32,6 +33,7 @@ class GameViewFactory(
         gameStateModel,
         chatModel,
         screenModel,
+        translationsModel,
         rpcOpt.get.game(),
         userService,
         translationsService,
@@ -45,6 +47,7 @@ class GameViewFactory(
       new PreGameView(
         preGameModel,
         screenModel,
+        translationsModel,
         gamePresenter,
         canvasUtils,
         viewUtils,
@@ -52,7 +55,7 @@ class GameViewFactory(
       )
 
     val boardView: BoardView =
-      new BoardView(gameModel, screenModel, gamePresenter, canvasUtils)
+      new BoardView(gameModel, screenModel, translationsModel, gamePresenter, canvasUtils)
     val gameView: GameView =
       new GameView(
         preGameModel,
@@ -60,6 +63,7 @@ class GameViewFactory(
         gameStateModel,
         chatModel,
         screenModel,
+        translationsModel,
         gamePresenter,
         translationsService,
         boardView,

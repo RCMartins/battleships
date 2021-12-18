@@ -35,6 +35,7 @@ class GameView(
     gameStateModel: ModelProperty[GameStateModel],
     chatModel: ModelProperty[ChatModel],
     screenModel: ModelProperty[ScreenModel],
+    translationsModel: ModelProperty[TranslationsModel],
     presenter: GamePresenter,
     translationsService: TranslationsService,
     boardView: BoardView,
@@ -63,11 +64,11 @@ class GameView(
   screenModel.subProp(_.canvasSize).listen(_ => reloadBoardView())
   screenModel.subProp(_.missilesPopupMillisOpt).listen(_ => reloadBoardView())
   screenModel.subProp(_.extraTurnPopup).listen(_ => reloadBoardView())
-  screenModel.subProp(_.extraTurnText).listen(_ => reloadBoardView())
   screenModel.subProp(_.screenResized).listen(_ => reloadBoardView())
   screenModel.subProp(_.hoverMove).listen(_ => reloadBoardView())
   screenModel.subProp(_.tick).listen(_ => reloadBoardView())
   translationsService.currentLangProperty.listen(_ => reloadBoardView())
+  translationsModel.listen(_ => reloadBoardView())
 
   gameModel.subProp(_.mousePosition).listen(_ => reloadBoardView())
   gameModel.subProp(_.mouseDown).listen(_ => reloadBoardView())
@@ -291,7 +292,9 @@ class GameView(
       buttonStyle = Color.Primary.toProperty,
       block = true.toProperty,
       componentId = ComponentId("add-enemy-time-button")
-    )(_ => Seq[Modifier](`class` := "btn-sm col-4 p-0 ml-2", span(FontAwesome.Solid.plus).render))
+    )(_ =>
+      Seq[Modifier](`class` := "btn-sm col-4 p-0 ml-2", span(FontAwesome.Solid.plus, " 30s").render)
+    )
 
   private val revealEnemyBoardButton =
     UdashButton(

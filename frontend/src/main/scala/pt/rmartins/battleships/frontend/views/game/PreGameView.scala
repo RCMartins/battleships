@@ -20,6 +20,7 @@ import scalatags.JsDom.all._
 class PreGameView(
     preGameModel: ModelProperty[PreGameModel],
     screenModel: ModelProperty[ScreenModel],
+    translationsModel: ModelProperty[TranslationsModel],
     gamePresenter: GamePresenter,
     canvasUtils: CanvasUtils,
     viewUtils: ViewUtils,
@@ -173,7 +174,7 @@ class PreGameView(
         combine(
           preGameModel.subProp(_.rules).transform(_.boardSize),
           preGameModel.subProp(_.previewBoardOpt),
-          screenModel.subProp(_.previewBoardTitle),
+          translationsModel.subProp(_.previewBoardTitle),
           screenModel.subProp(_.screenResized)
         )
       ) {

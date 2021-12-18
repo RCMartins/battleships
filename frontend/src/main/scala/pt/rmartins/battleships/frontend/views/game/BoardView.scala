@@ -9,6 +9,7 @@ import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.css.GameStyles
+import pt.rmartins.battleships.shared.model.game
 import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit
 import pt.rmartins.battleships.shared.model.game._
@@ -20,6 +21,7 @@ import scala.util.chaining.scalaUtilChainingOps
 class BoardView(
     gameModel: ModelProperty[GameModel],
     screenModel: ModelProperty[ScreenModel],
+    translationsModel: ModelProperty[TranslationsModel],
     gamePresenter: GamePresenter,
     canvasUtils: CanvasUtils
 ) extends CssView {
@@ -618,16 +620,17 @@ class BoardView(
     ) = gameModel.get
 
     val screenModelData = screenModel.get
+    val translationsData = translationsModel.get
 
     val renderingCtx = myBoardCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
 
     renderingCtx.clearRect(0, 0, myBoardCanvas.width, myBoardCanvas.height)
 
     gamePresenter.gameStateProperty.get match {
-      case Some(GameState(_, _, me, enemy, _: PlacingShipsMode)) =>
+      case Some(GameState(_, rules, me, enemy, _: PlacingShipsMode)) =>
         drawMyBoard(
           renderingCtx,
-          screenModelData.myBoardTitle.innerText,
+          translationsData.myBoardTitle.innerText,
           me,
           enemy,
           mousePositionOpt,
@@ -639,13 +642,18 @@ class BoardView(
           isMyTurn = false,
           tick = screenModelData.tick
         )
+        drawRulesSummary(
+          renderingCtx,
+          rules,
+          translationsData
+        )
       case Some(GameState(_, _, me, enemy, PlayingMode(isMyTurn, _, _, _, _))) =>
         drawMissiles(renderingCtx, turnAttacks, screenModelData.missilesPopupMillisOpt)
         drawDestructionSummary(renderingCtx, selectedShipOpt)
 
         drawMyBoard(
           renderingCtx,
-          screenModelData.myBoardTitle.innerText,
+          translationsData.myBoardTitle.innerText,
           me,
           enemy,
           None,
@@ -660,7 +668,7 @@ class BoardView(
 
         drawEnemyBoard(
           renderingCtx,
-          screenModelData.enemyBoardTitle.innerText,
+          translationsData.enemyBoardTitle.innerText,
           me,
           enemy,
           turnAttacks,
@@ -678,7 +686,7 @@ class BoardView(
           renderingCtx,
           turnAttacks,
           screenModelData.extraTurnPopup,
-          screenModelData.extraTurnText.innerText
+          translationsData.extraTurnText.innerText
         )
       case Some(GameState(_, _, me, enemy, GameOverMode(_, _, _, _, enemyRealBoard))) =>
         drawDestructionSummary(renderingCtx, selectedShipOpt)
@@ -686,7 +694,7 @@ class BoardView(
         if (screenModelData.revealEnemyBoard)
           drawGameOverEnemyBoard(
             renderingCtx,
-            screenModelData.realEnemyBoardTitle.innerText,
+            translationsData.realEnemyBoardTitle.innerText,
             me,
             enemyRealBoard,
             MyBoardGameOverPos.get,
@@ -697,7 +705,7 @@ class BoardView(
         else
           drawMyBoard(
             renderingCtx,
-            screenModelData.myBoardTitle.innerText,
+            translationsData.myBoardTitle.innerText,
             me,
             enemy,
             None,
@@ -712,7 +720,7 @@ class BoardView(
 
         drawEnemyBoard(
           renderingCtx,
-          screenModelData.enemyBoardTitle.innerText,
+          translationsData.enemyBoardTitle.innerText,
           me,
           enemy,
           Nil,
@@ -1249,6 +1257,71 @@ class BoardView(
           useAntiAliasing = true
         )
       }
+    }
+  }
+
+  def drawRulesSummary(
+      renderingCtx: CanvasRenderingContext2D,
+      rules: Rules,
+      translationsData: TranslationsModel
+  ): Unit = {
+    val textSize = 23
+    val lineMargin = 7
+
+    renderingCtx.fillStyle = s"rgb(0, 0, 0)"
+    renderingCtx.font = s"${textSize}px serif"
+    renderingCtx.textBaseline = "middle"
+    renderingCtx.textAlign = "right"
+
+    val coordinate: Coordinate =
+      screenModel.get.canvasSize.map { case Coordinate(x, _) =>
+        Coordinate(x - SquareSizeBig.get, SquareSizeBig.get)
+      }
+
+    val rulesDataList: List[String] =
+      List(
+        rules.timeLimit match {
+          case RuleTimeLimit.WithoutRuleTimeLimit =>
+            List(translationsData.withoutRuleTimeLimit.innerText)
+          case RuleTimeLimit.WithRuleTimeLimit(
+                initialTotalTimeSeconds,
+                additionalTurnTimeSecondsOpt
+              ) =>
+            List(
+              translationsData.withRuleTimeLimit.innerText,
+              s"$initialTotalTimeSeconds ${translationsData.seconds.innerText} ${translationsData.totalTime.innerText}"
+            ) ++
+              additionalTurnTimeSecondsOpt.map { case (additionalTurnTimeSeconds, _) =>
+                s"+$additionalTurnTimeSeconds ${translationsData.seconds.innerText} ${translationsData.eachTurn.innerText}"
+              }.toList
+        },
+        List(""),
+        List(s"${translationsData.amountOfShots.innerText}: ${rules.defaultTurnAttacks.size}"),
+        List(""),
+        Some(rules.turnBonuses.nonEmpty)
+          .map(_ => translationsData.bonuses.innerText + ":")
+          .toList, {
+          def rewardsToString(bonusRewardList: List[BonusReward]): String =
+            bonusRewardList
+              .map { case BonusReward.ExtraTurn(attackTypes) =>
+                s"${attackTypes.size} ${translationsData.shots.innerText}"
+              }
+              .mkString(", ")
+
+          rules.turnBonuses.map {
+            case TurnBonus(BonusType.FirstBlood, bonusRewardList) =>
+              s"${translationsData.bonusFirstBlood.innerText}: ${rewardsToString(bonusRewardList)}"
+            case TurnBonus(BonusType.DoubleKill, bonusRewardList) =>
+              s"${translationsData.bonusDoubleKill.innerText}: ${rewardsToString(bonusRewardList)}"
+            case TurnBonus(BonusType.TripleKill, bonusRewardList) =>
+              s"${translationsData.bonusTripleKill.innerText}: ${rewardsToString(bonusRewardList)}"
+          }
+        }
+      ).flatten
+
+    rulesDataList.foldLeft(coordinate) { case (Coordinate(lineLeftPosX, lineLeftPosY), lineStr) =>
+      renderingCtx.fillText(lineStr, lineLeftPosX, lineLeftPosY)
+      Coordinate(lineLeftPosX, lineLeftPosY + textSize + lineMargin)
     }
   }
 
