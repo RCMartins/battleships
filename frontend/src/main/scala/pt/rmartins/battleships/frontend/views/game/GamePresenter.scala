@@ -1175,11 +1175,13 @@ class GamePresenter(
     } else
       false
 
-  def keyDown(key: String): Unit = {
+  def keyDown(key: String, ctrlDown: Boolean): Unit = {
     gameStateProperty.get match {
       case Some(GameState(_, _, _, _, _: PlacingShipsMode)) =>
         if (key.equalsIgnoreCase("R"))
           rotateSelectedShip(1)
+        else if (key.equalsIgnoreCase("\u001A") && ctrlDown)
+          undoLastPlacedShip()
       case Some(GameState(_, _, _, _, _: PlayingMode)) =>
         if (key.equalsIgnoreCase(" "))
           launchAttack()

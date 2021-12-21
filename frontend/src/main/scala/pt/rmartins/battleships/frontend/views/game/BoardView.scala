@@ -40,7 +40,7 @@ class BoardView(
   }
 
   myBoardCanvas.onkeypress = (event: KeyboardEvent) => {
-    gamePresenter.keyDown(event.key)
+    gamePresenter.keyDown(event.key, event.ctrlKey)
   }
 
   val canvasDiv: Div =
