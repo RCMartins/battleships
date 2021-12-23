@@ -1011,7 +1011,7 @@ class GamePresenter(
 
   def undoLastPlacedShip(): Unit =
     gameStateProperty.get match {
-      case Some(gameState @ GameState(_, _, me, _, _)) =>
+      case Some(gameState @ GameState(_, _, me, _, placingShipsMode: PlacingShipsMode)) =>
         val undoShip: Option[Ship] =
           me.myBoard.ships match {
             case Nil =>
@@ -1030,7 +1030,8 @@ class GamePresenter(
 
         gameModel.subProp(_.selectedShip).set(undoShip)
 
-        cancelShipsPlacement()
+        if (placingShipsMode.iPlacedShips)
+          cancelShipsPlacement()
       case _ =>
     }
 

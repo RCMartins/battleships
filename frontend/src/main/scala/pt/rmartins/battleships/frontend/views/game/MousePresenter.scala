@@ -133,6 +133,12 @@ class MousePresenter(
           ) =>
         leftMouseDownPlacingShips(boardView, selectedShipOpt, gameState)
       case (
+            GameModel(_, Some(_), Some(2), _, _, _, _, _, _, _),
+            Some(gameState @ GameState(_, _, _, _, placingShipsMode: PlacingShipsMode)),
+            _
+          ) =>
+        rightMouseDownPlacingShips(boardView, gameState, placingShipsMode)
+      case (
             GameModel(_, Some(_), Some(2), selectedShipOpt, turnAttacks, _, _, _, _, _),
             Some(gameState @ GameState(_, _, _, _, PlayingOrGameOver())),
             _
@@ -181,6 +187,32 @@ class MousePresenter(
         }
     }
   }
+
+  private def rightMouseDownPlacingShips(
+      boardView: BoardView,
+      gameState: GameState,
+      placingShipsMode: PlacingShipsMode
+  ): Unit =
+    boardView.myBoardMouseCoordinate.get match {
+      case Some(boardCoor) =>
+        gameState.me.myBoard.removeShipAt(boardCoor) match {
+          case (_, None) =>
+          case (updatedBoard, Some(ShipInBoard(removedShip, _))) =>
+            gamePresenter.gameStateProperty.set(
+              Some(gameState.modify(_.me.myBoard).setTo(updatedBoard))
+            )
+            gameModel
+              .subProp(_.shipsLeftToPlace)
+              .set(
+                removedShip :: gameModel.subProp(_.shipsLeftToPlace).get
+              )
+            gameModel.subProp(_.selectedShip).set(Some(removedShip))
+
+            if (placingShipsMode.iPlacedShips)
+              gamePresenter.cancelShipsPlacement()
+        }
+      case _ =>
+    }
 
   private def rightMouseDownInGame(
       boardView: BoardView,
