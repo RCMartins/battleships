@@ -13,7 +13,8 @@ case class GameModel(
     turnAttacksQueuedStatus: AttacksQueuedStatus,
     selectedInGameMarkOpt: Option[InGameMarkSelector],
     timeRemaining: Option[(TimeRemaining, TimeRemaining)],
-    lineDashOffset: Int
+    lineDashOffset: Int,
+    marksPlacedHistory: List[Set[(Coordinate, BoardMark, BoardMark)]]
 )
 
 object GameModel extends HasModelPropertyCreator[GameModel] {
@@ -28,7 +29,8 @@ object GameModel extends HasModelPropertyCreator[GameModel] {
       turnAttacksQueuedStatus = AttacksQueuedStatus.NotSet,
       selectedInGameMarkOpt = None,
       timeRemaining = None,
-      lineDashOffset = 0
+      lineDashOffset = 0,
+      marksPlacedHistory = Nil
     )
 
 }

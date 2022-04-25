@@ -41,7 +41,7 @@ class MousePresenter(
       gamePresenter.gamePuzzleStateProperty.get
     ) match {
       case (
-            GameModel(_, Some(_), Some(button @ (0 | 2)), _, _, _, selectedBoardMarkOpt, _, _),
+            GameModel(_, Some(_), Some(button @ (0 | 2)), _, _, _, selectedBoardMarkOpt, _, _, _),
             Some(gameState @ GameState(gameId, _, me, _, PlayingOrGameOver())),
             None
           ) =>
@@ -70,7 +70,7 @@ class MousePresenter(
           case _ =>
         }
       case (
-            GameModel(_, Some(_), Some(button @ (0 | 2)), _, _, _, selectedBoardMarkOpt, _, _),
+            GameModel(_, Some(_), Some(button @ (0 | 2)), _, _, _, selectedBoardMarkOpt, _, _, _),
             None,
             Some(
               gamePuzzleState @ GamePuzzleState(
@@ -127,31 +127,31 @@ class MousePresenter(
       gamePresenter.gamePuzzleStateProperty.get
     ) match {
       case (
-            GameModel(_, Some(_), Some(0), selectedShipOpt, _, _, _, _, _),
+            GameModel(_, Some(_), Some(0), selectedShipOpt, _, _, _, _, _, _),
             Some(gameState @ GameState(_, _, _, _, _: PlacingShipsMode)),
             _
           ) =>
         leftMouseDownPlacingShips(boardView, selectedShipOpt, gameState)
       case (
-            GameModel(_, Some(_), Some(2), selectedShipOpt, turnAttacks, _, _, _, _),
+            GameModel(_, Some(_), Some(2), selectedShipOpt, turnAttacks, _, _, _, _, _),
             Some(gameState @ GameState(_, _, _, _, PlayingOrGameOver())),
             _
           ) =>
         rightMouseDownInGame(boardView, selectedShipOpt, turnAttacks, gameState)
       case (
-            gameModelValue @ GameModel(_, Some(_), Some(0), _, _, _, _, _, _),
+            gameModelValue @ GameModel(_, Some(_), Some(0), _, _, _, _, _, _, _),
             Some(gameState @ GameState(_, _, _, _, PlayingOrGameOver())),
             _
           ) =>
         leftMouseDownInGame(boardView, gameModelValue, gameState)
       case (
-            GameModel(_, Some(_), Some(2), _, _, _, _, _, _),
+            GameModel(_, Some(_), Some(2), _, _, _, _, _, _, _),
             _,
             Some(gamePuzzleState)
           ) =>
         rightMouseDownPuzzleMode(boardView, gamePuzzleState)
       case (
-            gameModelValue @ GameModel(_, Some(_), Some(0), _, _, _, _, _, _),
+            gameModelValue @ GameModel(_, Some(_), Some(0), _, _, _, _, _, _, _),
             _,
             Some(gamePuzzleState)
           ) =>
@@ -264,6 +264,7 @@ class MousePresenter(
       turnAttacksSent,
       selectedBoardMarkOpt,
       _,
+      _,
       _
     ) = gameModelValue
     val GameState(gameId, Rules(boardSize, _, _, _, _), me, _, _) = gameState
@@ -343,7 +344,7 @@ class MousePresenter(
       gameModelValue: GameModel,
       gamePuzzleState: GamePuzzleState
   ): Unit = {
-    val GameModel(_, _, _, selectedShipOpt, _, _, selectedBoardMarkOpt, _, _) = gameModelValue
+    val GameModel(_, _, _, selectedShipOpt, _, _, selectedBoardMarkOpt, _, _, _) = gameModelValue
     val GamePuzzleState(_, _, puzzleBoardMarks, PlayerPuzzle(boardSize, _, _, _, _), _) =
       gamePuzzleState
 
@@ -415,7 +416,16 @@ class MousePresenter(
   ): Option[(BoardMarks, List[(Coordinate, BoardMark)])] = {
     val (_, currentBoardMark) = boardMarks(boardCoordinate.x)(boardCoordinate.y)
 
-    if (!currentBoardMark.isPermanent && currentBoardMark != BoardMark.Empty)
+    if (!currentBoardMark.isPermanent && currentBoardMark != BoardMark.Empty) {
+      gameModel
+        .subProp(_.marksPlacedHistory)
+        .set(
+          Set[(Coordinate, BoardMark, BoardMark)](
+            (boardCoordinate, currentBoardMark, BoardMark.Empty)
+          ) ::
+            gameModel.subProp(_.marksPlacedHistory).get
+        )
+
       Some(
         (
           BoardUtils.updateBoardMarksUsing(
@@ -426,7 +436,7 @@ class MousePresenter(
           List((boardCoordinate, BoardMark.Empty))
         )
       )
-    else
+    } else
       None
   }
 
@@ -437,7 +447,7 @@ class MousePresenter(
       boardMarks: BoardMarks,
       fillWaterSelectorActive: Boolean
   ): Option[(BoardMarks, List[(Coordinate, BoardMark)])] = {
-    val updatedBoardMarksList: List[(Coordinate, BoardMark)] =
+    val updatedBoardMarksList: List[(Coordinate, BoardMark, BoardMark)] =
       (selectedInGameMark match {
         case InGameMarkSelector.ManualShipSelector =>
           List((boardCoordinate, BoardMark.ManualShip))
@@ -481,15 +491,18 @@ class MousePresenter(
               .toList
         case _ =>
           Nil
-      }).filter { case (coor, currentBoardMark) =>
-        val boardMark = boardMarks(coor.x)(coor.y)._2
-        !boardMark.isPermanent && boardMark != currentBoardMark
+      }).flatMap { case (coor, updateBoardMark) =>
+        val currentBoardMark = boardMarks(coor.x)(coor.y)._2
+        if (!currentBoardMark.isPermanent && currentBoardMark != updateBoardMark)
+          Some((coor, currentBoardMark, updateBoardMark))
+        else
+          None
       }
 
     if (updatedBoardMarksList.nonEmpty) {
       val updatedBoardMarks: BoardMarks =
         updatedBoardMarksList.foldLeft(boardMarks) {
-          case (enemyBoardMarks, (boardCoor, newBoardMark)) =>
+          case (enemyBoardMarks, (boardCoor, _, newBoardMark)) =>
             BoardUtils.updateBoardMarksUsing(
               enemyBoardMarks,
               boardCoor,
@@ -497,7 +510,16 @@ class MousePresenter(
             )
         }
 
-      Some((updatedBoardMarks, updatedBoardMarksList))
+      gameModel
+        .subProp(_.marksPlacedHistory)
+        .set(updatedBoardMarksList.toSet :: gameModel.subProp(_.marksPlacedHistory).get)
+
+      Some(
+        (
+          updatedBoardMarks,
+          updatedBoardMarksList.map { case (coor, _, boardMark) => (coor, boardMark) }
+        )
+      )
     } else
       None
   }

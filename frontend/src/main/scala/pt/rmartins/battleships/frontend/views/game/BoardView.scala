@@ -626,6 +626,7 @@ class BoardView(
       turnAttacksQueuedStatus,
       selectedBoardMarkOpt,
       _,
+      _,
       _
     ) = gameModel.get
 

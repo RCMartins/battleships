@@ -18,7 +18,7 @@ import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.BoardUtils
-import pt.rmartins.battleships.shared.model.utils.BoardUtils.canPlaceInBoard
+import pt.rmartins.battleships.shared.model.utils.BoardUtils.{BoardMarks, canPlaceInBoard}
 import pt.rmartins.battleships.shared.rpc.server.game.GameRPC
 import scalatags.JsDom.all.span
 
@@ -956,9 +956,11 @@ class GamePresenter(
           rotateSelectedShip(1)
         else if (key.equalsIgnoreCase("\u001A") && ctrlDown)
           undoLastPlacedShip()
-      case Some(GameState(_, _, _, _, _: PlayingMode)) =>
+      case Some(gameState @ GameState(_, _, _, _, _: PlayingMode)) =>
         if (key.equalsIgnoreCase(" "))
           launchAttack()
+        else if (key.equalsIgnoreCase("\u001A") && ctrlDown)
+          undoLastPlacedMark(gameState)
       case _ =>
     }
   }
@@ -1231,6 +1233,36 @@ class GamePresenter(
             )
         }
       case _ =>
+    }
+
+  def undoLastPlacedMark(gameState: GameState): Unit =
+    gameModel.subProp(_.marksPlacedHistory).get match {
+      case Nil =>
+      case lastMarksPlaced :: otherHistory =>
+        val updatedEnemyBoardMarks: BoardMarks =
+          lastMarksPlaced.foldLeft(gameState.me.enemyBoardMarks) {
+            case (updatedBoard, (coor, before, _)) =>
+              BoardUtils.updateBoardMarksUsing(
+                updatedBoard,
+                coor,
+                {
+                  case (maybeTurn, mark) if mark.isPermanent =>
+                    (maybeTurn, mark)
+                  case (maybeTurn, _) =>
+                    (maybeTurn, before)
+                }
+              )
+          }
+
+        gameStateProperty.set(
+          Some(gameState.modify(_.me.enemyBoardMarks).setTo(updatedEnemyBoardMarks))
+        )
+
+        gameModel.subProp(_.marksPlacedHistory).set(otherHistory)
+        gameRpc.sendBoardMarks(
+          gameState.gameId,
+          lastMarksPlaced.map { case (coor, before, _) => (coor, before) }.toList
+        )
     }
 
 }
