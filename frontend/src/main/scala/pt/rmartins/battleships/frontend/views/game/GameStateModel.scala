@@ -4,7 +4,8 @@ import io.udash.HasModelPropertyCreator
 import pt.rmartins.battleships.shared.model.game.GameState
 
 case class GameStateModel(
-    gameState: Option[GameState]
+    gameState: Option[GameState],
+    gamePuzzleState: Option[GamePuzzleState]
 )
 
 object GameStateModel extends HasModelPropertyCreator[GameStateModel]

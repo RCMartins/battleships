@@ -23,51 +23,14 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
   private var cachedTurnPlays: List[TurnPlay] =
     Nil
   private var cachedBotBoardMarks: BotBoardMarks =
-    Vector.fill(boardSize.x)(Vector.fill(boardSize.y)((None, Empty)))
+    createEmptyBotBoardMarks(boardSize)
+
+  def getBotBoardMarks: BotBoardMarks = cachedBotBoardMarks
 
   private val standardTripleKill: Boolean =
     rules.turnBonuses.exists(turnBonus =>
       turnBonus.bonusType == BonusType.TripleKill &&
         turnBonus.bonusReward.contains(BonusReward.ExtraTurn(List.fill(3)(AttackType.Simple)))
-    )
-
-  private def getSquare(
-      botBoardMarks: BotBoardMarks,
-      coordinate: Coordinate
-  ): (Option[Turn], BotBoardMark) =
-    botBoardMarks(coordinate.x)(coordinate.y)
-
-  private def getTurn(botBoardMarks: BotBoardMarks, coordinate: Coordinate): Option[Turn] =
-    botBoardMarks(coordinate.x)(coordinate.y)._1
-
-  private def getMark(botBoardMarks: BotBoardMarks, coordinate: Coordinate): BotBoardMark =
-    botBoardMarks(coordinate.x)(coordinate.y)._2
-
-  private def updateBoardMarksUsing(
-      botBoardMarks: BotBoardMarks,
-      coordinate: Coordinate,
-      f: PartialFunction[(Option[Turn], BotBoardMark), (Option[Turn], BotBoardMark)]
-  ): BotBoardMarks = {
-    val vectorX: Vector[(Option[Turn], BotBoardMark)] = botBoardMarks(coordinate.x)
-    val current = vectorX(coordinate.y)
-    botBoardMarks.updated(
-      coordinate.x,
-      vectorX.updated(
-        coordinate.y,
-        f.applyOrElse(current, (_: (Option[Turn], BotBoardMark)) => current)
-      )
-    )
-  }
-
-  private def forceSetBoardMark(
-      botBoardMarks: BotBoardMarks,
-      coordinate: Coordinate,
-      botBoardMark: BotBoardMark
-  ): BotBoardMarks =
-    updateBoardMarksUsing(
-      botBoardMarks,
-      coordinate,
-      { case (turnOpt, _) => (turnOpt, botBoardMark) }
     )
 
   private def forceSetBoardMarkUpdated(
@@ -656,7 +619,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
             (Some(boardMarks).filter(_ => boardWasUpdated), shotsList1, shotsList2)
           case headGuesser :: nextGuessers =>
             logLine("-" * 50)
-            logLine(s"${Ship.shipNames(headGuesser.shipId)}:")
+            logLine(s"${Ship.shipsNamesMap(headGuesser.shipId)}:")
             headGuesser.getBestShots(boardMarks, currentTurnAttackTypes) match {
               case (Some(updatedBoardMarks), shotsList1, shotsList2) if resultsSoFar.isEmpty =>
                 calcAllResults(
@@ -874,6 +837,48 @@ object BotHelper {
   }
 
   type BotBoardMarks = Vector[Vector[(Option[Turn], BotBoardMark)]]
+
+  def createEmptyBotBoardMarks(boardSize: Coordinate): BotBoardMarks =
+    Vector.fill(boardSize.x)(Vector.fill(boardSize.y)((None, Empty)))
+
+  def getSquare(
+      botBoardMarks: BotBoardMarks,
+      coordinate: Coordinate
+  ): (Option[Turn], BotBoardMark) =
+    botBoardMarks(coordinate.x)(coordinate.y)
+
+  def getTurn(botBoardMarks: BotBoardMarks, coordinate: Coordinate): Option[Turn] =
+    botBoardMarks(coordinate.x)(coordinate.y)._1
+
+  def getMark(botBoardMarks: BotBoardMarks, coordinate: Coordinate): BotBoardMark =
+    botBoardMarks(coordinate.x)(coordinate.y)._2
+
+  def forceSetBoardMark(
+      botBoardMarks: BotBoardMarks,
+      coordinate: Coordinate,
+      botBoardMark: BotBoardMark
+  ): BotBoardMarks =
+    updateBoardMarksUsing(
+      botBoardMarks,
+      coordinate,
+      { case (turnOpt, _) => (turnOpt, botBoardMark) }
+    )
+
+  private def updateBoardMarksUsing(
+      botBoardMarks: BotBoardMarks,
+      coordinate: Coordinate,
+      f: PartialFunction[(Option[Turn], BotBoardMark), (Option[Turn], BotBoardMark)]
+  ): BotBoardMarks = {
+    val vectorX: Vector[(Option[Turn], BotBoardMark)] = botBoardMarks(coordinate.x)
+    val current = vectorX(coordinate.y)
+    botBoardMarks.updated(
+      coordinate.x,
+      vectorX.updated(
+        coordinate.y,
+        f.applyOrElse(current, (_: (Option[Turn], BotBoardMark)) => current)
+      )
+    )
+  }
 
   def placeShipsAtRandom(
       boardSize: Coordinate,

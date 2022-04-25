@@ -7,6 +7,9 @@ case class Board(
     ships: List[ShipInBoard]
 ) {
 
+  def getSimpleShipsList: List[Ship] =
+    ships.map(_.ship)
+
   def addShip(shipInGame: ShipInBoard): Board =
     copy(ships = shipInGame :: ships)
 

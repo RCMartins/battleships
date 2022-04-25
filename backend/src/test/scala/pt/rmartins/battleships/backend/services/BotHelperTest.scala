@@ -4,7 +4,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{Assertion, Inspectors}
-import pt.rmartins.battleships.backend.services.BotHelper.BotBoardMarks
 import pt.rmartins.battleships.shared.model.game.AttackType._
 import pt.rmartins.battleships.shared.model.game.RuleTimeLimit.WithoutRuleTimeLimit
 import pt.rmartins.battleships.shared.model.game.Ship._
@@ -512,19 +511,11 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
     botHelper.placeAttacks(botHelper.rules.defaultTurnAttacks)
   }
 
-  private val testLogger: BotHelperLogger = new BotHelperLogger {
-    override def logLine(any: => Any): Unit = ()
-
-    override def logBotBoardMarks(boardSize: Coordinate, botBoardMarks: BotBoardMarks): Unit = ()
-
-    override def logBotGame(gameId: GameId, rules: Rules, turnHistory: List[TurnPlay]): Unit = ()
-  }
-
   private def createBotHelper(rules: Rules): BotHelper =
     new BotHelper(
       gameId = GameId(UUID.randomUUID().toString),
       rules = rules,
-      logger = testLogger
+      logger = BotHelperLogger.EmptyLogger
     )
 
 }

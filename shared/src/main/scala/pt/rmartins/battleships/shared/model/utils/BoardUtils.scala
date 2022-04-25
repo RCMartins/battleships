@@ -33,4 +33,10 @@ object BoardUtils {
       .exists(coor => board.ships.exists(_.shipActualPieces.exists(_.distance(coor) <= 1)))
   }
 
+  def toList(boardSize: Coordinate, boardMarks: BoardMarks): List[(Coordinate, BoardMark)] =
+    (for {
+      x <- 0 until boardSize.x
+      y <- 0 until boardSize.y
+    } yield (Coordinate(x, y), boardMarks(x)(y)._2)).toList
+
 }

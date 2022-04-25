@@ -46,6 +46,9 @@ object Translations {
     val startGameVsBot = key("game.buttons.start_game_bot")
     val invitePlayerButton = key("game.buttons.invite_player")
     val confirmRulesButton = key("game.buttons.confirm_rules")
+    val solvePuzzleButton = key("game.buttons.solve_puzzle")
+    val sendPuzzleAnswerButton = key("game.buttons.send_puzzle_answer")
+    val nextPuzzleButton = key("game.buttons.next_puzzle")
     val rematchButton = key("game.buttons.rematch")
     val quitGameButton = key("game.buttons.quitGame")
     val logoutButton = key("game.buttons.logout")
@@ -103,5 +106,11 @@ object Translations {
     val bonusDoubleKill = key("game.pregame.bonusDoubleKill")
     val bonusTripleKill = key("game.pregame.bonusTripleKill")
     val shots = key("game.pregame.shots")
+
+    val solvedPuzzles = key("game.puzzles.solved_puzzles")
+    val placeMarksCorrectly1 = key("game.puzzles.place_marks_correctly1")
+    val placeMarksCorrectly2 = key("game.puzzles.place_marks_correctly2")
+    val puzzleCorrect = key("game.puzzles.correct")
+    val puzzleIncorrect = key("game.puzzles.incorrect")
   }
 }

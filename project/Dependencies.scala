@@ -4,7 +4,7 @@ import org.scalajs.jsdependencies.sbtplugin.JSDependenciesPlugin.autoImport._
 import sbt._
 
 object Dependencies {
-  val versionOfScala = "2.13.6"
+  val versionOfScala = "2.13.7"
 
   // Udash
   val udashVersion = "0.9.0-M24"
@@ -12,9 +12,11 @@ object Dependencies {
 
   // Backend
   val jettyVersion = "9.4.40.v20210413"
-  val logbackVersion = "1.2.7"
+  val logbackVersion = "1.2.8"
   val typesafeConfigVersion = "1.4.1"
+  val quicklensVersion = "1.7.4"
   val betterFilesVersion = "3.9.1"
+  val zioJsonVersion = "0.1.5"
 
   // JS dependencies
   val bootstrapVersion = "5.1.3"
@@ -34,7 +36,7 @@ object Dependencies {
       "io.udash" %%% "udash-i18n" % udashVersion,
       "io.udash" %%% "udash-css" % udashVersion,
       "io.udash" %%% "udash-auth" % udashVersion,
-      "com.softwaremill.quicklens" %%% "quicklens" % "1.7.4"
+      "com.softwaremill.quicklens" %%% "quicklens" % quicklensVersion
     )
   )
 
@@ -89,9 +91,10 @@ object Dependencies {
       "org.eclipse.jetty" % "jetty-rewrite" % jettyVersion,
       "org.eclipse.jetty.websocket" % "websocket-server" % jettyVersion,
       "com.typesafe" % "config" % typesafeConfigVersion,
+      "com.github.pathikrit" %% "better-files" % betterFilesVersion,
+      "dev.zio" %% "zio-json" % zioJsonVersion,
       // server logging backend
-      "ch.qos.logback" % "logback-classic" % logbackVersion,
-      "com.github.pathikrit" %% "better-files" % betterFilesVersion
+      "ch.qos.logback" % "logback-classic" % logbackVersion
     )
   )
 

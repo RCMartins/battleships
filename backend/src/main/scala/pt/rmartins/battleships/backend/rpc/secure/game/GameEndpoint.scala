@@ -87,4 +87,10 @@ class GameEndpoint(implicit
   override def addToEnemyTimeSeconds(gameId: GameId, secondsToAdd: Int): Future[Unit] =
     gameService.addToEnemyTimeSeconds(gameId, ctx.username, secondsToAdd)
 
+  override def getRandomPuzzle(): Future[Option[(PuzzleId, PlayerPuzzle)]] =
+    gameService.getRandomPuzzle()
+
+  override def getPuzzleSolution(puzzleId: PuzzleId): Future[Option[PuzzleSolution]] =
+    gameService.getPuzzleSolution(puzzleId)
+
 }

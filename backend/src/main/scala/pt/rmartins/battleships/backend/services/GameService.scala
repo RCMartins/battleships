@@ -2,7 +2,8 @@ package pt.rmartins.battleships.backend.services
 
 import com.softwaremill.quicklens.ModifyPimp
 import io.udash.rpc.ClientId
-import pt.rmartins.battleships.backend.services.GameService.{BotClientId, BotUsername}
+import pt.rmartins.battleships.backend.services.GameService._
+import pt.rmartins.battleships.backend.services.PuzzlesGenerator.PuzzleWithId
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game.BonusReward.ExtraTurn
 import pt.rmartins.battleships.shared.model.game.GameMode._
@@ -25,6 +26,8 @@ class GameService(rpcClientsService: RpcClientsService) {
   private val activeGamesByPlayer: mutable.Map[Username, GameId] = mutable.Map.empty
   private val activeGames: mutable.Map[GameId, Game] = mutable.Map.empty
   private val activePreGames: mutable.Map[GameId, PreGame] = mutable.Map.empty
+
+  PuzzlesGenerator.initialize()
 
   private def updatePlayerActiveGames(preGame: PreGame): Unit =
     clock.synchronized {
@@ -113,6 +116,24 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   new Thread(botUpdater).start()
 
+  private val backgroundPuzzleGenerator: Runnable = () => {
+    val cycleTime = 60000L
+    val cycleTimeNoBot = 1000L
+
+    while (PuzzlesGenerator.morePuzzlesNeeded) {
+      PuzzlesGenerator.generatePuzzleAndSave(100)
+      val botGameRunning =
+        clock.synchronized {
+          activeGames.values.toList.exists(game =>
+            game.gameIsActive && game.bothPlayers.exists(!_.isHuman)
+          )
+        }
+      Thread.sleep(if (botGameRunning) cycleTime else cycleTimeNoBot)
+    }
+  }
+
+  new Thread(backgroundPuzzleGenerator).start()
+
   private def updateGameTime(game: Game, instant: Instant): Game = {
     val updatedGame =
       game.getCurrentTurnPlayer.flatMap(serverPlayer =>
@@ -165,7 +186,8 @@ class GameService(rpcClientsService: RpcClientsService) {
   }
 
   private def setGameOver(game: Game, whoWonUsername: Username): Game = {
-    sendSystemMessage(game, s"Game Over! Player '$whoWonUsername' won!")
+    if (game.isRealGame)
+      sendSystemMessage(game, s"Game Over! Player '$whoWonUsername' won!")
     game.modify(_.playerWhoWonOpt).setTo(Some(whoWonUsername))
   }
 
@@ -207,335 +229,6 @@ class GameService(rpcClientsService: RpcClientsService) {
       activeGamesByPlayer.remove(game.player2.username)
       activeGames.remove(game.gameId)
     }
-
-  case class ServerMyBoard(
-      boardSize: Coordinate,
-      ships: List[ShipInBoard]
-  ) {
-
-    lazy val efficientShipCheck: Vector[Vector[Option[ShipInBoard]]] =
-      ships
-        .flatMap(shipInGame => shipInGame.shipActualPieces.map(_ -> shipInGame))
-        .foldLeft(Vector.fill(boardSize.x)(Vector.fill(boardSize.y)(Option.empty[ShipInBoard]))) {
-          case (vectorMatrix, (shipPiece, shipInGame)) =>
-            vectorMatrix.updated(
-              shipPiece.x,
-              vectorMatrix(shipPiece.x).updated(shipPiece.y, Some(shipInGame))
-            )
-        }
-
-  }
-
-  case class ServerEnemyBoard(
-      boardSize: Coordinate,
-      boardMarks: BoardMarks,
-      totalShips: Int,
-      shipsLeft: Int
-  ) {
-
-    def updateMarks(
-        turn: Turn,
-        hits: List[(Coordinate, Option[ShipInBoard])]
-    ): ServerEnemyBoard = {
-      val allWater = hits.forall(_._2.isEmpty)
-      val allShipHit = hits.forall(_._2.nonEmpty)
-      val allSubmarineHits =
-        allShipHit && hits.forall(_._2.exists(_.ship.shipId == Ship.Submarine.shipId))
-
-      val updatedBoardMarks: BoardMarks =
-        hits.foldLeft(boardMarks) { case (marks, (coor, _)) =>
-          if (allWater)
-            updateBoardMarksUsing(marks, coor, _ => (Some(turn), BoardMark.Water))
-          else if (allShipHit)
-            updateBoardMarksUsing(marks, coor, _ => (Some(turn), BoardMark.ShipHit))
-          else
-            updateBoardMarksUsing(marks, coor, { case (_, boardMark) => (Some(turn), boardMark) })
-        }
-
-      val updatedBoardMarks2: BoardMarks =
-        if (allSubmarineHits)
-          hits
-            .flatMap(_._1.get8CoorAround)
-            .filter(_.isInsideBoard(boardSize))
-            .foldLeft(updatedBoardMarks) { case (marks, coor) =>
-              updateBoardMarksUsing(
-                marks,
-                coor,
-                { case (turnOpt, _) => (turnOpt, BoardMark.Water) }
-              )
-            }
-        else
-          updatedBoardMarks
-
-      copy(boardMarks = updatedBoardMarks2)
-    }
-
-    lazy val hasNFreeSpaces: Int =
-      boardMarks.map {
-        _.count { case (opt, boardMark) => opt.isEmpty && !boardMark.isPermanent }
-      }.sum
-
-  }
-
-  case class ServerTimeRemaining(
-      totalTimeRemainingNanos: Long,
-      turnTimeRemainingNanosOpt: Option[Long]
-  )
-
-  case class ServerPlayer(
-      clientId: ClientId,
-      username: Username,
-      startedFirst: Boolean,
-      myBoard: ServerMyBoard,
-      enemyBoard: ServerEnemyBoard,
-      turnPlayHistory: List[TurnPlay],
-      currentTurnOpt: Option[Turn],
-      currentTurnAttackTypes: List[AttackType],
-      extraTurnQueue: List[ExtraTurn],
-      timeRemaining: Option[ServerTimeRemaining],
-      botHelper: Option[BotHelper]
-  ) {
-
-    val isHuman: Boolean = clientId != BotClientId
-
-    def kills: Int = enemyBoard.totalShips - enemyBoard.shipsLeft
-
-    def toPlayer(game: Game): Player =
-      if (game.gameStarted)
-        Player(
-          Board(myBoard.boardSize, myBoard.ships),
-          enemyBoard.boardMarks,
-          turnPlayHistory
-        )
-      else
-        Player(
-          Board(myBoard.boardSize, myBoard.ships),
-          Vector.empty,
-          Nil
-        )
-
-    def getTimeRemaining: Option[TimeRemaining] =
-      timeRemaining.map {
-        case ServerTimeRemaining(totalTimeRemainingNanos, turnTimeRemainingNanos) =>
-          TimeRemaining(
-            (totalTimeRemainingNanos / 1000L / 1000L).toInt,
-            turnTimeRemainingNanos.map(turnTime => (turnTime / 1000L / 1000L).toInt)
-          )
-      }
-
-  }
-
-  case class PreGamePlayer(
-      clientId: ClientId,
-      username: Username,
-      acceptedRules: Boolean
-  )
-
-  case class PreGame(
-      gameId: GameId,
-      messages: List[ChatMessage], // TODO ?
-      rules: Rules,
-      player1: PreGamePlayer,
-      player2: PreGamePlayer
-  ) {
-
-    def getPlayer(playerUsername: Username): Option[PreGamePlayer] =
-      if (player1.username == playerUsername) Some(player1)
-      else if (player2.username == playerUsername) Some(player2)
-      else None
-
-    def getEnemy(player: PreGamePlayer): PreGamePlayer =
-      if (player == player1) player2 else player1
-
-    def getPlayers(playerUsername: Username): Option[(PreGamePlayer, PreGamePlayer)] =
-      getPlayer(playerUsername).map(player => (player, getEnemy(player)))
-
-    def updatePlayer(updatedPlayer: PreGamePlayer): PreGame =
-      if (updatedPlayer.username == player1.username)
-        copy(player1 = updatedPlayer)
-      else
-        copy(player2 = updatedPlayer)
-
-    def receiveRulesPatchBoardSize(
-        boardSizePatch: Coordinate
-    ): (PreGame, Boolean) =
-      rules.boardSize match {
-        case currentBoardSize if currentBoardSize == boardSizePatch =>
-          (this, false)
-        case _ =>
-          (this.modify(_.rules.boardSize).setTo(boardSizePatch), true)
-      }
-
-    def receiveRulesPatchFleet(
-        shipId: ShipId,
-        amountPatch: Int
-    ): (PreGame, Boolean) =
-      rules.gameFleet.shipCounterMap.get(shipId) match {
-        case None if 0 == amountPatch =>
-          (this, false)
-        case Some((currentAmount, _)) if currentAmount == amountPatch =>
-          (this, false)
-        case None =>
-          val updatedFleet: Fleet =
-            Fleet(rules.gameFleet.updateCounter(shipId, amountPatch, Rotation.Rotation0))
-          (this.modify(_.rules.gameFleet).setTo(updatedFleet), true)
-        case Some((_, rotation)) =>
-          val updatedFleet: Fleet =
-            Fleet(rules.gameFleet.updateCounter(shipId, amountPatch, rotation))
-          (this.modify(_.rules.gameFleet).setTo(updatedFleet), true)
-      }
-
-    def receiveRulesPatchDefaultAttacks(
-        defaultTurnAttacksPatch: List[AttackType]
-    ): (PreGame, Boolean) =
-      rules.defaultTurnAttacks match {
-        case currentDefaultTurnAttacks if currentDefaultTurnAttacks == defaultTurnAttacksPatch =>
-          (this, false)
-        case _ =>
-          (this.modify(_.rules.defaultTurnAttacks).setTo(defaultTurnAttacksPatch), true)
-      }
-
-    def receiveRulesPatchTurnBonuses(
-        turnBonusesPatch: List[TurnBonus]
-    ): (PreGame, Boolean) =
-      rules.turnBonuses match {
-        case currentTurnBonuses if currentTurnBonuses == turnBonusesPatch =>
-          (this, false)
-        case _ =>
-          (this.modify(_.rules.turnBonuses).setTo(turnBonusesPatch), true)
-      }
-
-    def receiveRulesPatchTimeLimit(
-        timeLimitPatch: RuleTimeLimit
-    ): (PreGame, Boolean) =
-      rules.timeLimit match {
-        case currentTimeLimit if currentTimeLimit == timeLimitPatch =>
-          (this, false)
-        case _ =>
-          (this.modify(_.rules.timeLimit).setTo(timeLimitPatch), true)
-      }
-
-  }
-
-  object PreGame {
-    def fromActiveGame(game: Game): PreGame =
-      PreGame(
-        gameId = game.gameId,
-        messages = Nil, // TODO add this?
-        rules = game.rules,
-        player1 =
-          PreGamePlayer(game.player1.clientId, game.player1.username, acceptedRules = false),
-        player2 = PreGamePlayer(game.player2.clientId, game.player2.username, acceptedRules = false)
-      )
-  }
-
-  case class Game(
-      gameId: GameId,
-      messages: List[ChatMessage],
-      boardSize: Coordinate,
-      rules: Rules,
-      player1: ServerPlayer,
-      player2: ServerPlayer,
-      playerWhoWonOpt: Option[Username],
-      currentTurnPlayer: Option[Username],
-      lastUpdateTimeOpt: Option[Instant],
-      requestInProgress: Option[(Username, PlayerRequestType)]
-  ) {
-
-    val isInPlacingShipsMode: Boolean =
-      player1.myBoard.ships.isEmpty || player2.myBoard.ships.isEmpty
-
-    val gameStarted: Boolean = currentTurnPlayer.nonEmpty
-
-    val gameIsActive: Boolean = currentTurnPlayer.nonEmpty && playerWhoWonOpt.isEmpty
-
-    val gameIsOver: Boolean = playerWhoWonOpt.nonEmpty
-
-    val bothPlayers: List[ServerPlayer] = List(player1, player2)
-
-    def getPlayerSafe(playerUsername: Username): Option[ServerPlayer] =
-      if (player1.username == playerUsername) Some(player1)
-      else if (player2.username == playerUsername) Some(player2)
-      else None
-
-    private def getPlayerUnsafe(playerUsername: Username): ServerPlayer =
-      if (player1.username == playerUsername) player1 else player2
-
-    def enemyPlayer(player: ServerPlayer): ServerPlayer =
-      enemyPlayer(player.username)
-
-    def enemyPlayer(playerUsername: Username): ServerPlayer =
-      if (player1.username == playerUsername) player2 else player1
-
-    def toGameStatePlayer1: GameState =
-      toGameState(player1, player2)
-
-    def toGameStatePlayer2: GameState =
-      toGameState(player2, player1)
-
-    private def toGameState(me: ServerPlayer, enemy: ServerPlayer): GameState = {
-      val gameMode: GameMode =
-        (
-          me.currentTurnOpt.flatMap(currentTurn => currentTurnPlayer.map((currentTurn, _))),
-          playerWhoWonOpt
-        ) match {
-          case (None, _) =>
-            PlacingShipsMode(me.myBoard.ships.nonEmpty, enemy.myBoard.ships.nonEmpty)
-          case (Some((turn, currentPlayerUsername)), None) =>
-            PlayingMode(
-              currentPlayerUsername == me.username,
-              turn = turn,
-              turnAttackTypes = me.currentTurnAttackTypes,
-              myTimeRemaining = me.getTimeRemaining,
-              enemyTimeRemaining = enemy.getTimeRemaining
-            )
-          case (Some((turn, _)), Some(playerWhoWon)) =>
-            GameOverMode(
-              turn,
-              me.username == playerWhoWon,
-              myTimeRemaining = me.getTimeRemaining,
-              enemyTimeRemaining = enemy.getTimeRemaining,
-              enemyRealBoard = enemy.myBoard.ships
-            )
-        }
-
-      GameState(
-        gameId,
-        rules,
-        me.toPlayer(this),
-        SimplePlayer(
-          enemy.username,
-          enemy.isHuman,
-          enemy.enemyBoard.boardSize,
-          enemy.turnPlayHistory
-        ),
-        gameMode
-      )
-    }
-
-    def placeShips(playerUsername: Username, shipPositions: List[ShipInBoard]): Game =
-      updatePlayer(getPlayerUnsafe(playerUsername).modify(_.myBoard.ships).setTo(shipPositions))
-
-    def updatePlayer(updatedPlayer: ServerPlayer): Game =
-      if (updatedPlayer.username == player1.username)
-        copy(player1 = updatedPlayer)
-      else
-        copy(player2 = updatedPlayer)
-
-    def updatePlayerByUsername(playerUsername: Username, f: ServerPlayer => ServerPlayer): Game =
-      getPlayerSafe(playerUsername)
-        .map(serverPlayer => updatePlayer(f(serverPlayer)))
-        .getOrElse(this)
-
-    def getCurrentTurnPlayer: Option[ServerPlayer] =
-      if (gameIsActive)
-        currentTurnPlayer.map(currentUsername =>
-          if (currentUsername == player1.username) player1 else player2
-        )
-      else
-        None
-
-  }
 
   def sendMsg(gameId: GameId, playerUsername: Username, msgText: String): Future[Unit] =
     Future {
@@ -921,7 +614,8 @@ class GameService(rpcClientsService: RpcClientsService) {
           playerWhoWonOpt = None,
           currentTurnPlayer = None,
           lastUpdateTimeOpt = None,
-          requestInProgress = None
+          requestInProgress = None,
+          isRealGame = true
         )
       )
     }
@@ -1112,135 +806,19 @@ class GameService(rpcClientsService: RpcClientsService) {
   ): Unit = {
     val instantNow = Instant.now()
     val gameWithLastTurnUpdated = updateGameTime(game, instantNow)
+    if (!gameWithLastTurnUpdated.gameIsOver) {
+      val updatedGameWithTurnTime: Game =
+        updateGameWithTurnAttacksUnsafe(
+          Some(this),
+          gameWithLastTurnUpdated,
+          player,
+          currentTurn,
+          turnAttacks
+        )
 
-    val enemy = gameWithLastTurnUpdated.enemyPlayer(player)
-    val hits: List[(Coordinate, Option[ShipInBoard])] =
-      turnAttacks.map(_.coordinateOpt.get).map { case coor @ Coordinate(x, y) =>
-        coor -> enemy.myBoard.efficientShipCheck(x)(y)
-      }
-
-    val hitHints: List[HitHint] =
-      hits
-        .groupBy(_._2)
-        .toList
-        .flatMap {
-          case (None, listOfMisses) =>
-            listOfMisses.map(_ => HitHint.Water)
-          case (Some(shipInGame), listOfHits) =>
-            val hitsOnTheShip =
-              listOfHits.map(_ => HitHint.ShipHit(shipInGame.ship.shipId, destroyed = false))
-            val shipIsDestroyed =
-              shipInGame.shipActualPieces.forall { case pieceCoor @ Coordinate(x, y) =>
-                listOfHits.exists(_._1 == pieceCoor) ||
-                  player.enemyBoard.boardMarks(x)(y)._1.nonEmpty
-              }
-            if (shipIsDestroyed)
-              hitsOnTheShip.head.copy(destroyed = true) :: hitsOnTheShip.tail
-            else
-              hitsOnTheShip
-        }
-        .sortBy {
-          case Water =>
-            (true, Int.MaxValue)
-          case ShipHit(shipId, destroyed) =>
-            (destroyed, shipId.id)
-        }
-
-    val turnPlay: TurnPlay =
-      TurnPlay(currentTurn, turnAttacks, hitHints)
-
-    val killsThisTurn = hitHints.count(_.isDestroyed)
-
-    val updatedPlayer =
-      player
-        .modify(_.turnPlayHistory)
-        .using(turnPlay :: _)
-        .modify(_.enemyBoard)
-        .using(_.updateMarks(currentTurn, hits))
-        .modify(_.enemyBoard.shipsLeft)
-        .using(_ - killsThisTurn)
-
-    val gameOver = updatedPlayer.enemyBoard.shipsLeft == 0
-    val updatedGameWithPlayer: Game = gameWithLastTurnUpdated.updatePlayer(updatedPlayer)
-    val updatedGameWithTurnTime =
-      if (gameOver) {
-        setGameOver(updatedGameWithPlayer, updatedPlayer.username)
-      } else {
-        val bonusRewardList: List[BonusReward] =
-          rewardExtraTurns(gameBeforeHits = game, turnPlay = turnPlay)
-        val extraTurnBonuses: List[ExtraTurn] =
-          bonusRewardList.collect { case extraTurn @ ExtraTurn(_) => extraTurn }
-
-        val updatedGameWithNextTurn: Game =
-          updatedPlayer.extraTurnQueue ++ extraTurnBonuses match {
-            case ExtraTurn(attackTypes) :: nextExtraTurns =>
-              val updatedPlayerWithExtraTurns =
-                updatedPlayer
-                  .modify(_.currentTurnOpt)
-                  .using(_.map { case Turn(currentTurn, extraTurn) =>
-                    Turn(currentTurn, extraTurn.map(_ + 1).orElse(Some(1)))
-                  })
-                  .modify(_.currentTurnAttackTypes)
-                  .setTo(attackTypes)
-                  .modify(_.extraTurnQueue)
-                  .setTo(nextExtraTurns)
-
-              updatedGameWithPlayer.updatePlayer(updatedPlayerWithExtraTurns)
-            case Nil =>
-              val updatedPlayerWithExtraTurns =
-                updatedPlayer
-                  .modify(_.currentTurnOpt)
-                  .using(_.map { case Turn(currentTurn, _) => Turn(currentTurn + 1, None) })
-                  .modify(_.currentTurnAttackTypes)
-                  .setTo(updatedGameWithPlayer.rules.defaultTurnAttacks)
-
-              updatedGameWithPlayer
-                .updatePlayer(updatedPlayerWithExtraTurns)
-                .modify(_.currentTurnPlayer)
-                .using(_.map(updatedGameWithPlayer.enemyPlayer(_).username))
-          }
-
-        updatedGameWithNextTurn.getCurrentTurnPlayer match {
-          case None =>
-            updatedGameWithNextTurn
-          case Some(serverPlayer) =>
-            updatedGameWithNextTurn.rules.timeLimit match {
-              case WithRuleTimeLimit(_, Some((additionalTurnTimeSeconds, _))) =>
-                updatedGameWithNextTurn.updatePlayer(
-                  serverPlayer.modify(_.timeRemaining).using {
-                    _.map { serverTimeRemaining =>
-                      serverTimeRemaining.copy(turnTimeRemainingNanosOpt =
-                        Some(additionalTurnTimeSeconds * 1000L * 1000L * 1000L)
-                      )
-                    }
-                  }
-                )
-              case _ =>
-                updatedGameWithNextTurn
-            }
-        }
-      }
-
-    val finalGameUpdated = updateGameTime(updatedGameWithTurnTime, Instant.now())
-    updateServerState(finalGameUpdated)
-    sendBothGameState(finalGameUpdated)
-  }
-
-  private def rewardExtraTurns(gameBeforeHits: Game, turnPlay: TurnPlay): List[BonusReward] = {
-    val killsThisTurn = turnPlay.hitHints.count(_.isDestroyed)
-
-    gameBeforeHits.rules.turnBonuses.flatMap { case TurnBonus(bonusType, bonusReward) =>
-      bonusType match {
-        case BonusType.FirstBlood
-            if killsThisTurn > 0 && gameBeforeHits.bothPlayers.forall(_.kills == 0) =>
-          bonusReward
-        case BonusType.DoubleKill if killsThisTurn == 2 =>
-          bonusReward
-        case BonusType.TripleKill if killsThisTurn == 3 =>
-          bonusReward
-        case _ =>
-          Nil
-      }
+      val finalGameUpdated: Game = updateGameTime(updatedGameWithTurnTime, Instant.now())
+      updateServerState(finalGameUpdated)
+      sendBothGameState(finalGameUpdated)
     }
   }
 
@@ -1303,6 +881,21 @@ class GameService(rpcClientsService: RpcClientsService) {
           sendSystemMessage(playerUsername, "Invalid request!")
       }
     }
+
+  def getRandomPuzzle(): Future[Option[(PuzzleId, PlayerPuzzle)]] =
+    Future.successful(
+      PuzzlesGenerator.getRandomPuzzle.map { case PuzzleWithId(puzzleId, puzzle) =>
+        println(puzzleId)
+        (puzzleId, puzzle.playerPuzzle)
+      }
+    )
+
+  def getPuzzleSolution(puzzleId: PuzzleId): Future[Option[PuzzleSolution]] =
+    Future.successful(
+      PuzzlesGenerator.getPuzzle(puzzleId).map { case PuzzleWithId(_, puzzle) =>
+        puzzle.puzzleSolution
+      }
+    )
 
   private def sendSystemMessage(username: Username, message: String): Unit = {
     if (username != BotUsername)
@@ -1442,5 +1035,480 @@ object GameService {
 
   val BotClientId: ClientId = ClientId("0")
   val BotUsername: Username = Username("Bot")
+
+  case class ServerMyBoard(
+      boardSize: Coordinate,
+      ships: List[ShipInBoard]
+  ) {
+
+    lazy val efficientShipCheck: Vector[Vector[Option[ShipInBoard]]] =
+      ships
+        .flatMap(shipInGame => shipInGame.shipActualPieces.map(_ -> shipInGame))
+        .foldLeft(Vector.fill(boardSize.x)(Vector.fill(boardSize.y)(Option.empty[ShipInBoard]))) {
+          case (vectorMatrix, (shipPiece, shipInGame)) =>
+            vectorMatrix.updated(
+              shipPiece.x,
+              vectorMatrix(shipPiece.x).updated(shipPiece.y, Some(shipInGame))
+            )
+        }
+
+  }
+
+  case class ServerEnemyBoard(
+      boardSize: Coordinate,
+      boardMarks: BoardMarks,
+      totalShips: Int,
+      shipsLeft: Int
+  ) {
+
+    def updateMarks(
+        turn: Turn,
+        hits: List[(Coordinate, Option[ShipInBoard])]
+    ): ServerEnemyBoard = {
+      val allWater = hits.forall(_._2.isEmpty)
+      val allShipHit = hits.forall(_._2.nonEmpty)
+      val allSubmarineHits =
+        allShipHit && hits.forall(_._2.exists(_.ship.shipId == Ship.Submarine.shipId))
+
+      val updatedBoardMarks: BoardMarks =
+        hits.foldLeft(boardMarks) { case (marks, (coor, _)) =>
+          if (allWater)
+            updateBoardMarksUsing(marks, coor, _ => (Some(turn), BoardMark.Water))
+          else if (allShipHit)
+            updateBoardMarksUsing(marks, coor, _ => (Some(turn), BoardMark.ShipHit))
+          else
+            updateBoardMarksUsing(marks, coor, { case (_, boardMark) => (Some(turn), boardMark) })
+        }
+
+      val updatedBoardMarks2: BoardMarks =
+        if (allSubmarineHits)
+          hits
+            .flatMap(_._1.get8CoorAround)
+            .filter(_.isInsideBoard(boardSize))
+            .foldLeft(updatedBoardMarks) { case (marks, coor) =>
+              updateBoardMarksUsing(
+                marks,
+                coor,
+                { case (turnOpt, _) => (turnOpt, BoardMark.Water) }
+              )
+            }
+        else
+          updatedBoardMarks
+
+      copy(boardMarks = updatedBoardMarks2)
+    }
+
+    lazy val hasNFreeSpaces: Int =
+      boardMarks.map {
+        _.count { case (opt, boardMark) => opt.isEmpty && !boardMark.isPermanent }
+      }.sum
+
+  }
+
+  case class ServerTimeRemaining(
+      totalTimeRemainingNanos: Long,
+      turnTimeRemainingNanosOpt: Option[Long]
+  )
+
+  case class ServerPlayer(
+      clientId: ClientId,
+      username: Username,
+      startedFirst: Boolean,
+      myBoard: ServerMyBoard,
+      enemyBoard: ServerEnemyBoard,
+      turnPlayHistory: List[TurnPlay],
+      currentTurnOpt: Option[Turn],
+      currentTurnAttackTypes: List[AttackType],
+      extraTurnQueue: List[ExtraTurn],
+      timeRemaining: Option[ServerTimeRemaining],
+      botHelper: Option[BotHelper]
+  ) {
+
+    val isHuman: Boolean = clientId != BotClientId
+
+    def kills: Int = enemyBoard.totalShips - enemyBoard.shipsLeft
+
+    def toPlayer(game: Game): Player =
+      if (game.gameStarted)
+        Player(
+          Board(myBoard.boardSize, myBoard.ships),
+          enemyBoard.boardMarks,
+          turnPlayHistory
+        )
+      else
+        Player(
+          Board(myBoard.boardSize, myBoard.ships),
+          Vector.empty,
+          Nil
+        )
+
+    def getTimeRemaining: Option[TimeRemaining] =
+      timeRemaining.map {
+        case ServerTimeRemaining(totalTimeRemainingNanos, turnTimeRemainingNanos) =>
+          TimeRemaining(
+            (totalTimeRemainingNanos / 1000L / 1000L).toInt,
+            turnTimeRemainingNanos.map(turnTime => (turnTime / 1000L / 1000L).toInt)
+          )
+      }
+
+  }
+
+  case class PreGamePlayer(
+      clientId: ClientId,
+      username: Username,
+      acceptedRules: Boolean
+  )
+
+  case class PreGame(
+      gameId: GameId,
+      messages: List[ChatMessage], // TODO ?
+      rules: Rules,
+      player1: PreGamePlayer,
+      player2: PreGamePlayer
+  ) {
+
+    def getPlayer(playerUsername: Username): Option[PreGamePlayer] =
+      if (player1.username == playerUsername) Some(player1)
+      else if (player2.username == playerUsername) Some(player2)
+      else None
+
+    def getEnemy(player: PreGamePlayer): PreGamePlayer =
+      if (player == player1) player2 else player1
+
+    def getPlayers(playerUsername: Username): Option[(PreGamePlayer, PreGamePlayer)] =
+      getPlayer(playerUsername).map(player => (player, getEnemy(player)))
+
+    def updatePlayer(updatedPlayer: PreGamePlayer): PreGame =
+      if (updatedPlayer.username == player1.username)
+        copy(player1 = updatedPlayer)
+      else
+        copy(player2 = updatedPlayer)
+
+    def receiveRulesPatchBoardSize(
+        boardSizePatch: Coordinate
+    ): (PreGame, Boolean) =
+      rules.boardSize match {
+        case currentBoardSize if currentBoardSize == boardSizePatch =>
+          (this, false)
+        case _ =>
+          (this.modify(_.rules.boardSize).setTo(boardSizePatch), true)
+      }
+
+    def receiveRulesPatchFleet(
+        shipId: ShipId,
+        amountPatch: Int
+    ): (PreGame, Boolean) =
+      rules.gameFleet.shipCounterMap.get(shipId) match {
+        case None if 0 == amountPatch =>
+          (this, false)
+        case Some((currentAmount, _)) if currentAmount == amountPatch =>
+          (this, false)
+        case None =>
+          val updatedFleet: Fleet =
+            Fleet(rules.gameFleet.updateCounter(shipId, amountPatch, Rotation.Rotation0))
+          (this.modify(_.rules.gameFleet).setTo(updatedFleet), true)
+        case Some((_, rotation)) =>
+          val updatedFleet: Fleet =
+            Fleet(rules.gameFleet.updateCounter(shipId, amountPatch, rotation))
+          (this.modify(_.rules.gameFleet).setTo(updatedFleet), true)
+      }
+
+    def receiveRulesPatchDefaultAttacks(
+        defaultTurnAttacksPatch: List[AttackType]
+    ): (PreGame, Boolean) =
+      rules.defaultTurnAttacks match {
+        case currentDefaultTurnAttacks if currentDefaultTurnAttacks == defaultTurnAttacksPatch =>
+          (this, false)
+        case _ =>
+          (this.modify(_.rules.defaultTurnAttacks).setTo(defaultTurnAttacksPatch), true)
+      }
+
+    def receiveRulesPatchTurnBonuses(
+        turnBonusesPatch: List[TurnBonus]
+    ): (PreGame, Boolean) =
+      rules.turnBonuses match {
+        case currentTurnBonuses if currentTurnBonuses == turnBonusesPatch =>
+          (this, false)
+        case _ =>
+          (this.modify(_.rules.turnBonuses).setTo(turnBonusesPatch), true)
+      }
+
+    def receiveRulesPatchTimeLimit(
+        timeLimitPatch: RuleTimeLimit
+    ): (PreGame, Boolean) =
+      rules.timeLimit match {
+        case currentTimeLimit if currentTimeLimit == timeLimitPatch =>
+          (this, false)
+        case _ =>
+          (this.modify(_.rules.timeLimit).setTo(timeLimitPatch), true)
+      }
+
+  }
+
+  object PreGame {
+    def fromActiveGame(game: Game): PreGame =
+      PreGame(
+        gameId = game.gameId,
+        messages = Nil, // TODO add this?
+        rules = game.rules,
+        player1 =
+          PreGamePlayer(game.player1.clientId, game.player1.username, acceptedRules = false),
+        player2 = PreGamePlayer(game.player2.clientId, game.player2.username, acceptedRules = false)
+      )
+  }
+
+  case class Game(
+      gameId: GameId,
+      messages: List[ChatMessage],
+      boardSize: Coordinate,
+      rules: Rules,
+      player1: ServerPlayer,
+      player2: ServerPlayer,
+      playerWhoWonOpt: Option[Username],
+      currentTurnPlayer: Option[Username],
+      lastUpdateTimeOpt: Option[Instant],
+      requestInProgress: Option[(Username, PlayerRequestType)],
+      isRealGame: Boolean
+  ) {
+
+    val isInPlacingShipsMode: Boolean =
+      player1.myBoard.ships.isEmpty || player2.myBoard.ships.isEmpty
+
+    val gameStarted: Boolean = currentTurnPlayer.nonEmpty
+
+    val gameIsActive: Boolean = currentTurnPlayer.nonEmpty && playerWhoWonOpt.isEmpty
+
+    val gameIsOver: Boolean = playerWhoWonOpt.nonEmpty
+
+    val bothPlayers: List[ServerPlayer] = List(player1, player2)
+
+    def getPlayerSafe(playerUsername: Username): Option[ServerPlayer] =
+      if (player1.username == playerUsername) Some(player1)
+      else if (player2.username == playerUsername) Some(player2)
+      else None
+
+    private def getPlayerUnsafe(playerUsername: Username): ServerPlayer =
+      if (player1.username == playerUsername) player1 else player2
+
+    def enemyPlayer(player: ServerPlayer): ServerPlayer =
+      enemyPlayer(player.username)
+
+    def enemyPlayer(playerUsername: Username): ServerPlayer =
+      if (player1.username == playerUsername) player2 else player1
+
+    def toGameStatePlayer1: GameState =
+      toGameState(player1, player2)
+
+    def toGameStatePlayer2: GameState =
+      toGameState(player2, player1)
+
+    private def toGameState(me: ServerPlayer, enemy: ServerPlayer): GameState = {
+      val gameMode: GameMode =
+        (
+          me.currentTurnOpt.flatMap(currentTurn => currentTurnPlayer.map((currentTurn, _))),
+          playerWhoWonOpt
+        ) match {
+          case (None, _) =>
+            PlacingShipsMode(me.myBoard.ships.nonEmpty, enemy.myBoard.ships.nonEmpty)
+          case (Some((turn, currentPlayerUsername)), None) =>
+            PlayingMode(
+              currentPlayerUsername == me.username,
+              turn = turn,
+              turnAttackTypes = me.currentTurnAttackTypes,
+              myTimeRemaining = me.getTimeRemaining,
+              enemyTimeRemaining = enemy.getTimeRemaining
+            )
+          case (Some((turn, _)), Some(playerWhoWon)) =>
+            GameOverMode(
+              turn,
+              me.username == playerWhoWon,
+              myTimeRemaining = me.getTimeRemaining,
+              enemyTimeRemaining = enemy.getTimeRemaining,
+              enemyRealBoard = enemy.myBoard.ships
+            )
+        }
+
+      GameState(
+        gameId,
+        rules,
+        me.toPlayer(this),
+        SimplePlayer(
+          enemy.username,
+          enemy.isHuman,
+          enemy.enemyBoard.boardSize,
+          enemy.turnPlayHistory
+        ),
+        gameMode
+      )
+    }
+
+    def placeShips(playerUsername: Username, shipPositions: List[ShipInBoard]): Game =
+      updatePlayer(getPlayerUnsafe(playerUsername).modify(_.myBoard.ships).setTo(shipPositions))
+
+    def updatePlayer(updatedPlayer: ServerPlayer): Game =
+      if (updatedPlayer.username == player1.username)
+        copy(player1 = updatedPlayer)
+      else
+        copy(player2 = updatedPlayer)
+
+    def updatePlayerByUsername(playerUsername: Username, f: ServerPlayer => ServerPlayer): Game =
+      getPlayerSafe(playerUsername)
+        .map(serverPlayer => updatePlayer(f(serverPlayer)))
+        .getOrElse(this)
+
+    def getCurrentTurnPlayer: Option[ServerPlayer] =
+      if (gameIsActive)
+        currentTurnPlayer.map(currentUsername =>
+          if (currentUsername == player1.username) player1 else player2
+        )
+      else
+        None
+
+  }
+
+  private[services] def updateGameWithTurnAttacksUnsafe(
+      gameServiceOpt: Option[GameService],
+      game: Game,
+      player: ServerPlayer,
+      currentTurn: Turn,
+      turnAttacks: List[Attack]
+  ): Game = {
+    val enemy = game.enemyPlayer(player)
+    val hits: List[(Coordinate, Option[ShipInBoard])] =
+      turnAttacks.map(_.coordinateOpt.get).map { case coor @ Coordinate(x, y) =>
+        coor -> enemy.myBoard.efficientShipCheck(x)(y)
+      }
+
+    val hitHints: List[HitHint] =
+      hits
+        .groupBy(_._2)
+        .toList
+        .flatMap {
+          case (None, listOfMisses) =>
+            listOfMisses.map(_ => HitHint.Water)
+          case (Some(shipInGame), listOfHits) =>
+            val hitsOnTheShip =
+              listOfHits.map(_ => HitHint.ShipHit(shipInGame.ship.shipId, destroyed = false))
+            val shipIsDestroyed =
+              shipInGame.shipActualPieces.forall { case pieceCoor @ Coordinate(x, y) =>
+                listOfHits.exists(_._1 == pieceCoor) ||
+                  player.enemyBoard.boardMarks(x)(y)._1.nonEmpty
+              }
+            if (shipIsDestroyed)
+              hitsOnTheShip.head.copy(destroyed = true) :: hitsOnTheShip.tail
+            else
+              hitsOnTheShip
+        }
+        .sortBy {
+          case Water =>
+            (true, Int.MaxValue)
+          case ShipHit(shipId, destroyed) =>
+            (destroyed, shipId.id)
+        }
+
+    val turnPlay: TurnPlay =
+      TurnPlay(currentTurn, turnAttacks, hitHints)
+
+    val killsThisTurn = hitHints.count(_.isDestroyed)
+
+    val updatedPlayer =
+      player
+        .modify(_.turnPlayHistory)
+        .using(turnPlay :: _)
+        .modify(_.enemyBoard)
+        .using(_.updateMarks(currentTurn, hits))
+        .modify(_.enemyBoard.shipsLeft)
+        .using(_ - killsThisTurn)
+
+    val gameOver = updatedPlayer.enemyBoard.shipsLeft == 0
+    val updatedGameWithPlayer: Game = game.updatePlayer(updatedPlayer)
+    val updatedGameWithTurnTime: Game =
+      if (gameOver)
+        gameServiceOpt match {
+          case None =>
+            simpleSetGameOver(updatedGameWithPlayer, updatedPlayer.username)
+          case Some(gameService) =>
+            gameService.setGameOver(updatedGameWithPlayer, updatedPlayer.username)
+        }
+      else {
+        val bonusRewardList: List[BonusReward] =
+          rewardExtraTurns(gameBeforeHits = game, turnPlay = turnPlay)
+        val extraTurnBonuses: List[ExtraTurn] =
+          bonusRewardList.collect { case extraTurn @ ExtraTurn(_) => extraTurn }
+
+        val updatedGameWithNextTurn: Game =
+          updatedPlayer.extraTurnQueue ++ extraTurnBonuses match {
+            case ExtraTurn(attackTypes) :: nextExtraTurns =>
+              val updatedPlayerWithExtraTurns =
+                updatedPlayer
+                  .modify(_.currentTurnOpt)
+                  .using(_.map { case Turn(currentTurn, extraTurn) =>
+                    Turn(currentTurn, extraTurn.map(_ + 1).orElse(Some(1)))
+                  })
+                  .modify(_.currentTurnAttackTypes)
+                  .setTo(attackTypes)
+                  .modify(_.extraTurnQueue)
+                  .setTo(nextExtraTurns)
+
+              updatedGameWithPlayer.updatePlayer(updatedPlayerWithExtraTurns)
+            case Nil =>
+              val updatedPlayerWithExtraTurns =
+                updatedPlayer
+                  .modify(_.currentTurnOpt)
+                  .using(_.map { case Turn(currentTurn, _) => Turn(currentTurn + 1, None) })
+                  .modify(_.currentTurnAttackTypes)
+                  .setTo(updatedGameWithPlayer.rules.defaultTurnAttacks)
+
+              updatedGameWithPlayer
+                .updatePlayer(updatedPlayerWithExtraTurns)
+                .modify(_.currentTurnPlayer)
+                .using(_.map(updatedGameWithPlayer.enemyPlayer(_).username))
+          }
+
+        updatedGameWithNextTurn.getCurrentTurnPlayer match {
+          case None =>
+            updatedGameWithNextTurn
+          case Some(serverPlayer) =>
+            updatedGameWithNextTurn.rules.timeLimit match {
+              case WithRuleTimeLimit(_, Some((additionalTurnTimeSeconds, _))) =>
+                updatedGameWithNextTurn.updatePlayer(
+                  serverPlayer.modify(_.timeRemaining).using {
+                    _.map { serverTimeRemaining =>
+                      serverTimeRemaining.copy(turnTimeRemainingNanosOpt =
+                        Some(additionalTurnTimeSeconds * 1000L * 1000L * 1000L)
+                      )
+                    }
+                  }
+                )
+              case _ =>
+                updatedGameWithNextTurn
+            }
+        }
+      }
+
+    updatedGameWithTurnTime
+  }
+
+  private def rewardExtraTurns(gameBeforeHits: Game, turnPlay: TurnPlay): List[BonusReward] = {
+    val killsThisTurn = turnPlay.hitHints.count(_.isDestroyed)
+
+    gameBeforeHits.rules.turnBonuses.flatMap { case TurnBonus(bonusType, bonusReward) =>
+      bonusType match {
+        case BonusType.FirstBlood
+            if killsThisTurn > 0 && gameBeforeHits.bothPlayers.forall(_.kills == 0) =>
+          bonusReward
+        case BonusType.DoubleKill if killsThisTurn == 2 =>
+          bonusReward
+        case BonusType.TripleKill if killsThisTurn == 3 =>
+          bonusReward
+        case _ =>
+          Nil
+      }
+    }
+  }
+
+  private def simpleSetGameOver(game: Game, whoWonUsername: Username): Game = {
+    game.modify(_.playerWhoWonOpt).setTo(Some(whoWonUsername))
+  }
 
 }

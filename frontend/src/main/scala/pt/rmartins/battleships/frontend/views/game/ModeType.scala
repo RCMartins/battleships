@@ -4,7 +4,7 @@ sealed trait ModeType
 
 object ModeType {
 
-  case object PreGameModeType extends ModeType
+  case object PlacingGameModeType extends ModeType
 
   case object PlayingModeType extends ModeType
 

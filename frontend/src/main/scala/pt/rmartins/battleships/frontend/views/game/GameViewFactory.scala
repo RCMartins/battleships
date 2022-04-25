@@ -18,13 +18,14 @@ class GameViewFactory(
   override def create(): (View, Presenter[RoutingInGameState.type]) = {
     val preGameModel = ModelProperty[PreGameModel](PreGameModel.default)
     val gameModel = ModelProperty[GameModel](GameModel.default)
-    val gameStateModel = ModelProperty[GameStateModel](GameStateModel(None))
+    val gameStateModel = ModelProperty[GameStateModel](GameStateModel(None, None))
     val chatModel = ModelProperty[ChatModel](ChatModel.default)
     val screenModel = ModelProperty[ScreenModel](ScreenModel.default)
     val translationsModel = ModelProperty[TranslationsModel](TranslationsModel.default)
 
     val rpcOpt: Option[SecureRPC] = userService.secureRpc()
     if (rpcOpt.isEmpty) throw SharedExceptions.UnauthorizedException()
+    val gameRpc = rpcOpt.get.game()
 
     val gamePresenter: GamePresenter =
       new GamePresenter(
@@ -34,10 +35,16 @@ class GameViewFactory(
         chatModel,
         screenModel,
         translationsModel,
-        rpcOpt.get.game(),
+        gameRpc,
         userService,
         translationsService,
         notificationsCenter
+      )
+    val mousePresenter: MousePresenter =
+      new MousePresenter(
+        gameModel,
+        gamePresenter,
+        gameRpc
       )
     val canvasUtils: CanvasUtils =
       new CanvasUtils(gamePresenter)
@@ -55,7 +62,14 @@ class GameViewFactory(
       )
 
     val boardView: BoardView =
-      new BoardView(gameModel, screenModel, translationsModel, gamePresenter, canvasUtils)
+      new BoardView(
+        gameModel,
+        screenModel,
+        translationsModel,
+        gamePresenter,
+        mousePresenter,
+        canvasUtils
+      )
     val gameView: GameView =
       new GameView(
         preGameModel,

@@ -60,6 +60,12 @@ object Coordinate extends HasGenCodec[Coordinate] {
 
   def square(size: Int): Coordinate = Coordinate(size, size)
 
+  def fill(boardSize: Coordinate): Set[Coordinate] =
+    (for {
+      x <- 0 until boardSize.x
+      y <- 0 until boardSize.y
+    } yield Coordinate(x, y)).toSet
+
   def defaultCompare(coor1: Coordinate, coor2: Coordinate): Int =
     if (coor1.x == coor2.x)
       coor2.y - coor1.y

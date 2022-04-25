@@ -20,7 +20,13 @@ case class TranslationsModel(
     bonusFirstBlood: Span,
     bonusDoubleKill: Span,
     bonusTripleKill: Span,
-    shots: Span
+    shots: Span,
+    placeMarksCorrectly1: Span,
+    placeMarksCorrectly2: Span,
+    sendPuzzleAnswer: Span,
+    solvedPuzzles: Span,
+    puzzleCorrect: Span,
+    puzzleIncorrect: Span
 )
 
 object TranslationsModel extends HasModelPropertyCreator[TranslationsModel] {
@@ -42,7 +48,13 @@ object TranslationsModel extends HasModelPropertyCreator[TranslationsModel] {
       bonusFirstBlood = span.render,
       bonusDoubleKill = span.render,
       bonusTripleKill = span.render,
-      shots = span.render
+      shots = span.render,
+      placeMarksCorrectly1 = span.render,
+      placeMarksCorrectly2 = span.render,
+      sendPuzzleAnswer = span.render,
+      solvedPuzzles = span.render,
+      puzzleCorrect = span.render,
+      puzzleIncorrect = span.render
     )
 
 }

@@ -46,6 +46,10 @@ trait GameRPC {
 
   def addToEnemyTimeSeconds(gameId: GameId, secondsToAdd: Int): Future[Unit]
 
+  def getRandomPuzzle(): Future[Option[(PuzzleId, PlayerPuzzle)]]
+
+  def getPuzzleSolution(puzzleId: PuzzleId): Future[Option[PuzzleSolution]]
+
 }
 
 object GameRPC extends DefaultServerRpcCompanion[GameRPC]

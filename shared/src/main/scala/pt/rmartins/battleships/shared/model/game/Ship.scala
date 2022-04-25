@@ -25,6 +25,12 @@ case class Ship(shipId: ShipId, pieces: List[Coordinate], rotation: Rotation) {
   def shipBiggestToSmallestOrder: (Int, Int) =
     (-piecesSize, shipId.id)
 
+  def name: String =
+    Ship.shipsNamesMap(shipId)
+
+  def shortName: String =
+    Ship.shipsShortNamesMap(shipId)
+
 }
 
 object Ship extends HasGenCodec[Ship] {
@@ -94,48 +100,56 @@ object Ship extends HasGenCodec[Ship] {
   val SmallC: Ship =
     List((0, 0), (0, 1), (0, 2), (1, 0), (1, 2)).pipe(toShip)
 
-  private val allShipsListNames: List[(Ship, String)] =
-    List[(Ship, String)](
-      (Submarine, "Submarine"),
-      (Skeeter, "Skeeter"),
-      (Ranger, "Ranger"),
-      (Conqueror, "Conqueror"),
-      (AircraftCarrier, "AircraftCarrier"),
-      (TorpedoBoat, "TorpedoBoat"),
-      (Cruiser, "Cruiser"),
-      (MiniCruiser, "MiniCruiser"),
-      (Epoch, "Epoch"),
-      (Battleship, "Battleship"),
-      (MotherShip, "MotherShip"),
-      (Atoll, "Atoll"),
-      (HoleStar, "HoleStar"),
-      (SmallStar, "SmallStar"),
-      (StarShip, "StarShip"),
-      (LShip, "LShip"),
-      (MissileShip, "MissileShip"),
-      (HoledMissile, "HoledMissile"),
-      (WShip, "WShip"),
-      (ArrowShip, "ArrowShip"),
-      (LongShip, "LongShip"),
-      (SmallSnake, "SmallSnake"),
-      (LongArrow, "LongArrow"),
-      (Plane, "Plane"),
-      (StaffShip, "StaffShip"),
-      (Butterfly, "Butterfly"),
-      (HammerHead, "HammerHead"),
-      (CornerShip, "CornerShip"),
-      (MiniCorner, "MiniCorner"),
-      (SmallC, "SmallC")
+  private val allShipsListNames: List[(Ship, String, String)] =
+    List[(Ship, String, String)](
+      (Submarine, "Submarine", "Su"),
+      (Skeeter, "Skeeter", "Sk"),
+      (Ranger, "Ranger", "Ra"),
+      (Conqueror, "Conqueror", "Co"),
+      (AircraftCarrier, "AircraftCarrier", "AC"),
+      (TorpedoBoat, "TorpedoBoat", "TB"),
+      (Cruiser, "Cruiser", "Cr"),
+      (MiniCruiser, "MiniCruiser", "MC"),
+      (Epoch, "Epoch", "Ep"),
+      (Battleship, "Battleship", "Ba"),
+      (MotherShip, "MotherShip", "MS"),
+      (Atoll, "Atoll", "At"),
+      (HoleStar, "HoleStar", "HS"),
+      (SmallStar, "SmallStar", "sS"),
+      (StarShip, "StarShip", "SS"),
+      (LShip, "LShip", "LS"),
+      (MissileShip, "MissileShip", "MS"),
+      (HoledMissile, "HoledMissile", "HM"),
+      (WShip, "WShip", "SD"),
+      (ArrowShip, "ArrowShip", "AS"),
+      (LongShip, "LongShip", "LS"),
+      (SmallSnake, "SmallSnake", "SS"),
+      (LongArrow, "LongArrow", "LA"),
+      (Plane, "Plane", "Pl"),
+      (StaffShip, "StaffShip", "St"),
+      (Butterfly, "Butterfly", "Bu"),
+      (HammerHead, "HammerHead", "HH"),
+      (CornerShip, "CornerShip", "CS"),
+      (MiniCorner, "MiniCorner", "MC"),
+      (SmallC, "SmallC", "SC")
     ).sortBy(_._1.piecesSize)
+
+  val shipsNamesMap: Map[ShipId, String] =
+    allShipsListNames.map { case (ship, name, _) => ship.shipId -> name }.toMap
+
+  val shipsShortNamesMap: Map[ShipId, String] =
+    allShipsListNames.map { case (ship, _, shortName) => ship.shipId -> shortName }.toMap
+
+  if (allShipsListNames.size != shipsShortNamesMap.size)
+    throw new Exception(
+      s"Duplicate Short Name: ${allShipsListNames.map(_._3).groupBy(identity).keys}"
+    )
 
   val allShipsList: List[Ship] =
     allShipsListNames.map(_._1)
 
   val allShipIdsSet: Set[ShipId] =
     allShipsList.map(_.shipId).toSet
-
-  val shipNames: Map[ShipId, String] =
-    allShipsListNames.map { case (ship, name) => ship.shipId -> name }.toMap
 
   lazy val allShipsFleetMaxX: Fleet = {
     val initialFleet =

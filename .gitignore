@@ -12,3 +12,5 @@ out
 gen
 /.attach_pid*
 .bsp
+
+puzzles/

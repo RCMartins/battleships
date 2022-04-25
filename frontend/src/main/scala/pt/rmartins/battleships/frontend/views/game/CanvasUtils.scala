@@ -204,6 +204,11 @@ object CanvasUtils {
       val fillColor: String = "255, 0, 0"
     }
 
+    case class DarkGreen(border: CanvasBorder = Standard(), alpha: Double = 1.0)
+        extends CanvasColor {
+      val fillColor: String = "51, 204, 51"
+    }
+
   }
 
   def drawTurnNumberCoor(

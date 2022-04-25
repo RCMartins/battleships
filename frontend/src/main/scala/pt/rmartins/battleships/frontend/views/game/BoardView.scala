@@ -9,9 +9,9 @@ import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.shared.css.GameStyles
-import pt.rmartins.battleships.shared.model.game
 import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit
+import pt.rmartins.battleships.shared.model.game.RuleTimeLimit._
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.BoardUtils.canPlaceInBoard
 import scalatags.JsDom.all._
@@ -23,6 +23,7 @@ class BoardView(
     screenModel: ModelProperty[ScreenModel],
     translationsModel: ModelProperty[TranslationsModel],
     gamePresenter: GamePresenter,
+    mousePresenter: MousePresenter,
     canvasUtils: CanvasUtils
 ) extends CssView {
 
@@ -48,7 +49,7 @@ class BoardView(
 
   myBoardCanvas.onmousemove = (mouseEvent: MouseEvent) => {
     val rect = myBoardCanvas.getBoundingClientRect()
-    gamePresenter.mouseMove(
+    mousePresenter.mouseMove(
       this,
       mouseEvent.clientX.toInt - rect.left.toInt,
       mouseEvent.clientY.toInt - rect.top.toInt
@@ -56,20 +57,20 @@ class BoardView(
   }
 
   myBoardCanvas.onmouseleave = (_: MouseEvent) => {
-    gamePresenter.mouseLeave()
+    mousePresenter.mouseLeave()
   }
 
   myBoardCanvas.onmousedown = (mouseEvent: MouseEvent) => {
-    gamePresenter.mouseDown(this, mouseEvent.button)
+    mousePresenter.mouseDown(this, mouseEvent.button)
     false // Prevent the mouse down from exiting the canvas
   }
 
   myBoardCanvas.onmouseup = (_: MouseEvent) => {
-    gamePresenter.mouseUp()
+    mousePresenter.mouseUp()
   }
 
   myBoardCanvas.onmousewheel = (wheelEvent: WheelEvent) => {
-    gamePresenter.mouseWheel(this, wheelEvent.deltaY.toInt / 100)
+    mousePresenter.mouseWheel(this, wheelEvent.deltaY.toInt / 100)
   }
 
   myBoardCanvas.oncontextmenu = (event: MouseEvent) => {
@@ -77,9 +78,11 @@ class BoardView(
   }
 
   private val BoardSizeProperty: ReadableProperty[Int] =
-    gamePresenter.rulesProperty.transform {
-      case None        => 1
-      case Some(rules) => rules.boardSize.x
+    combine(
+      gamePresenter.rulesProperty.transform(_.map(_.boardSize)),
+      gamePresenter.gamePuzzleStateProperty.transform(_.map(_.playerPuzzle.boardSize))
+    ).transform { case (boardSizeOpt1, boardSizeOpt2) =>
+      boardSizeOpt1.orElse(boardSizeOpt2).map(_.x).getOrElse(1)
     }
 
   private val squareSizesProperty: ReadableProperty[IndexedSeq[Int]] =
@@ -218,31 +221,40 @@ class BoardView(
         (boardSize * enemyBoardSqSize) / summaryShipsSqSize
     }
 
+  private val shipsForSummaryProperty: ReadableProperty[Option[List[Ship]]] =
+    combine(
+      gamePresenter.rulesProperty.transform(_.map(_.gameFleet.shipsList)),
+      gamePresenter.gamePuzzleStateProperty.transform(
+        _.map(_.playerPuzzle.gameFleet.shipsList)
+      )
+    ).transform { case (shipsListOpt1, shipsListOpt2) =>
+      shipsListOpt1.orElse(shipsListOpt2)
+    }
+
   private val DestructionSummaryPos: ReadableProperty[Coordinate] =
     combine(
-      gamePresenter.modeTypeProperty,
+      gamePresenter.modeTypeOrPuzzleProperty,
       MissilesInicialPos,
       MissilesSqSize,
       DestructionSummaryHitCountSize
-    )
-      .transform {
-        case (
-              Some(modeType @ (PlayingModeType | GameOverModeType)),
-              missilesPos,
-              missilesSize,
-              destructionSummaryHitCountSize
-            ) =>
-          missilesPos +
-            Coordinate(
-              if (modeType == PlayingModeType)
-                missilesSize + destructionSummaryHitCountSize * 2
-              else
-                destructionSummaryHitCountSize * 2,
-              0
-            )
-        case _ =>
-          Coordinate.origin
-      }
+    ).transform {
+      case (
+            modeType @ ((Some(PlayingModeType | GameOverModeType), _) | (_, true)),
+            missilesPos,
+            missilesSize,
+            destructionSummaryHitCountSize
+          ) =>
+        missilesPos +
+          Coordinate(
+            if (modeType._1.contains(PlayingModeType))
+              missilesSize + destructionSummaryHitCountSize * 2
+            else
+              destructionSummaryHitCountSize * 2,
+            0
+          )
+      case _ =>
+        Coordinate.origin
+    }
 
   private val DestructionSummaryCombined: ReadableProperty[(Coordinate, Int)] =
     combine(DestructionSummaryPos, SummaryShipsSqSize)
@@ -250,8 +262,8 @@ class BoardView(
   private val PlaceShipBoardMargin = Coordinate.square(20)
 
   private val shipsSummaryRelCoordinates: ReadableProperty[List[(ShipId, List[ViewShip])]] =
-    combine(gamePresenter.rulesProperty, SummaryMaxY).transform {
-      case (Some(Rules(_, shipsInThisGame, _, _, _)), summaryMaxY) =>
+    combine(shipsForSummaryProperty, SummaryMaxY).transform {
+      case (Some(shipsInThisGame), summaryMaxY) =>
         def getShipsToPlacePos(
             posX: Int,
             posY: Int,
@@ -301,9 +313,7 @@ class BoardView(
           }
 
         val shipsGrouped: List[(ShipId, List[Ship])] =
-          shipsInThisGame.shipsList
-            .groupBy(_.shipId)
-            .toList
+          shipsInThisGame.groupBy(_.shipId).toList
 
         val minX =
           shipsGrouped.map { case (_, ships) =>
@@ -353,7 +363,7 @@ class BoardView(
       case (
             shipsSummary,
             shipsLeftToPlace,
-            Some(PreGameModeType),
+            Some(PlacingGameModeType),
             placeShipsPos,
             placeShipsSqSize
           ) =>
@@ -400,15 +410,15 @@ class BoardView(
       : ReadableProperty[List[(ShipId, Coordinate, Int, List[SummaryShip])]] =
     combine(
       shipsSummaryRelCoordinates,
-      gamePresenter.meProperty.transform(_.map(_.turnPlayHistory)),
-      gamePresenter.modeTypeProperty,
+      gamePresenter.turnPlayHistory,
+      gamePresenter.modeTypeOrPuzzleProperty,
       DestructionSummaryCombined,
       DestructionSummaryHitCountSize
     ).transform {
       case (
             shipsSummary,
             Some(turnPlayHistory),
-            Some(PlayingModeType | GameOverModeType),
+            (Some(PlayingModeType | GameOverModeType), _) | (_, true),
             (destructionSummaryPos, destructionSummarySqSize),
             destructionSummaryHitCountSize
           ) =>
@@ -490,7 +500,7 @@ class BoardView(
       case (
             Some(mousePosition),
             Some(boardSize),
-            Some(PreGameModeType),
+            Some(PlacingGameModeType),
             defaultSquareSize,
             myBoardPosPreGame
           ) =>
@@ -509,15 +519,15 @@ class BoardView(
   val enemyBoardMouseCoordinate: ReadableProperty[Option[Coordinate]] =
     combine(
       gamePresenter.mousePositionProperty,
-      gamePresenter.enemyProperty,
-      gamePresenter.modeTypeProperty,
+      gamePresenter.mainBoardSizeProperty,
+      gamePresenter.modeTypeOrPuzzleProperty,
       EnemyBoardPos,
       EnemyBoardSqSize
     ).transform {
       case (
             Some(mousePosition),
-            Some(enemy),
-            Some(PlayingModeType | GameOverModeType),
+            Some(boardSize),
+            (Some(PlayingModeType | GameOverModeType), _) | (_, true),
             enemyBoardPos,
             defaultSquareSize
           ) =>
@@ -525,10 +535,10 @@ class BoardView(
         Some(relativeBoardCoor)
           .filter(coor =>
             coor >= -PlaceShipBoardMargin &&
-              coor <= (enemy.boardSize * defaultSquareSize + PlaceShipBoardMargin)
+              coor <= (boardSize * defaultSquareSize + PlaceShipBoardMargin)
           )
           .map(_ / defaultSquareSize)
-          .map(_.roundTo(enemy.boardSize))
+          .map(_.roundTo(boardSize))
       case _ =>
         None
     }
@@ -536,11 +546,11 @@ class BoardView(
   private val BoardMarksSelectorAllPositions
       : ReadableProperty[List[(InGameMarkSelector, Coordinate)]] =
     combine(
-      gamePresenter.modeTypeProperty,
+      gamePresenter.modeTypeOrPuzzleProperty,
       BoardMarksSelectorCombined
     ).transform {
       case (
-            Some(PlayingModeType | GameOverModeType),
+            (Some(PlayingModeType | GameOverModeType), _) | (_, true),
             (boardMarksSelectorPos, boardMarksSelectorSize, boardMarksSelectorMargin)
           ) =>
         MarksSelectorOrder.zipWithIndex.map { case (boardMark, index) =>
@@ -557,13 +567,13 @@ class BoardView(
   val boardMarkHover: ReadableProperty[Option[InGameMarkSelector]] =
     combine(
       gamePresenter.mousePositionProperty,
-      gamePresenter.modeTypeProperty,
+      gamePresenter.modeTypeOrPuzzleProperty,
       BoardMarksSelectorAllPositions,
       BoardMarksSelectorSize
     ).transform {
       case (
             Some(mousePosition),
-            Some(PlayingModeType | GameOverModeType),
+            (Some(PlayingModeType | GameOverModeType), _) | (_, true),
             boardMarksSelectorAllPositions,
             boardMarksSelectorSize
           ) =>
@@ -631,8 +641,8 @@ class BoardView(
         drawMyBoard(
           renderingCtx,
           translationsData.myBoardTitle.innerText,
-          me,
-          enemy,
+          me.myBoard,
+          enemy.turnPlayHistory,
           mousePositionOpt,
           selectedShipOpt,
           MyBoardPreGamePos.get,
@@ -654,8 +664,8 @@ class BoardView(
         drawMyBoard(
           renderingCtx,
           translationsData.myBoardTitle.innerText,
-          me,
-          enemy,
+          me.myBoard,
+          enemy.turnPlayHistory,
           None,
           None,
           MyBoardInGamePos.get,
@@ -670,7 +680,6 @@ class BoardView(
           renderingCtx,
           translationsData.enemyBoardTitle.innerText,
           me,
-          enemy,
           turnAttacks,
           EnemyBoardPos.get,
           selectedBoardMarkOpt,
@@ -706,8 +715,8 @@ class BoardView(
           drawMyBoard(
             renderingCtx,
             translationsData.myBoardTitle.innerText,
-            me,
-            enemy,
+            me.myBoard,
+            enemy.turnPlayHistory,
             None,
             None,
             MyBoardGameOverPos.get,
@@ -722,7 +731,6 @@ class BoardView(
           renderingCtx,
           translationsData.enemyBoardTitle.innerText,
           me,
-          enemy,
           Nil,
           EnemyBoardPos.get,
           selectedBoardMarkOpt,
@@ -734,15 +742,74 @@ class BoardView(
         )
 
         drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
-      case _ =>
+      case None =>
+        gamePresenter.gamePuzzleStateProperty.get match {
+          case Some(
+                GamePuzzleState(
+                  puzzleSolvedCounter,
+                  _,
+                  enemyBoardMarks,
+                  playerPuzzle,
+                  puzzleSolutionOpt
+                )
+              ) =>
+            drawDestructionSummary(renderingCtx, selectedShipOpt)
+
+            drawEnemyBoard(
+              renderingCtx,
+              "",
+              Player(
+                Board(playerPuzzle.boardSize, Nil),
+                enemyBoardMarks,
+                playerPuzzle.turnPlayHistory
+              ),
+              Nil,
+              EnemyBoardPos.get,
+              selectedBoardMarkOpt,
+              selectedShipOpt,
+              screenModelData.hoverMove,
+              attacksQueuedStatus = AttacksQueuedStatus.NotSet,
+              isMyTurn = false,
+              tick = screenModelData.tick
+            )
+
+            drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
+
+            puzzleSolutionOpt match {
+              case None =>
+                drawPlayerPuzzleObjective(renderingCtx, playerPuzzle, translationsData)
+              case Some((PuzzleSolution.CorrectShipBoardMarksSolution(board), correctState)) =>
+                drawMyBoard(
+                  renderingCtx,
+                  "Solution",
+                  board,
+                  Nil,
+                  None,
+                  None,
+                  MyBoardGameOverPos.get,
+                  SquareSizeBig.get,
+                  fillEmptySquares = true,
+                  hideMyBoard = false,
+                  isMyTurn = false,
+                  tick = screenModelData.tick
+                )
+
+                drawPuzzleCorrectSolution(renderingCtx, correctState, translationsData)
+              case _ =>
+            }
+
+            drawPuzzleCounter(renderingCtx, puzzleSolvedCounter, translationsData)
+
+          case None =>
+        }
     }
   }
 
   def drawMyBoard(
       renderingCtx: CanvasRenderingContext2D,
       boardTitle: String,
-      me: Player,
-      enemy: SimplePlayer,
+      myBoard: Board,
+      turnPlayHistory: List[TurnPlay],
       mousePositionOpt: Option[Coordinate],
       selectedShipOpt: Option[Ship],
       boardPosition: Coordinate,
@@ -752,7 +819,7 @@ class BoardView(
       isMyTurn: Boolean,
       tick: Int
   ): Unit = {
-    val boardSize = me.myBoard.boardSize
+    val boardSize = myBoard.boardSize
 
     drawBoardLimits(
       renderingCtx,
@@ -813,14 +880,14 @@ class BoardView(
           )
         }
 
-      me.myBoard.ships.foreach { case ShipInBoard(ship, position) =>
+      myBoard.ships.foreach { case ShipInBoard(ship, position) =>
         ship.pieces
           .map(_ + position)
           .foreach(drawBoardSquare(renderingCtx, boardPosition, _, squareSize, CanvasColor.Ship()))
       }
     }
 
-    enemy.turnPlayHistory.zipWithIndex.foreach { case (TurnPlay(turn, turnAttacks, _), index) =>
+    turnPlayHistory.zipWithIndex.foreach { case (TurnPlay(turn, turnAttacks, _), index) =>
       turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
         val textSize = Math.max((MinTextSize * 0.6).toInt, (squareSize * 0.6).toInt)
         drawTurnNumberCoor(
@@ -850,7 +917,7 @@ class BoardView(
               boardCoor.roundTo(boardSize - ship.size + Coordinate(1, 1))
 
             def drawCoordinate(coor: Coordinate): Unit =
-              if (canPlaceInBoard(me.myBoard, ship, roundedBoardCoor))
+              if (canPlaceInBoard(myBoard, ship, roundedBoardCoor))
                 drawBoardSquare(
                   renderingCtx,
                   boardPosition,
@@ -883,7 +950,6 @@ class BoardView(
       renderingCtx: CanvasRenderingContext2D,
       boardTitle: String,
       me: Player,
-      enemy: SimplePlayer,
       turnAttacks: List[Attack],
       boardPosition: Coordinate,
       selectedBoardMarkOpt: Option[InGameMarkSelector],
@@ -898,7 +964,7 @@ class BoardView(
     drawBoardLimits(
       renderingCtx,
       boardTitle,
-      enemy.boardSize,
+      me.myBoard.boardSize,
       boardPosition,
       squareSize,
       backgroundColor = None,
@@ -951,9 +1017,8 @@ class BoardView(
               case _                                           => false
             } =>
           drawTurn(CanvasColor.White(CanvasBorder.DashRed()))
-        case None =>
-          if (index == 0)
-            drawTurn(CanvasColor.White(CanvasBorder.RedBold()))
+        case None if index == 0 =>
+          drawTurn(CanvasColor.White(CanvasBorder.RedBold()))
         case _ =>
       }
     }
@@ -1098,7 +1163,8 @@ class BoardView(
         case Some(timeMillis) if timeMillis > MissilesFastPopupTime =>
           val perc: Double =
             (timeMillis - MissilesFastPopupTime).toDouble / MissilesInitialPopupTime
-          (missilesSize * (1 + MissilesMaxOversize * (MissilesFastPerc + (1 - MissilesFastPerc) * perc))).toInt
+          (missilesSize *
+            (1 + MissilesMaxOversize * (MissilesFastPerc + (1 - MissilesFastPerc) * perc))).toInt
         case Some(timeMillis) =>
           val perc: Double = timeMillis.toDouble / MissilesFastPopupTime
           (missilesSize * (1 + MissilesMaxOversize * MissilesFastPerc * perc)).toInt
@@ -1273,7 +1339,7 @@ class BoardView(
     renderingCtx.textBaseline = "middle"
     renderingCtx.textAlign = "right"
 
-    val coordinate: Coordinate =
+    val initialCoordinate: Coordinate =
       screenModel.get.canvasSize.map { case Coordinate(x, _) =>
         Coordinate(x - SquareSizeBig.get, SquareSizeBig.get)
       }
@@ -1281,18 +1347,26 @@ class BoardView(
     val rulesDataList: List[String] =
       List(
         rules.timeLimit match {
-          case RuleTimeLimit.WithoutRuleTimeLimit =>
+          case WithoutRuleTimeLimit =>
             List(translationsData.withoutRuleTimeLimit.innerText)
-          case RuleTimeLimit.WithRuleTimeLimit(
+          case WithRuleTimeLimit(
                 initialTotalTimeSeconds,
                 additionalTurnTimeSecondsOpt
               ) =>
             List(
               translationsData.withRuleTimeLimit.innerText,
-              s"$initialTotalTimeSeconds ${translationsData.seconds.innerText} ${translationsData.totalTime.innerText}"
+              List(
+                initialTotalTimeSeconds,
+                translationsData.seconds.innerText,
+                translationsData.totalTime.innerText
+              ).mkString(" ")
             ) ++
               additionalTurnTimeSecondsOpt.map { case (additionalTurnTimeSeconds, _) =>
-                s"+$additionalTurnTimeSeconds ${translationsData.seconds.innerText} ${translationsData.eachTurn.innerText}"
+                List(
+                  s"+$additionalTurnTimeSeconds",
+                  translationsData.seconds.innerText,
+                  translationsData.eachTurn.innerText
+                ).mkString(" ")
               }.toList
         },
         List(""),
@@ -1319,10 +1393,98 @@ class BoardView(
         }
       ).flatten
 
-    rulesDataList.foldLeft(coordinate) { case (Coordinate(lineLeftPosX, lineLeftPosY), lineStr) =>
-      renderingCtx.fillText(lineStr, lineLeftPosX, lineLeftPosY)
-      Coordinate(lineLeftPosX, lineLeftPosY + textSize + lineMargin)
+    rulesDataList.foldLeft(initialCoordinate) {
+      case (Coordinate(lineLeftPosX, lineLeftPosY), lineStr) =>
+        renderingCtx.fillText(lineStr, lineLeftPosX, lineLeftPosY)
+        Coordinate(lineLeftPosX, lineLeftPosY + textSize + lineMargin)
     }
+  }
+
+  def drawPlayerPuzzleObjective(
+      renderingCtx: CanvasRenderingContext2D,
+      playerPuzzle: PlayerPuzzle,
+      translationsData: TranslationsModel
+  ): Unit = {
+    val textSize = 23
+    val lineMargin = 15
+
+    val initialCoordinateText: Coordinate =
+      screenModel.get.canvasSize.map { case Coordinate(x, _) =>
+        Coordinate(x - SquareSizeSmall.get, SquareSizeBig.get + 100)
+      }
+
+    playerPuzzle.puzzleObjective match {
+      case PuzzleObjective.CorrectShipBoardMarks =>
+        renderingCtx.fillStyle = s"rgb(0, 0, 0)"
+        renderingCtx.font = s"bold ${textSize}px serif"
+        renderingCtx.textBaseline = "middle"
+        renderingCtx.textAlign = "right"
+        renderingCtx.fillText(
+          translationsData.placeMarksCorrectly1.innerText,
+          initialCoordinateText.x,
+          initialCoordinateText.y
+        )
+
+        renderingCtx.fillText(
+          s"${translationsData.placeMarksCorrectly2.innerText} '${translationsData.sendPuzzleAnswer.innerText}'",
+          initialCoordinateText.x,
+          initialCoordinateText.y + textSize + lineMargin
+        )
+      case PuzzleObjective.WinInXTurns(maximumTurns) =>
+        ???
+    }
+  }
+
+  def drawPuzzleCounter(
+      renderingCtx: CanvasRenderingContext2D,
+      puzzleSolvedCounter: Int,
+      translationsData: TranslationsModel
+  ): Unit = {
+    val textSize = 23
+
+    val counterPosition: Coordinate =
+      screenModel.get.canvasSize.map { case Coordinate(x, y) =>
+        Coordinate(x / 2, y - textSize)
+      }
+
+    renderingCtx.fillStyle = s"rgb(0, 0, 0)"
+    renderingCtx.font = s"bold ${textSize}px serif"
+    renderingCtx.textBaseline = "bottom"
+    renderingCtx.textAlign = "center"
+    renderingCtx.fillText(
+      s"${translationsData.solvedPuzzles.innerText}: $puzzleSolvedCounter",
+      counterPosition.x,
+      counterPosition.y
+    )
+  }
+
+  def drawPuzzleCorrectSolution(
+      renderingCtx: CanvasRenderingContext2D,
+      correctState: Boolean,
+      translationsData: TranslationsModel
+  ): Unit = {
+    val textSize = 23
+    renderingCtx.fillStyle =
+      if (correctState)
+        s"rgb(${CanvasColor.DarkGreen().fillColor})"
+      else
+        s"rgb(${CanvasColor.Red().fillColor})"
+    renderingCtx.font = s"bold ${textSize}px serif"
+    renderingCtx.textBaseline = "bottom"
+    renderingCtx.textAlign = "right"
+
+    val initialCoordinate: Coordinate =
+      screenModel.get.canvasSize.map { case Coordinate(x, y) =>
+        Coordinate(x - SquareSizeBig.get, y - textSize)
+      }
+
+    val text: String =
+      if (correctState)
+        translationsData.puzzleCorrect.innerText
+      else
+        translationsData.puzzleIncorrect.innerText
+
+    renderingCtx.fillText(text, initialCoordinate.x, initialCoordinate.y)
   }
 
 }

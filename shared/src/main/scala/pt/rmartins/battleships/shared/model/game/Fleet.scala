@@ -54,6 +54,13 @@ object Fleet extends HasGenCodec[Fleet] {
       }
     )
 
+  def fromShipsList(initialShips: List[Ship]): Fleet =
+    Fleet(
+      initialShips.groupBy(_.shipId).toList.map { case (shipId, list) =>
+        shipId -> ((list.size, Rotation.Rotation0))
+      }
+    )
+
   val default10By10: (Coordinate, Fleet) =
     (
       Coordinate.square(10),

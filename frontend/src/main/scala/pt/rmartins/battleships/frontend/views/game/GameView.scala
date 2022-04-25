@@ -163,6 +163,35 @@ class GameView(
         }
       }
 
+  private val solvePuzzleButton = UdashButton(
+    buttonStyle = Color.Primary.toProperty,
+    block = true.toProperty,
+    componentId = ComponentId("solve-puzzle-button")
+  )(nested =>
+    Seq[Modifier](span(nested(translatedDynamic(Translations.Game.solvePuzzleButton)(_.apply()))))
+  )
+
+  private val sendPuzzleSolutionButton = UdashButton(
+    buttonStyle = Color.Primary.toProperty,
+    block = true.toProperty,
+    disabled = presenter.gamePuzzleStateProperty.transform(_.exists(_.puzzleSolutionOpt.nonEmpty)),
+    componentId = ComponentId("send-puzzle-solution-button")
+  )(nested =>
+    Seq[Modifier](
+      span(nested(translatedDynamic(Translations.Game.sendPuzzleAnswerButton)(_.apply())))
+    )
+  )
+
+  private val nextPuzzleButton = UdashButton(
+    buttonStyle = Color.Primary.toProperty,
+    block = true.toProperty,
+    componentId = ComponentId("next-puzzle-button")
+  )(nested =>
+    Seq[Modifier](
+      span(nested(translatedDynamic(Translations.Game.nextPuzzleButton)(_.apply())))
+    )
+  )
+
   private val confirmShipsButton =
     UdashButton(
       buttonStyle = Color.Primary.toProperty,
@@ -329,10 +358,11 @@ class GameView(
           combine(
             preGameModel.subProp(_.inJoinedPreGame),
             presenter.modeTypeProperty,
-            presenter.placingShipsModeProperty
+            presenter.placingShipsModeProperty,
+            presenter.gamePuzzleStateProperty
           )
         ) {
-          case ((Some(_), _, _), nested) =>
+          case ((Some(_), _, _, _), nested) =>
             div(
               `class` := "row mx-0",
               div(`class` := "ml-2", cancelRulesButton),
@@ -347,14 +377,32 @@ class GameView(
                   div.render
               })
             ).render
-          case ((_, None, _), _) =>
+          case ((_, _, _, Some(GamePuzzleState(_, _, _, _, Some(_)))), _) =>
+            div(
+              `class` := "row justify-content-between mx-0",
+              div(
+                `class` := "row mx-0",
+                div(`class` := "mx-2", sendPuzzleSolutionButton)
+              ),
+              div(`class` := "mx-2", nextPuzzleButton)
+            ).render
+          case ((_, _, _, Some(_)), _) =>
             div(
               `class` := "row mx-0",
-              div(`class` := "mx-2", startGameVsBotButton),
-              div(`class` := "ml-2", invitePlayerButton),
-              usernameInput(factory)
+              div(`class` := "mx-2", sendPuzzleSolutionButton)
             ).render
-          case ((_, _, Some(PlacingShipsMode(false, _))), _) =>
+          case ((_, None, _, _), _) =>
+            div(
+              `class` := "row justify-content-between mx-0",
+              div(
+                `class` := "row mx-0",
+                div(`class` := "mx-2", startGameVsBotButton),
+                div(`class` := "ml-2", invitePlayerButton),
+                usernameInput(factory)
+              ),
+              div(`class` := "mx-2", solvePuzzleButton)
+            ).render
+          case ((_, _, Some(PlacingShipsMode(false, _)), _), _) =>
             div(
               `class` := "row justify-content-between mx-0",
               div(
@@ -366,13 +414,13 @@ class GameView(
               ),
               div(`class` := "mx-2", editRulesButton)
             ).render
-          case ((_, _, Some(PlacingShipsMode(true, _))), _) =>
+          case ((_, _, Some(PlacingShipsMode(true, _)), _), _) =>
             div(
               `class` := "row mx-0",
               div(`class` := "mx-2", undoButton),
               div(`class` := "mx-2", resetButton)
             ).render
-          case ((_, Some(PlayingModeType), _), _) =>
+          case ((_, Some(PlayingModeType), _, _), _) =>
             div(
               `class` := "row justify-content-between mx-0",
               div(
@@ -382,7 +430,7 @@ class GameView(
               ),
               div(`class` := "mx-2", hideMyBoardButton)
             ).render
-          case ((_, Some(GameOverModeType), _), _) =>
+          case ((_, Some(GameOverModeType), _, _), _) =>
             div(
               `class` := "row justify-content-between mx-0",
               div(`class` := "mx-2", rematchButton),
@@ -401,6 +449,18 @@ class GameView(
 
   invitePlayerButton.listen { _ =>
     presenter.invitePlayer(preGameModel.subProp(_.enemyUsernameText).get)
+  }
+
+  solvePuzzleButton.listen { _ =>
+    presenter.startNewPuzzle()
+  }
+
+  sendPuzzleSolutionButton.listen { _ =>
+    presenter.getPuzzleSolution()
+  }
+
+  nextPuzzleButton.listen { _ =>
+    presenter.startNewPuzzle()
   }
 
   confirmRulesButton.listen { _ =>
@@ -469,7 +529,15 @@ class GameView(
       )
     )
 
-  private val movesTabDisabledProperty: ReadableProperty[Boolean] =
+  private val myMovesTabDisabledProperty: ReadableProperty[Boolean] =
+    combine(presenter.modeTypeProperty, presenter.gamePuzzleStateProperty.transform(_.nonEmpty))
+      .transform {
+        case (_, true)                                     => false
+        case (Some(PlayingModeType | GameOverModeType), _) => false
+        case _                                             => true
+      }
+
+  private val enemyMovesTabDisabledProperty: ReadableProperty[Boolean] =
     presenter.modeTypeProperty.transform {
       case Some(PlayingModeType | GameOverModeType) => false
       case _                                        => true
@@ -477,7 +545,7 @@ class GameView(
 
   private val myMovesTabButton: UdashButton =
     UdashButton(
-      disabled = movesTabDisabledProperty
+      disabled = myMovesTabDisabledProperty
     )(nested =>
       Seq[Modifier](
         `class` := "nav-link btn-outline-primary" +
@@ -493,7 +561,7 @@ class GameView(
 
   private val enemyMovesTabButton: UdashButton =
     UdashButton(
-      disabled = movesTabDisabledProperty
+      disabled = enemyMovesTabDisabledProperty
     )(nested =>
       Seq[Modifier](
         `class` := "nav-link btn-outline-primary" +
@@ -675,8 +743,8 @@ class GameView(
 
   private def turnPlaysToHtml(showCheckbox: Boolean, turnPlay: TurnPlay): Seq[dom.Element] = {
     val fleetMaxSize: Coordinate = {
-      val size =
-        gameStateModel.get.gameState.map(_.rules.gameFleet.maxSize).getOrElse(Coordinate.origin)
+      val size: Coordinate =
+        presenter.gameFleetMaxSize.get
       if (size.y > size.x)
         size.flipCoor
       else
@@ -863,13 +931,14 @@ class GameView(
         produceWithNested(
           combine(
             presenter.gameStateProperty.transform(_.nonEmpty),
+            presenter.gamePuzzleStateProperty.transform(_.nonEmpty),
             preGameModel.subProp(_.inJoinedPreGame).transform(_.nonEmpty)
           )
-        ) { case ((hasGameState, inJoinedPreGame), nested) =>
+        ) { case ((hasGameState, hasPuzzleState, inJoinedPreGame), nested) =>
           span(
             nested(
               translatedDynamic(
-                if (hasGameState || inJoinedPreGame)
+                if (hasGameState || hasPuzzleState || inJoinedPreGame)
                   Translations.Game.quitGameButton
                 else
                   Translations.Game.logoutButton
@@ -1023,6 +1092,7 @@ class GameView(
   quitGameButton.listen { _ =>
     if (
       presenter.gameStateProperty.transform(_.nonEmpty).get ||
+      presenter.gamePuzzleStateProperty.transform(_.nonEmpty).get ||
       preGameModel.subProp(_.inJoinedPreGame).transform(_.nonEmpty).get
     )
       Globals.modalToggle(quitGameModalId)
@@ -1227,27 +1297,35 @@ class GameView(
         factory.body(nested =>
           Seq[Modifier](
             `class` := "p-0",
-            nested(produceWithNested(gameStateModel.transform(_.gameState.isEmpty)) {
-              case (true, nested) =>
-                val basePreGameDiv = div.render
-
-                var handle: Int = 0
-
-                handle = window.setInterval(
-                  () => {
-                    if (basePreGameDiv.clientWidth != 0) {
-                      val innerDiv = preGameView.createComponents(basePreGameDiv, nested)
-                      basePreGameDiv.appendChild(innerDiv)
-                      window.clearTimeout(handle)
-                    }
-                  },
-                  timeout = 20
+            nested(
+              produceWithNested(
+                gameStateModel.transform(gameStateModel =>
+                  (gameStateModel.gameState.isEmpty, gameStateModel.gamePuzzleState.isEmpty)
                 )
+              ) {
+                case ((true, false), _) =>
+                  boardView.canvasDiv
+                case ((true, true), nested) =>
+                  val basePreGameDiv = div.render
 
-                basePreGameDiv
-              case (false, _) =>
-                boardView.canvasDiv
-            })
+                  var handle: Int = 0
+
+                  handle = window.setInterval(
+                    () => {
+                      if (basePreGameDiv.clientWidth != 0) {
+                        val innerDiv = preGameView.createComponents(basePreGameDiv, nested)
+                        basePreGameDiv.appendChild(innerDiv)
+                        window.clearTimeout(handle)
+                      }
+                    },
+                    timeout = 20
+                  )
+
+                  basePreGameDiv
+                case (_, _) =>
+                  boardView.canvasDiv
+              }
+            )
           )
         ),
         factory.footer(nested => nested(mainGameForm)),

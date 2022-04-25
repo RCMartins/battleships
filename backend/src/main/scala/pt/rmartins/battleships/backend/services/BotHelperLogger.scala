@@ -17,6 +17,14 @@ trait BotHelperLogger {
 
 object BotHelperLogger {
 
+  object EmptyLogger extends BotHelperLogger {
+    override def logLine(any: => Any): Unit = ()
+
+    override def logBotBoardMarks(boardSize: Coordinate, botBoardMarks: BotBoardMarks): Unit = ()
+
+    override def logBotGame(gameId: GameId, rules: Rules, turnHistory: List[TurnPlay]): Unit = ()
+  }
+
   object DefaultLogger extends BotHelperLogger {
     private val logFolder = File("log")
 
@@ -25,16 +33,16 @@ object BotHelperLogger {
 
     def logBotBoardMarks(boardSize: Coordinate, botBoardMarks: BotBoardMarks): Unit = {
       def idToChar(shipIds: Set[ShipId]): Set[String] =
-        shipIds.map(id => (if (id.id < 10) '0' + id.id else 'A' + (id.id - 10)).toChar.toString)
+        shipIds.map(shipId => Ship.shipsShortNamesMap(shipId))
 
       def printShipIds(ids: Set[String]): String = {
         val sorted = ids.toSeq.sorted
         if (sorted.size == 1)
-          "   " + sorted.mkString(",") + "   "
+          " " * 4 + sorted.mkString(",") + " " * 5
         else if (sorted.size == 2)
-          "  " + sorted.mkString(",") + "  "
+          " " * 3 + sorted.mkString(",") + " " * 3
         else if (sorted.size == 3)
-          " " + sorted.mkString(",") + " "
+          " " * 1 + sorted.mkString(",") + " " * 2
         else
           sorted.mkString(",")
       }
@@ -43,9 +51,9 @@ object BotHelperLogger {
         val strList =
           for (x <- 0 until boardSize.x) yield {
             botBoardMarks(x)(y) match {
-              case (_, Empty)                  => "       "
-              case (_, Water)                  => "   .   "
-              case (_, ShipOrWater(shipIds))   => printShipIds(idToChar(shipIds) + "W")
+              case (_, Empty)                  => " " * 11
+              case (_, Water)                  => " " * 5 + "." + " " * 5
+              case (_, ShipOrWater(shipIds))   => printShipIds(idToChar(shipIds) + "Wa")
               case (_, ShipExclusive(shipIds)) => printShipIds(idToChar(shipIds))
             }
           }
@@ -96,7 +104,7 @@ object BotHelperLogger {
                   .mkString("List(", ", ", ")"), {
                   val hits: List[String] =
                     hitHints.collect { case HitHint.ShipHit(shipId, destroyed) =>
-                      s"(${Ship.shipNames(shipId)}, $destroyed)"
+                      s"(${Ship.shipsNamesMap(shipId)}, $destroyed)"
                     }
                   if (hits.isEmpty) "Nil" else hits.mkString("List(", ", ", ")")
                 }
@@ -114,7 +122,7 @@ object BotHelperLogger {
       } else {
         val shipsStr: String =
           rules.gameFleet.shipCounterList
-            .map { case (shipId, (amount, _)) => s"(${Ship.shipNames(shipId)}, $amount)" }
+            .map { case (shipId, (amount, _)) => s"(${Ship.allShipsMap(shipId)}, $amount)" }
             .mkString(", ")
 
         file.append(s"boardSize = ${rules.boardSize.toCodeString}\n\n")
