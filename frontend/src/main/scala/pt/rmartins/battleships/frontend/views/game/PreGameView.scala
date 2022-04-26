@@ -364,24 +364,27 @@ class PreGameView(
     def updateRuleTimeLimit(): Unit =
       timeLimitProperty.set(generateRuleTimeLimitOpt)
 
-    timeLimitProperty.listen {
-      case WithoutRuleTimeLimit =>
-        totalTimeLimitCheckBox.checked = false
-        totalTimeLimit.disabled = true
-        turnTimeLimitCheckBox.checked = false
-        turnTimeLimitCheckBox.disabled = true
-        turnTimeLimit.disabled = true
-      case WithRuleTimeLimit(initialTotalTimeSeconds, additionalTurnTimeSecondsOpt) =>
-        totalTimeLimitCheckBox.checked = true
-        totalTimeLimit.disabled = false
-        totalTimeLimit.value = selectSecondsToString(initialTotalTimeSeconds)
-        turnTimeLimitCheckBox.checked = additionalTurnTimeSecondsOpt.nonEmpty
-        turnTimeLimitCheckBox.disabled = false
-        turnTimeLimit.disabled = additionalTurnTimeSecondsOpt.isEmpty
-        additionalTurnTimeSecondsOpt.foreach { case (additionalTurnTimeSeconds, _) =>
-          turnTimeLimit.value = selectSecondsToString(additionalTurnTimeSeconds)
-        }
-    }
+    timeLimitProperty.listen(
+      {
+        case WithoutRuleTimeLimit =>
+          totalTimeLimitCheckBox.checked = false
+          totalTimeLimit.disabled = true
+          turnTimeLimitCheckBox.checked = false
+          turnTimeLimitCheckBox.disabled = true
+          turnTimeLimit.disabled = true
+        case WithRuleTimeLimit(initialTotalTimeSeconds, additionalTurnTimeSecondsOpt) =>
+          totalTimeLimitCheckBox.checked = true
+          totalTimeLimit.disabled = false
+          totalTimeLimit.value = selectSecondsToString(initialTotalTimeSeconds)
+          turnTimeLimitCheckBox.checked = additionalTurnTimeSecondsOpt.nonEmpty
+          turnTimeLimitCheckBox.disabled = false
+          turnTimeLimit.disabled = additionalTurnTimeSecondsOpt.isEmpty
+          additionalTurnTimeSecondsOpt.foreach { case (additionalTurnTimeSeconds, _) =>
+            turnTimeLimit.value = selectSecondsToString(additionalTurnTimeSeconds)
+          }
+      },
+      initUpdate = true
+    )
 
     totalTimeLimitCheckBox.onchange = _ => {
       totalTimeLimit.disabled = !totalTimeLimitCheckBox.checked
