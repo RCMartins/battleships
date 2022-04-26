@@ -278,18 +278,22 @@ class GameView(
           produceWithNested(
             combine(
               gameModel.subProp(_.turnAttacksQueuedStatus),
-              presenter.isMyTurnProperty
+              presenter.isMyTurnProperty,
+              gameModel.subProp(_.turnAttacks).transform(_.count(_.isPlaced)),
+              gameModel.subProp(_.turnAttacks).transform(_.size)
             )
           ) {
-            case ((AttacksQueuedStatus.NotSet, true), nested) =>
+            case ((AttacksQueuedStatus.NotSet, true, placed, size), nested) =>
               span(
-                nested(translatedDynamic(Translations.Game.launchAttackButton)(_.apply()))
+                nested(translatedDynamic(Translations.Game.launchAttackButton)(_.apply())),
+                s" $placed/$size"
               ).render
-            case ((AttacksQueuedStatus.NotSet, false), nested) =>
+            case ((AttacksQueuedStatus.NotSet, false, placed, size), nested) =>
               span(
-                nested(translatedDynamic(Translations.Game.queueAttackButton)(_.apply()))
+                nested(translatedDynamic(Translations.Game.queueAttackButton)(_.apply())),
+                s" $placed/$size"
               ).render
-            case ((_, _), nested) =>
+            case ((_, _, _, _), nested) =>
               span(
                 nested(translatedDynamic(Translations.Game.waitForTurnButton)(_.apply()))
               ).render
