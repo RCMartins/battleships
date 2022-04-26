@@ -673,12 +673,18 @@ class GameService(rpcClientsService: RpcClientsService) {
       gameId: GameId,
       playerUsername: Username,
       shipPositions: List[ShipInBoard]
-  ): Future[Unit] =
+  ): Future[Unit] = {
+    def isValidFleet(gameFleet: Fleet, shipPositions: List[ShipInBoard]): Boolean = {
+      gameFleet.shipCounterMap.forall { case (shipId, (amount, _)) =>
+        shipPositions.count(_.ship.shipId == shipId) == amount
+      }
+    }
+
     Future {
       activeGames.get(gameId) match {
         case None =>
           sendSystemMessage(playerUsername, "Error finding game!")
-        case Some(game) if !game.gameStarted =>
+        case Some(game) if !game.gameStarted && isValidFleet(game.rules.gameFleet, shipPositions) =>
           val gameWithShips = game.placeShips(playerUsername, shipPositions)
 
           val readyToStart =
@@ -725,6 +731,7 @@ class GameService(rpcClientsService: RpcClientsService) {
           sendSystemMessage(playerUsername, "Invalid request!")
       }
     }
+  }
 
   def cancelShipsPlacement(
       gameId: GameId,

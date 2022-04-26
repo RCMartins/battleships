@@ -383,10 +383,13 @@ class GamePresenter(
       toGameState: Option[GameState]
   ): Unit = {
     (fromGameState, toGameState) match {
-      case (None, Some(GameState(_, rules, _, _, _: PlacingShipsMode))) =>
+      case (None, Some(GameState(_, rules, _, _, PlacingShipsMode(iPlacedShips, _)))) =>
         clearPreGame()
         val shipsToPlace: List[Ship] =
-          rules.gameFleet.shipsList.sortBy(_.shipBiggestToSmallestOrder)
+          if (iPlacedShips)
+            Nil
+          else
+            rules.gameFleet.shipsList.sortBy(_.shipBiggestToSmallestOrder)
         gameModel
           .subProp(_.shipsLeftToPlace)
           .set(shipsToPlace)

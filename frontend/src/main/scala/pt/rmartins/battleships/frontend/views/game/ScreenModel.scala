@@ -1,9 +1,7 @@
 package pt.rmartins.battleships.frontend.views.game
 
 import io.udash.HasModelPropertyCreator
-import org.scalajs.dom.html.Span
 import pt.rmartins.battleships.shared.model.game.{Coordinate, Turn}
-import scalatags.JsDom.all._
 
 case class ScreenModel(
     canvasSize: Coordinate,
