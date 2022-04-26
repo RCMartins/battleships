@@ -716,6 +716,8 @@ class GamePresenter(
             } yield (Coordinate(x, y), rotation)
           )
 
+        val fixedRandomGenerator = new Random(seed = 0L)
+
         def tryPlacingAllPreviewShips(): Option[(Board, Int)] = {
           val sortedShipCounters: List[(ShipId, Property[Int])] =
             allShipCounters.sortBy { case (shipId, _) => -Ship.allShipsMap(shipId).piecesSize }
@@ -724,7 +726,7 @@ class GamePresenter(
 
           def placePreviewShip(board: Board, ship: Ship): Option[Board] = {
             val result: Option[(Coordinate, Ship)] =
-              Random
+              fixedRandomGenerator
                 .shuffle(possibleCoorLazyList)
                 .map { case (coordinate, rotation) => (coordinate, ship.rotateTo(rotation)) }
                 .find { case (coordinate, shipRotated) =>
