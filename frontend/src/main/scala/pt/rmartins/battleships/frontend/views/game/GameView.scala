@@ -75,7 +75,7 @@ class GameView(
   gameModel.subProp(_.selectedShip).listen(_ => reloadBoardView())
   gameModel.subProp(_.turnAttacks).listen(_ => reloadBoardView())
   gameModel.subProp(_.turnAttacksQueuedStatus).listen(_ => reloadBoardView())
-  gameModel.subProp(_.selectedInGameMarkOpt).listen(_ => reloadBoardView())
+  gameModel.subProp(_.selectedAction).listen(_ => reloadBoardView())
   gameModel.subProp(_.lineDashOffset).listen(_ => reloadBoardView())
 
   private val startGameVsBotButton = UdashButton(

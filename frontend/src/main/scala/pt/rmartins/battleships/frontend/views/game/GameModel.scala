@@ -1,7 +1,7 @@
 package pt.rmartins.battleships.frontend.views.game
 
 import io.udash.HasModelPropertyCreator
-import pt.rmartins.battleships.frontend.views.game.BoardView.InGameMarkSelector
+import pt.rmartins.battleships.frontend.views.game.BoardView.GameAction
 import pt.rmartins.battleships.shared.model.game._
 
 case class GameModel(
@@ -11,7 +11,7 @@ case class GameModel(
     selectedShip: Option[Ship],
     turnAttacks: List[Attack],
     turnAttacksQueuedStatus: AttacksQueuedStatus,
-    selectedInGameMarkOpt: Option[InGameMarkSelector],
+    selectedAction: GameAction,
     timeRemaining: Option[(TimeRemaining, TimeRemaining)],
     lineDashOffset: Int,
     marksPlacedHistory: List[Set[(Coordinate, BoardMark, BoardMark)]]
@@ -27,7 +27,7 @@ object GameModel extends HasModelPropertyCreator[GameModel] {
       selectedShip = None,
       turnAttacks = Nil,
       turnAttacksQueuedStatus = AttacksQueuedStatus.NotSet,
-      selectedInGameMarkOpt = None,
+      selectedAction = GameAction.ShotSelector,
       timeRemaining = None,
       lineDashOffset = 0,
       marksPlacedHistory = Nil

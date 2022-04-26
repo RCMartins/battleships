@@ -9,7 +9,7 @@ import pt.rmartins.battleships.frontend.ApplicationContext.application
 import pt.rmartins.battleships.frontend.routing.{RoutingInGameState, RoutingLoginPageState}
 import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
 import pt.rmartins.battleships.frontend.services.{TranslationsService, UserContextService}
-import pt.rmartins.battleships.frontend.views.game.BoardView.InGameMarkSelector
+import pt.rmartins.battleships.frontend.views.game.BoardView.GameAction
 import pt.rmartins.battleships.frontend.views.game.JoinedPreGame.PlayingAgainstPlayer
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
@@ -1187,7 +1187,7 @@ class GamePresenter(
         setSelectedTab(ScreenModel.myMovesTab)
         gameModel.set(
           gameModel.get.copy(
-            selectedInGameMarkOpt = Some(InGameMarkSelector.ManualShipSelector)
+            selectedAction = GameAction.ManualShipSelector
           )
         )
     }

@@ -543,8 +543,7 @@ class BoardView(
         None
     }
 
-  private val BoardMarksSelectorAllPositions
-      : ReadableProperty[List[(InGameMarkSelector, Coordinate)]] =
+  private val BoardMarksSelectorAllPositions: ReadableProperty[List[(GameAction, Coordinate)]] =
     combine(
       gamePresenter.modeTypeOrPuzzleProperty,
       BoardMarksSelectorCombined
@@ -564,7 +563,7 @@ class BoardView(
         Nil
     }
 
-  val boardMarkHover: ReadableProperty[Option[InGameMarkSelector]] =
+  val boardMarkHover: ReadableProperty[Option[GameAction]] =
     combine(
       gamePresenter.mousePositionProperty,
       gamePresenter.modeTypeOrPuzzleProperty,
@@ -624,7 +623,7 @@ class BoardView(
       selectedShipOpt,
       turnAttacks,
       turnAttacksQueuedStatus,
-      selectedBoardMarkOpt,
+      selectedAction,
       _,
       _,
       _
@@ -683,7 +682,7 @@ class BoardView(
           me,
           turnAttacks,
           EnemyBoardPos.get,
-          selectedBoardMarkOpt,
+          selectedAction,
           selectedShipOpt,
           screenModelData.hoverMove,
           attacksQueuedStatus = turnAttacksQueuedStatus,
@@ -691,7 +690,7 @@ class BoardView(
           tick = screenModelData.tick
         )
 
-        drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
+        drawBoardMarksSelector(renderingCtx, selectedAction, showShootSelector = true)
         drawExtraTurnPopup(
           renderingCtx,
           turnAttacks,
@@ -734,7 +733,7 @@ class BoardView(
           me,
           Nil,
           EnemyBoardPos.get,
-          selectedBoardMarkOpt,
+          selectedAction,
           selectedShipOpt,
           screenModelData.hoverMove,
           attacksQueuedStatus = AttacksQueuedStatus.NotSet,
@@ -742,7 +741,7 @@ class BoardView(
           tick = screenModelData.tick
         )
 
-        drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
+        drawBoardMarksSelector(renderingCtx, selectedAction, showShootSelector = false)
       case None =>
         gamePresenter.gamePuzzleStateProperty.get match {
           case Some(
@@ -766,7 +765,7 @@ class BoardView(
               ),
               Nil,
               EnemyBoardPos.get,
-              selectedBoardMarkOpt,
+              selectedAction,
               selectedShipOpt,
               screenModelData.hoverMove,
               attacksQueuedStatus = AttacksQueuedStatus.NotSet,
@@ -774,7 +773,7 @@ class BoardView(
               tick = screenModelData.tick
             )
 
-            drawBoardMarksSelector(renderingCtx, selectedBoardMarkOpt)
+            drawBoardMarksSelector(renderingCtx, selectedAction, showShootSelector = false)
 
             puzzleSolutionOpt match {
               case None =>
@@ -953,7 +952,7 @@ class BoardView(
       me: Player,
       turnAttacks: List[Attack],
       boardPosition: Coordinate,
-      selectedBoardMarkOpt: Option[InGameMarkSelector],
+      selectedAction: GameAction,
       selectedShipOpt: Option[Ship],
       hoverMove: Option[Turn],
       attacksQueuedStatus: AttacksQueuedStatus,
@@ -1025,13 +1024,24 @@ class BoardView(
     }
 
     enemyBoardMouseCoordinate.get.foreach { enemyBoardCoor =>
-      selectedBoardMarkOpt match {
-        case Some(selectedBoardMark) =>
+      selectedAction match {
+        case GameAction.ShotSelector
+            if turnAttacks.exists(!_.isPlaced) &&
+              gamePresenter.isValidCoordinateTarget(enemyBoardCoor) =>
+          drawCrosshair(
+            renderingCtx,
+            boardPosition,
+            enemyBoardCoor,
+            squareSize,
+            lineWidth = 2.0,
+            alpha = 0.5
+          )
+        case _ =>
           val boardMark = me.enemyBoardMarks(enemyBoardCoor.x)(enemyBoardCoor.y)._2
-          (boardMark, selectedBoardMark) match {
+          (boardMark, selectedAction) match {
             case (
                   BoardMark.ShipHit | BoardMark.ManualShip,
-                  InGameMarkSelector.FillWaterSelector
+                  GameAction.FillWaterSelector
                 ) =>
               drawImageAbs(
                 renderingCtx,
@@ -1044,26 +1054,14 @@ class BoardView(
               )
             case (boardMark, _) if !boardMark.isPermanent =>
               val canvasColor: CanvasColor =
-                selectedBoardMark match {
-                  case InGameMarkSelector.ManualWaterSelector => CanvasColor.Water(alpha = 0.5)
-                  case InGameMarkSelector.ManualShipSelector  => CanvasColor.Ship(alpha = 0.5)
-                  case _                                      => CanvasColor.White()
+                selectedAction match {
+                  case GameAction.ManualWaterSelector => CanvasColor.Water(alpha = 0.5)
+                  case GameAction.ManualShipSelector  => CanvasColor.Ship(alpha = 0.5)
+                  case _                              => CanvasColor.White()
                 }
               drawBoardSquare(renderingCtx, boardPosition, enemyBoardCoor, squareSize, canvasColor)
             case _ =>
           }
-        case None
-            if turnAttacks.exists(!_.isPlaced) &&
-              gamePresenter.isValidCoordinateTarget(enemyBoardCoor) =>
-          drawCrosshair(
-            renderingCtx,
-            boardPosition,
-            enemyBoardCoor,
-            squareSize,
-            lineWidth = 2.0,
-            alpha = 0.5
-          )
-        case _ =>
       }
     }
 
@@ -1289,40 +1287,56 @@ class BoardView(
 
   def drawBoardMarksSelector(
       renderingCtx: CanvasRenderingContext2D,
-      selectedBoardMarkOpt: Option[InGameMarkSelector]
+      selectedAction: GameAction,
+      showShootSelector: Boolean
   ): Unit = {
     val boardMarksSize = BoardMarksSelectorSize.get
 
-    val selected = selectedBoardMarkOpt.orElse(boardMarkHover.get)
-
     BoardMarksSelectorAllPositions.get.foreach { case (boardMark, position) =>
       val canvasBorder: CanvasBorder =
-        if (selected.contains(boardMark))
+        if (selectedAction == boardMark)
           CanvasBorder.RedBold()
         else
           CanvasBorder.Standard()
 
-      val canvasColor =
+      val canvasColorOpt =
         boardMark match {
-          case InGameMarkSelector.ManualWaterSelector =>
-            CanvasColor.Water(canvasBorder)
-          case InGameMarkSelector.ManualShipSelector | InGameMarkSelector.FillWaterSelector =>
-            CanvasColor.Ship(canvasBorder)
+          case GameAction.ManualWaterSelector =>
+            Some(CanvasColor.Water(canvasBorder))
+          case GameAction.ManualShipSelector | GameAction.FillWaterSelector =>
+            Some(CanvasColor.Ship(canvasBorder))
+          case GameAction.ShotSelector if showShootSelector =>
+            Some(CanvasColor.White(canvasBorder))
           case _ =>
-            CanvasColor.White(canvasBorder)
+            None
         }
-      drawBoardSquare(renderingCtx, position, Coordinate.origin, boardMarksSize, canvasColor)
 
-      if (boardMark == InGameMarkSelector.FillWaterSelector) {
-        drawImageAbs(
-          renderingCtx,
-          fillWaterImage.element,
-          x = position.x + 3,
-          y = position.y + 3,
-          boardMarksSize - 6,
-          boardMarksSize - 6,
-          useAntiAliasing = true
-        )
+      canvasColorOpt.foreach { canvasColor =>
+        drawBoardSquare(renderingCtx, position, Coordinate.origin, boardMarksSize, canvasColor)
+      }
+
+      boardMark match {
+        case GameAction.FillWaterSelector =>
+          drawImageAbs(
+            renderingCtx,
+            fillWaterImage.element,
+            x = position.x + 3,
+            y = position.y + 3,
+            boardMarksSize - 6,
+            boardMarksSize - 6,
+            useAntiAliasing = true
+          )
+        case GameAction.ShotSelector if showShootSelector =>
+          drawImageAbs(
+            renderingCtx,
+            attackSimpleImage.element,
+            x = position.x + 3,
+            y = position.y + 3,
+            boardMarksSize - 6,
+            boardMarksSize - 6,
+            useAntiAliasing = true
+          )
+        case _ =>
       }
     }
   }
@@ -1504,31 +1518,30 @@ object BoardView {
   val CanvasSize: Coordinate =
     Coordinate(1000, 20 + 300 + BoardMarkMargin * 2 + BoardMarkSize)
 
-  sealed trait InGameMarkSelector {
-    def matches(currentBoardMark: BoardMark): Boolean
+  sealed trait GameAction
+
+  object GameAction {
+
+    case object ShotSelector extends GameAction
+
+    case object ManualShipSelector extends GameAction
+
+    case object ManualWaterSelector extends GameAction
+
+    case object FillWaterSelector extends GameAction
+
+    object BoardMarkSelector {
+      def unapply(gameAction: GameAction): Boolean = gameAction != ShotSelector
+    }
+
   }
 
-  object InGameMarkSelector {
-
-    case object ManualShipSelector extends InGameMarkSelector {
-      override def matches(boardMark: BoardMark): Boolean = boardMark.isShip
-    }
-
-    case object ManualWaterSelector extends InGameMarkSelector {
-      override def matches(boardMark: BoardMark): Boolean = boardMark.isWater
-    }
-
-    case object FillWaterSelector extends InGameMarkSelector {
-      override def matches(boardMark: BoardMark): Boolean = false
-    }
-
-  }
-
-  val MarksSelectorOrder: List[InGameMarkSelector] =
+  val MarksSelectorOrder: List[GameAction] =
     List(
-      InGameMarkSelector.ManualShipSelector,
-      InGameMarkSelector.ManualWaterSelector,
-      InGameMarkSelector.FillWaterSelector
+      GameAction.ShotSelector,
+      GameAction.ManualShipSelector,
+      GameAction.ManualWaterSelector,
+      GameAction.FillWaterSelector
     )
 
   val MissilesInitialPopupTime: Int = 2000

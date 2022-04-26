@@ -2,7 +2,8 @@ package pt.rmartins.battleships.frontend.views.game
 
 import com.softwaremill.quicklens.ModifyPimp
 import io.udash._
-import pt.rmartins.battleships.frontend.views.game.BoardView.InGameMarkSelector
+import pt.rmartins.battleships.frontend.views.game.BoardView.GameAction
+import pt.rmartins.battleships.frontend.views.game.BoardView.GameAction._
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game._
@@ -41,12 +42,12 @@ class MousePresenter(
       gamePresenter.gamePuzzleStateProperty.get
     ) match {
       case (
-            GameModel(_, Some(_), Some(button @ (0 | 2)), _, _, _, selectedBoardMarkOpt, _, _, _),
+            GameModel(_, Some(_), Some(button @ (0 | 2)), _, _, _, selectedAction, _, _, _),
             Some(gameState @ GameState(gameId, _, me, _, PlayingOrGameOver())),
             None
-          ) =>
-        (boardView.enemyBoardMouseCoordinate.get, selectedBoardMarkOpt, button) match {
-          case (Some(enemyBoardCoor), _, 2) =>
+          ) if selectedAction != ShotSelector =>
+        (boardView.enemyBoardMouseCoordinate.get, button) match {
+          case (Some(enemyBoardCoor), 2) =>
             removeBoardMark(me.enemyBoardMarks, enemyBoardCoor).foreach {
               case (boardMarksUpdated, updatedBoardMarksList) =>
                 gamePresenter.gameStateProperty.set(
@@ -54,9 +55,9 @@ class MousePresenter(
                 )
                 gameRpc.sendBoardMarks(gameId, updatedBoardMarksList)
             }
-          case (Some(enemyBoardCoor), Some(selectedBoardMark), 0) =>
+          case (Some(enemyBoardCoor), 0) =>
             setBoardMark(
-              selectedBoardMark,
+              selectedAction,
               enemyBoardCoor,
               me.myBoard.boardSize,
               me.enemyBoardMarks,
@@ -70,7 +71,7 @@ class MousePresenter(
           case _ =>
         }
       case (
-            GameModel(_, Some(_), Some(button @ (0 | 2)), _, _, _, selectedBoardMarkOpt, _, _, _),
+            GameModel(_, Some(_), Some(button @ (0 | 2)), _, _, _, selectedAction, _, _, _),
             None,
             Some(
               gamePuzzleState @ GamePuzzleState(
@@ -81,17 +82,17 @@ class MousePresenter(
                 _
               )
             )
-          ) =>
-        (boardView.enemyBoardMouseCoordinate.get, selectedBoardMarkOpt, button) match {
-          case (Some(enemyBoardCoor), _, 2) =>
+          ) if selectedAction != ShotSelector =>
+        (boardView.enemyBoardMouseCoordinate.get, button) match {
+          case (Some(enemyBoardCoor), 2) =>
             removeBoardMark(boardMarks, enemyBoardCoor).foreach { case (boardMarksUpdated, _) =>
               gamePresenter.gamePuzzleStateProperty.set(
                 Some(gamePuzzleState.copy(boardMarks = boardMarksUpdated))
               )
             }
-          case (Some(enemyBoardCoor), Some(selectedBoardMark), 0) =>
+          case (Some(enemyBoardCoor), 0) =>
             setBoardMark(
-              selectedBoardMark,
+              selectedAction,
               enemyBoardCoor,
               boardSize,
               boardMarks,
@@ -294,35 +295,19 @@ class MousePresenter(
       selectedShipOpt,
       turnAttacks,
       turnAttacksSent,
-      selectedBoardMarkOpt,
+      selectedAction,
       _,
       _,
       _
     ) = gameModelValue
     val GameState(gameId, Rules(boardSize, _, _, _, _), me, _, _) = gameState
 
-    (
-      boardView.enemyBoardMouseCoordinate.get,
-      boardView.boardMarkHover.get,
-      selectedBoardMarkOpt
-    ) match {
-      case (Some(enemyBoardCoor), None, Some(selectedInGameMark)) =>
-        setBoardMark(
-          selectedInGameMark,
-          enemyBoardCoor,
-          boardSize,
-          me.enemyBoardMarks,
-          fillWaterSelectorActive = true
-        ).foreach { case (updatedBoardMarks, updatedBoardMarksList) =>
-          gamePresenter.gameStateProperty.set(
-            Some(gameState.copy(me = me.copy(enemyBoardMarks = updatedBoardMarks)))
-          )
-          gameRpc.sendBoardMarks(gameId, updatedBoardMarksList)
-        }
-      case (Some(enemyBoardCoor), None, None)
+    (boardView.enemyBoardMouseCoordinate.get, boardView.boardMarkHover.get) match {
+      case (Some(enemyBoardCoor), None)
           if gameState.gameMode.isPlaying &&
             turnAttacksSent == AttacksQueuedStatus.NotSet &&
-            gamePresenter.isValidCoordinateTarget(enemyBoardCoor) =>
+            gamePresenter.isValidCoordinateTarget(enemyBoardCoor) &&
+            selectedAction == ShotSelector =>
         def setFirstMissile(turnAttacks: List[Attack]): List[Attack] =
           turnAttacks match {
             case Nil =>
@@ -345,11 +330,23 @@ class MousePresenter(
             setFirstMissile(turnAttacks)
 
         gameModel.subProp(_.turnAttacks).set(turnAttackUpdated)
-      case (None, Some(boardMarkClicked), selectedBoardMarkOpt)
-          if !selectedBoardMarkOpt.contains(boardMarkClicked) =>
-        gameModel.subProp(_.selectedInGameMarkOpt).set(Some(boardMarkClicked))
-      case (None, None, Some(_)) =>
-        gameModel.subProp(_.selectedInGameMarkOpt).set(None)
+      case (Some(enemyBoardCoor), None) =>
+        setBoardMark(
+          selectedAction,
+          enemyBoardCoor,
+          boardSize,
+          me.enemyBoardMarks,
+          fillWaterSelectorActive = true
+        ).foreach { case (updatedBoardMarks, updatedBoardMarksList) =>
+          gamePresenter.gameStateProperty.set(
+            Some(gameState.copy(me = me.copy(enemyBoardMarks = updatedBoardMarks)))
+          )
+          gameRpc.sendBoardMarks(gameId, updatedBoardMarksList)
+        }
+      case (None, Some(newSelectedAction)) if selectedAction != newSelectedAction =>
+        gameModel.subProp(_.selectedAction).set(newSelectedAction)
+      case (None, None) if selectedAction != ShotSelector =>
+        gameModel.subProp(_.selectedAction).set(ShotSelector)
       case _ =>
     }
 
@@ -376,18 +373,14 @@ class MousePresenter(
       gameModelValue: GameModel,
       gamePuzzleState: GamePuzzleState
   ): Unit = {
-    val GameModel(_, _, _, selectedShipOpt, _, _, selectedBoardMarkOpt, _, _, _) = gameModelValue
+    val GameModel(_, _, _, selectedShipOpt, _, _, selectedAction, _, _, _) = gameModelValue
     val GamePuzzleState(_, _, puzzleBoardMarks, PlayerPuzzle(boardSize, _, _, _, _), _) =
       gamePuzzleState
 
-    (
-      boardView.enemyBoardMouseCoordinate.get,
-      boardView.boardMarkHover.get,
-      selectedBoardMarkOpt
-    ) match {
-      case (Some(enemyBoardCoor), None, Some(selectedInGameMark)) =>
+    (boardView.enemyBoardMouseCoordinate.get, boardView.boardMarkHover.get) match {
+      case (Some(enemyBoardCoor), None) if selectedAction != ShotSelector =>
         setBoardMark(
-          selectedInGameMark,
+          selectedAction,
           enemyBoardCoor,
           boardSize,
           puzzleBoardMarks,
@@ -397,11 +390,10 @@ class MousePresenter(
             Some(gamePuzzleState.modify(_.boardMarks).setTo(updatedBoardMarks))
           )
         }
-      case (None, Some(boardMarkClicked), selectedBoardMarkOpt)
-          if !selectedBoardMarkOpt.contains(boardMarkClicked) =>
-        gameModel.subProp(_.selectedInGameMarkOpt).set(Some(boardMarkClicked))
-      case (None, None, Some(_)) =>
-        gameModel.subProp(_.selectedInGameMarkOpt).set(None)
+      case (None, Some(newSelectedAction)) if selectedAction != newSelectedAction =>
+        gameModel.subProp(_.selectedAction).set(newSelectedAction)
+      case (None, None) if selectedAction != ShotSelector =>
+        gameModel.subProp(_.selectedAction).set(ShotSelector)
       case _ =>
     }
 
@@ -417,27 +409,18 @@ class MousePresenter(
         if (wheelRotation != 0)
           gamePresenter.rotateSelectedShip(wheelRotation)
       case modeTypePair @ ((Some(PlayingModeType | GameOverModeType), _) | (_, true)) =>
-        val nextIndex: Option[Int] =
-          gameModel.get.selectedInGameMarkOpt.flatMap(selectedInGameMark =>
-            BoardView.MarksSelectorOrder.zipWithIndex.find(_._1 == selectedInGameMark)
-          ) match {
-            case None if wheelRotation > 0 =>
-              Some(0)
-            case None if wheelRotation < 0 =>
-              Some(BoardView.MarksSelectorOrder.size - 1)
-            case Some((_, currentIndex)) =>
-              if (modeTypePair._1.contains(PlayingModeType))
-                Some(currentIndex + wheelRotation)
-                  .filter(index => index >= 0 && index < BoardView.MarksSelectorOrder.size)
-              else
-                Some(
-                  (currentIndex + wheelRotation + BoardView.MarksSelectorOrder.size) %
-                    BoardView.MarksSelectorOrder.size
-                )
-          }
+        val currentIndex: Int =
+          BoardView.MarksSelectorOrder.indexOf(gameModel.get.selectedAction)
+        val nextIndex: Int =
+          if (modeTypePair._1.contains(PlayingModeType))
+            (currentIndex + wheelRotation + BoardView.MarksSelectorOrder.size) %
+              BoardView.MarksSelectorOrder.size
+          else
+            (((currentIndex - 1) + wheelRotation + BoardView.MarksSelectorOrder.size - 1) %
+              (BoardView.MarksSelectorOrder.size - 1)) + 1
         gameModel
-          .subProp(_.selectedInGameMarkOpt)
-          .set(nextIndex.map(BoardView.MarksSelectorOrder))
+          .subProp(_.selectedAction)
+          .set(BoardView.MarksSelectorOrder(nextIndex))
       case _ =>
     }
   }
@@ -473,7 +456,7 @@ class MousePresenter(
   }
 
   private def setBoardMark(
-      selectedInGameMark: InGameMarkSelector,
+      selectedInGameMark: GameAction,
       boardCoordinate: Coordinate,
       boardSize: Coordinate,
       boardMarks: BoardMarks,
@@ -481,11 +464,11 @@ class MousePresenter(
   ): Option[(BoardMarks, List[(Coordinate, BoardMark)])] = {
     val updatedBoardMarksList: List[(Coordinate, BoardMark, BoardMark)] =
       (selectedInGameMark match {
-        case InGameMarkSelector.ManualShipSelector =>
+        case ManualShipSelector =>
           List((boardCoordinate, BoardMark.ManualShip))
-        case InGameMarkSelector.ManualWaterSelector =>
+        case ManualWaterSelector =>
           List((boardCoordinate, BoardMark.ManualWater))
-        case InGameMarkSelector.FillWaterSelector if fillWaterSelectorActive =>
+        case FillWaterSelector if fillWaterSelectorActive =>
           def isShip(coordinate: Coordinate): Boolean =
             boardMarks(coordinate.x)(coordinate.y)._2.isShip
 
