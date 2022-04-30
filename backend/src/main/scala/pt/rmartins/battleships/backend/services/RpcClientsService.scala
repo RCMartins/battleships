@@ -57,6 +57,24 @@ class RpcClientsService(sendToClientFactory: ClientRPCTarget => MainClientRPC) {
     authClients.remove(clientId).foreach(ctx => clientUsernames.remove(ctx.username.toLowerCase))
   }
 
+  def sendInviteRequest(clientId: ClientId, inviterUsername: Username): Unit =
+    authClients.get(clientId) match {
+      case Some(_) =>
+        sendToClient(clientId).game().sendInviteRequest(inviterUsername)
+      case _ =>
+    }
+
+  def sendInviteResponse(
+      clientId: ClientId,
+      invitedUsername: Username,
+      inviteAnswer: Boolean
+  ): Unit =
+    authClients.get(clientId) match {
+      case Some(_) =>
+        sendToClient(clientId).game().sendInviteResponse(invitedUsername, inviteAnswer)
+      case _ =>
+    }
+
   def sendPreGameState(clientId: ClientId, preGameState: PreGameState): Unit =
     authClients.get(clientId) match {
       case Some(_) =>
@@ -121,13 +139,14 @@ class RpcClientsService(sendToClientFactory: ClientRPCTarget => MainClientRPC) {
       case _ =>
     }
 
-  def sendMessage(clientId: ClientId, message: String): Unit = {
+  def sendMessage(clientId: ClientId, message: String): Unit =
     sendToClient(clientId).chat().newMessage(ChatMessage(message, "System", new Date()))
-  }
 
-  def sendMessage(clientId: ClientId, chatMessage: ChatMessage): Unit = {
+  def sendMessage(clientId: ClientId, chatMessage: ChatMessage): Unit =
     sendToClient(clientId).chat().newMessage(chatMessage)
-  }
+
+  def sendUserErrorMessage(clientId: ClientId, userError: UserError): Unit =
+    sendToClient(clientId).game().newUserErrorMessage(userError)
 
 }
 

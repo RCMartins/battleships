@@ -6,12 +6,15 @@ import pt.rmartins.battleships.shared.model.game._
 
 /** Provides notifications about new messages and connections status. */
 class NotificationsCenter {
+
   private[rpc] val logInListeners: CallbacksHandler[String] =
     new CallbacksHandler[String]
   private[rpc] val msgListeners: CallbacksHandler[ChatMessage] =
     new CallbacksHandler[ChatMessage]
-  private[rpc] val quitGameListeners: CallbacksHandler[Unit] =
-    new CallbacksHandler[Unit]
+  private[rpc] val sendInviteRequestListeners: CallbacksHandler[Username] =
+    new CallbacksHandler[Username]
+  private[rpc] val sendInviteResponseListeners: CallbacksHandler[(Username, Boolean)] =
+    new CallbacksHandler[(Username, Boolean)]
   private[rpc] val preGameStateListeners: CallbacksHandler[PreGameState] =
     new CallbacksHandler[PreGameState]
   private[rpc] val preGameConfirmStateListeners: CallbacksHandler[(Boolean, Boolean)] =
@@ -30,6 +33,11 @@ class NotificationsCenter {
   private[rpc] val receiveHitsListeners: CallbacksHandler[Seq[Coordinate]] =
     new CallbacksHandler[Seq[Coordinate]]
 
+  private[rpc] val quitGameListeners: CallbacksHandler[Unit] =
+    new CallbacksHandler[Unit]
+  private[rpc] val userErrorMessageListeners: CallbacksHandler[UserError] =
+    new CallbacksHandler[UserError]
+
   def onLogin(
       callback: logInListeners.CallbackType
   ): Registration =
@@ -37,6 +45,16 @@ class NotificationsCenter {
 
   def onNewMsg(callback: msgListeners.CallbackType): Registration =
     msgListeners.register(callback)
+
+  def onSendInviteRequest(
+      callback: sendInviteRequestListeners.CallbackType
+  ): Registration =
+    sendInviteRequestListeners.register(callback)
+
+  def onSendInviteAnwser(
+      callback: sendInviteResponseListeners.CallbackType
+  ): Registration =
+    sendInviteResponseListeners.register(callback)
 
   def onUpdatePreGameState(
       callback: preGameStateListeners.CallbackType
@@ -63,11 +81,6 @@ class NotificationsCenter {
   ): Registration =
     gamePlayerRequestAnswerListeners.register(callback)
 
-  def onQuitGame(
-      callback: quitGameListeners.CallbackType
-  ): Registration =
-    quitGameListeners.register(callback)
-
   def onGameState(
       callback: gameStateListeners.CallbackType
   ): Registration =
@@ -82,5 +95,15 @@ class NotificationsCenter {
       callback: receiveHitsListeners.CallbackType
   ): Registration =
     receiveHitsListeners.register(callback)
+
+  def onQuitGame(
+      callback: quitGameListeners.CallbackType
+  ): Registration =
+    quitGameListeners.register(callback)
+
+  def onUserErrorMessage(
+      callback: userErrorMessageListeners.CallbackType
+  ): Registration =
+    userErrorMessageListeners.register(callback)
 
 }

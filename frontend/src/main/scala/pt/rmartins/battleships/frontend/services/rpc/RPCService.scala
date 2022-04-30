@@ -8,6 +8,8 @@ class RPCService(notificationsCenter: NotificationsCenter) extends MainClientRPC
 
   override def game(): GameNotificationsRPC =
     new GameService(
+      notificationsCenter.sendInviteRequestListeners,
+      notificationsCenter.sendInviteResponseListeners,
       notificationsCenter.preGameStateListeners,
       notificationsCenter.preGameConfirmStateListeners,
       notificationsCenter.preGameEnemyRulesPatchListeners,
@@ -15,7 +17,8 @@ class RPCService(notificationsCenter: NotificationsCenter) extends MainClientRPC
       notificationsCenter.gamePlayerRequestAnswerListeners,
       notificationsCenter.gameStateListeners,
       notificationsCenter.gameModeListeners,
-      notificationsCenter.quitGameListeners
+      notificationsCenter.quitGameListeners,
+      notificationsCenter.userErrorMessageListeners
     )
 
   override val chat: ChatNotificationsRPC =

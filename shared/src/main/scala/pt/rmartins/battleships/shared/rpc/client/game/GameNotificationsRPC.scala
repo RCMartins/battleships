@@ -5,6 +5,10 @@ import pt.rmartins.battleships.shared.model.game._
 
 trait GameNotificationsRPC {
 
+  def sendInviteRequest(inviterUsername: Username): Unit
+
+  def sendInviteResponse(invitedUsername: Username, inviteAnswer: Boolean): Unit
+
   def sendPreGameState(preGameState: PreGameState): Unit
 
   def sendPreGameConfirmState(acceptedRules: Boolean, enemyAcceptedRules: Boolean): Unit
@@ -20,6 +24,8 @@ trait GameNotificationsRPC {
   def gameModeUpdate(gameMode: GameMode): Unit
 
   def sendQuitGame(): Unit
+
+  def newUserErrorMessage(userError: UserError): Unit
 
 }
 

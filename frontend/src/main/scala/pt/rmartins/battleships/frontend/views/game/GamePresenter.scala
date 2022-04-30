@@ -62,10 +62,11 @@ class GamePresenter(
 
   val enemyUsernameProperty: ReadableProperty[Option[Username]] =
     combine(
+      preGameModel.subProp(_.inviterUsername),
       preGameModel.subProp(_.inJoinedPreGame).transform(_.flatMap(_.enemyUsernameOpt)),
       gameStateModel.transform(_.gameState.map(_.enemy.username))
-    ).transform { case (preGameEnemy, inGameEnemy) =>
-      preGameEnemy.orElse(inGameEnemy)
+    ).transform { case (inviterUsername, preGameEnemy, inGameEnemy) =>
+      inviterUsername.orElse(preGameEnemy.orElse(inGameEnemy))
     }
 
   val gameModeProperty: Property[Option[GameMode]] =
@@ -159,7 +160,28 @@ class GamePresenter(
     chatModel.subSeq(_.msgs).append(msg)
   }
 
-  private val onUpdatePreGameCallback = notificationsCenter.onUpdatePreGameState {
+  private val onSendInviteRequestCallback = notificationsCenter.onSendInviteRequest {
+    inviterUsername =>
+      preGameModel
+        .subProp(_.inviterUsername)
+        .set(Some(inviterUsername))
+  }
+
+  private val onSendInviteAnswerCallback = notificationsCenter.onSendInviteAnwser {
+    case (invitedUsername, inviteAnswer) =>
+      preGameModel.subProp(_.invitedUsername).get match {
+        case Some(currentInvitesUsername) if currentInvitesUsername == invitedUsername =>
+          preGameModel.subProp(_.invitedUsername).set(None)
+          modeTypeOrPuzzleProperty.get match {
+            case (None, false) if inviteAnswer =>
+              gameRpc.startGameWithPlayer(invitedUsername, preGameRulesProperty.get)
+            case _ =>
+          }
+        case _ =>
+      }
+  }
+
+  private val onUpdatePreGameStateCallback = notificationsCenter.onUpdatePreGameState {
     case PreGameState(gameId, enemyUsername, confirmRules, enemyConfirmedRules, updateRules) =>
       preGameModel
         .subProp(_.inJoinedPreGame)
@@ -234,18 +256,6 @@ class GamePresenter(
       }
     }
 
-  private val onQuitGameCallback = notificationsCenter.onQuitGame { case _ =>
-    if (preGameModel.get.inJoinedPreGame.nonEmpty)
-      clearPreGame()
-    else {
-      val updatedGameState = None
-      updateGameState(gameStateProperty.get.map(_.gameMode), updatedGameState)
-      gameModel.set(GameModel.default)
-      gameStateProperty.set(updatedGameState)
-      screenModel.set(ScreenModel.resetScreenModel(screenModel.get))
-    }
-  }
-
   private val onGameStateCallback = notificationsCenter.onGameState { case updatedGameState =>
     val currentGameState = gameStateProperty.get
     val mergedGameState: GameState = mergeGameState(currentGameState, updatedGameState)
@@ -263,6 +273,25 @@ class GamePresenter(
       }
     updateGameState(currentGameState.map(_.gameMode), finalGameState)
     gameStateProperty.set(finalGameState)
+  }
+
+  private val onQuitGameCallback = notificationsCenter.onQuitGame { case _ =>
+    if (preGameModel.get.inJoinedPreGame.nonEmpty)
+      clearPreGame()
+    else {
+      val updatedGameState = None
+      updateGameState(gameStateProperty.get.map(_.gameMode), updatedGameState)
+      gameModel.set(GameModel.default)
+      gameStateProperty.set(updatedGameState)
+      screenModel.set(ScreenModel.resetScreenModel(screenModel.get))
+    }
+  }
+
+  private val onUserErrorMessageCallback = notificationsCenter.onUserErrorMessage {
+    case UserError.InviteItself =>
+      screenModel.subProp(_.errorModalType).set(Some(ErrorModalType.InviteItselfError))
+    case UserError.UsernameNotFound(username) =>
+      screenModel.subProp(_.errorModalType).set(Some(ErrorModalType.UsernameNotFound(username)))
   }
 
   val chatMessagesProperty: ReadableSeqProperty[ChatMessage] =
@@ -797,12 +826,12 @@ class GamePresenter(
           )
         }
 
-        val previewBoardOptProperty =
+        val previewBoardOptProperty: Property[Option[(Board, Int)]] =
           preGameModel.subProp(_.previewBoardOpt)
-        val updatedPreviewBoardOpt =
+        val updatedPreviewBoardOpt: Option[(Board, Int)] =
           tryPlacingAllPreviewShips()
 
-        previewBoardOptProperty.set(updatedPreviewBoardOpt)
+        previewBoardOptProperty.set(updatedPreviewBoardOpt, force = true)
       },
       initUpdate = true
     )
@@ -826,14 +855,18 @@ class GamePresenter(
     // remove callbacks from NotificationsCenter before exit
     msgCallback.cancel()
 
-    onUpdatePreGameCallback.cancel()
+    onSendInviteRequestCallback.cancel()
+    onSendInviteAnswerCallback.cancel()
+    onUpdatePreGameStateCallback.cancel()
     onPreGameRulesPatchCallback.cancel()
     onPreGameConfirmStateCallback.cancel()
     onPlayerRequestCallback.cancel()
     onPlayerRequestAnswerCallback.cancel()
-    onQuitGameCallback.cancel()
     onGameStateCallback.cancel()
     onGameModeCallback.cancel()
+
+    onQuitGameCallback.cancel()
+    onUserErrorMessageCallback.cancel()
   }
 
   def sendMsg(): Unit =
@@ -847,9 +880,12 @@ class GamePresenter(
       case _ =>
     }
 
-  private def createCurrentRules: Either[ErrorModalType, Rules] = {
+  def showErrorModal(errorModalType: ErrorModalType): Unit =
+    screenModel.subProp(_.errorModalType).set(Some(errorModalType), force = true)
+
+  def getCurrentRulesValidated: Either[ErrorModalType, Rules] = {
     val preGame = preGameModel.get
-    if (preGame.previewBoardOpt.exists(_._2 < PreGameModel.MinPreviewTries))
+    if (preGame.previewBoardOpt.forall(_._2 < PreGameModel.MinPreviewTries))
       Left(ErrorModalType.SmallBoardError)
     else if (preGame.rules.gameFleet.shipAmount == 0)
       Left(ErrorModalType.EmptyFleetError)
@@ -858,29 +894,30 @@ class GamePresenter(
     }
   }
 
-  def showErrorModal(errorModalType: ErrorModalType): Unit =
-    screenModel.subProp(_.errorModalType).set(Some(errorModalType), force = true)
-
   def startGameWithBots(): Unit =
-    createCurrentRules match {
+    getCurrentRulesValidated match {
       case Left(errorModalType) => showErrorModal(errorModalType)
       case Right(rules)         => gameRpc.startGameWithBots(rules)
     }
 
   def invitePlayer(otherPlayerUsername: Username): Unit =
-    if (otherPlayerUsername.username.nonEmpty)
-      createCurrentRules match {
-        case Left(errorModalType) => showErrorModal(errorModalType)
-        case Right(rules)         => gameRpc.invitePlayer(otherPlayerUsername, rules)
-      }
+    if (otherPlayerUsername.username.nonEmpty) {
+      preGameModel.subProp(_.invitedUsername).set(Some(otherPlayerUsername))
+      gameRpc.invitePlayer(otherPlayerUsername)
+    }
 
   def confirmRules(): Unit =
     preGameModel.subProp(_.inJoinedPreGame).get match {
       case Some(playingAgainstPlayer @ PlayingAgainstPlayer(gameId, false, _, _)) =>
-        preGameModel
-          .subProp(_.inJoinedPreGame)
-          .set(Some(playingAgainstPlayer.copy(confirmed = true)))
-        gameRpc.confirmRules(gameId)
+        getCurrentRulesValidated match {
+          case Left(errorModalType) =>
+            showErrorModal(errorModalType)
+          case Right(_) =>
+            preGameModel
+              .subProp(_.inJoinedPreGame)
+              .set(Some(playingAgainstPlayer.copy(confirmed = true)))
+            gameRpc.confirmRules(gameId)
+        }
       case _ =>
     }
 
@@ -1154,6 +1191,13 @@ class GamePresenter(
         gameRpc.addToEnemyTimeSeconds(gameId, secondsToAdd)
       case _ =>
     }
+
+  def answerInvitePlayerRequest(answer: Boolean): Unit = {
+    preGameModel.subProp(_.inviterUsername).get.foreach { inviterUsername =>
+      preGameModel.subProp(_.inviterUsername).set(None)
+      gameRpc.sendPlayerInviteAnswer(inviterUsername, answer)
+    }
+  }
 
   def requestEditRules(): Unit =
     gameStateProperty.get match {

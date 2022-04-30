@@ -5,6 +5,8 @@ import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.rpc.client.game.GameNotificationsRPC
 
 class GameService(
+    sendInviteRequestListeners: CallbacksHandler[Username],
+    sendInviteResponseListeners: CallbacksHandler[(Username, Boolean)],
     preGameStateListeners: CallbacksHandler[PreGameState],
     preGameConfirmStateListeners: CallbacksHandler[(Boolean, Boolean)],
     preGameEnemyRulesPatchListeners: CallbacksHandler[PreGameRulesPatch],
@@ -12,8 +14,15 @@ class GameService(
     gamePlayerRequestAnswerListeners: CallbacksHandler[(PlayerRequestType, Boolean)],
     gameStateListeners: CallbacksHandler[GameState],
     gameModeListeners: CallbacksHandler[GameMode],
-    quitGameListeners: CallbacksHandler[Unit]
+    quitGameListeners: CallbacksHandler[Unit],
+    userErrorMessageListeners: CallbacksHandler[UserError]
 ) extends GameNotificationsRPC {
+
+  override def sendInviteRequest(inviterUsername: Username): Unit =
+    sendInviteRequestListeners.fire(inviterUsername)
+
+  override def sendInviteResponse(invitedUsername: Username, inviteAnswer: Boolean): Unit =
+    sendInviteResponseListeners.fire((invitedUsername, inviteAnswer))
 
   override def sendPreGameState(preGameState: PreGameState): Unit =
     preGameStateListeners.fire(preGameState)
@@ -41,5 +50,8 @@ class GameService(
 
   override def sendQuitGame(): Unit =
     quitGameListeners.fire(())
+
+  override def newUserErrorMessage(userError: UserError): Unit =
+    userErrorMessageListeners.fire(userError)
 
 }

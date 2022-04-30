@@ -12,7 +12,11 @@ trait GameRPC {
 
   def startGameWithBots(rules: Rules): Future[Unit]
 
-  def invitePlayer(otherPlayerUsername: Username, rules: Rules): Future[Unit]
+  def invitePlayer(otherPlayerUsername: Username): Future[Unit]
+
+  def sendPlayerInviteAnswer(inviterUsername: Username, answer: Boolean): Future[Unit]
+
+  def startGameWithPlayer(otherPlayerUsername: Username, rules: Rules): Future[Unit]
 
   def confirmRules(gameId: GameId): Future[Unit]
 

@@ -17,6 +17,7 @@ import org.scalajs.dom
 import org.scalajs.dom._
 import org.scalajs.dom.html.{Canvas, Div, Input, LI, Span}
 import pt.rmartins.battleships.frontend.services.TranslationsService
+import pt.rmartins.battleships.frontend.views.game.ErrorModalType._
 import pt.rmartins.battleships.frontend.views.game.JoinedPreGame.PlayingAgainstPlayer
 import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
@@ -94,17 +95,34 @@ class GameView(
     Seq[Modifier](span(nested(translatedDynamic(Translations.Game.invitePlayerButton)(_.apply()))))
   )
 
-  private val confirmRulesButton = UdashButton(
-    buttonStyle = Color.Primary.toProperty,
+  private val cancelPlayerInviteButton = UdashButton(
+    buttonStyle = Color.Danger.toProperty,
     block = true.toProperty,
-    componentId = ComponentId("confirm-rules-button"),
-    disabled = preGameModel.subProp(_.inJoinedPreGame).transform {
-      case Some(PlayingAgainstPlayer(_, true, _, _)) => true
-      case _                                         => false
-    }
+    componentId = ComponentId("cancel-invite-player-button")
   )(nested =>
-    Seq[Modifier](span(nested(translatedDynamic(Translations.Game.confirmRulesButton)(_.apply()))))
+    Seq[Modifier](
+      span(nested(translatedDynamic(Translations.Game.cancelInvitePlayerButton)(_.apply())))
+    )
   )
+
+  private val confirmRulesButton = {
+    val isConfirmedProperty: ReadableProperty[Boolean] =
+      preGameModel.subProp(_.inJoinedPreGame).transform {
+        case Some(PlayingAgainstPlayer(_, true, _, _)) => true
+        case _                                         => false
+      }
+
+    UdashButton(
+      buttonStyle = Color.Primary.toProperty,
+      block = true.toProperty,
+      componentId = ComponentId("confirm-rules-button"),
+      disabled = isConfirmedProperty
+    )(nested =>
+      Seq[Modifier](
+        span(nested(translatedDynamic(Translations.Game.confirmRulesButton)(_.apply())))
+      )
+    )
+  }
 
   private val cancelRulesButton =
     UdashButton(
@@ -360,17 +378,29 @@ class GameView(
       nested(
         produceWithNested(
           combine(
+            preGameModel.subProp(_.invitedUsername),
             preGameModel.subProp(_.inJoinedPreGame),
             presenter.modeTypeProperty,
             presenter.placingShipsModeProperty,
             presenter.gamePuzzleStateProperty
           )
         ) {
-          case ((Some(_), _, _, _), nested) =>
+          case ((Some(Username(invitedUsername)), _, _, _, _), nested) =>
+            div(
+              `class` := "row mx-0",
+              div(`class` := "mr-2", cancelPlayerInviteButton),
+              div(
+                `class` := "mt-1",
+                nested(translatedDynamic(Translations.Game.waitingPlayerInvitation)(_.apply())),
+                span(" (", b(invitedUsername), ")")
+              )
+            ).render
+          case ((_, Some(_), _, _, _), nested) =>
             div(
               `class` := "row mx-0",
               div(`class` := "ml-2", cancelRulesButton),
               div(`class` := "mx-2", confirmRulesButton),
+              // TODO why using produceWithNested here if we already have inJoinedPreGame value?
               nested(produceWithNested(preGameModel.subProp(_.inJoinedPreGame)) {
                 case (Some(PlayingAgainstPlayer(_, _, true, _)), nested) =>
                   div(
@@ -381,7 +411,7 @@ class GameView(
                   div.render
               })
             ).render
-          case ((_, _, _, Some(GamePuzzleState(_, _, _, _, Some(_)))), _) =>
+          case ((_, _, _, _, Some(GamePuzzleState(_, _, _, _, Some(_)))), _) =>
             div(
               `class` := "row justify-content-between mx-0",
               div(
@@ -390,12 +420,12 @@ class GameView(
               ),
               div(`class` := "mx-2", nextPuzzleButton)
             ).render
-          case ((_, _, _, Some(_)), _) =>
+          case ((_, _, _, _, Some(_)), _) =>
             div(
               `class` := "row mx-0",
               div(`class` := "mx-2", sendPuzzleSolutionButton)
             ).render
-          case ((_, None, _, _), _) =>
+          case ((_, _, None, _, _), _) =>
             div(
               `class` := "row justify-content-between mx-0",
               div(
@@ -406,7 +436,7 @@ class GameView(
               ),
               div(`class` := "mx-2", solvePuzzleButton)
             ).render
-          case ((_, _, Some(PlacingShipsMode(false, _)), _), _) =>
+          case ((_, _, _, Some(PlacingShipsMode(false, _)), _), _) =>
             div(
               `class` := "row justify-content-between mx-0",
               div(
@@ -418,13 +448,13 @@ class GameView(
               ),
               div(`class` := "mx-2", editRulesButton)
             ).render
-          case ((_, _, Some(PlacingShipsMode(true, _)), _), _) =>
+          case ((_, _, _, Some(PlacingShipsMode(true, _)), _), _) =>
             div(
               `class` := "row mx-0",
               div(`class` := "mx-2", undoButton),
               div(`class` := "mx-2", resetButton)
             ).render
-          case ((_, Some(PlayingModeType), _, _), _) =>
+          case ((_, _, Some(PlayingModeType), _, _), _) =>
             div(
               `class` := "row justify-content-between mx-0",
               div(
@@ -434,7 +464,7 @@ class GameView(
               ),
               div(`class` := "mx-2", hideMyBoardButton)
             ).render
-          case ((_, Some(GameOverModeType), _, _), _) =>
+          case ((_, _, Some(GameOverModeType), _, _), _) =>
             div(
               `class` := "row justify-content-between mx-0",
               div(`class` := "mx-2", rematchButton),
@@ -453,6 +483,10 @@ class GameView(
 
   invitePlayerButton.listen { _ =>
     presenter.invitePlayer(preGameModel.subProp(_.enemyUsernameText).get)
+  }
+
+  cancelPlayerInviteButton.listen { _ =>
+    preGameModel.subProp(_.invitedUsername).set(None)
   }
 
   solvePuzzleButton.listen { _ =>
@@ -956,7 +990,7 @@ class GameView(
   )
 
   private val errorModalId: String = "error-modal"
-  def startGameErrorModal(nested: NestedInterceptor): Div =
+  def generalGameErrorModal(nested: NestedInterceptor): Div =
     div(
       `class` := "modal fade",
       id := errorModalId,
@@ -966,7 +1000,16 @@ class GameView(
           `class` := "modal-content",
           div(
             `class` := "modal-header",
-            h5(nested(translatedDynamic(Translations.Game.cannotStartGameTitle)(_.apply()))),
+            nested(produceWithNested(screenModel.subProp(_.errorModalType)) {
+              case (Some(SmallBoardError | EmptyFleetError), nested) =>
+                h5(
+                  nested(translatedDynamic(Translations.Game.cannotStartGameTitle)(_.apply()))
+                ).render
+              case _ =>
+                h5(
+                  nested(translatedDynamic(Translations.Game.generalErrorTitle)(_.apply()))
+                ).render
+            }),
             span(
               FontAwesome.Solid.times,
               FontAwesome.Modifiers.Sizing.x2,
@@ -976,15 +1019,24 @@ class GameView(
           div(
             `class` := "modal-body",
             nested(produceWithNested(screenModel.subProp(_.errorModalType)) {
-              case (Some(ErrorModalType.SmallBoardError), nested) =>
+              case (Some(SmallBoardError), nested) =>
                 span(
                   nested(translatedDynamic(Translations.Game.startGameBoardSizeError)(_.apply()))
                 ).render
-              case (Some(ErrorModalType.EmptyFleetError), nested) =>
+              case (Some(EmptyFleetError), nested) =>
                 span(
                   nested(translatedDynamic(Translations.Game.startGameEmptyFleetError)(_.apply()))
                 ).render
-              case _ =>
+              case (Some(InviteItselfError), nested) =>
+                span(
+                  nested(translatedDynamic(Translations.Game.inviteItselfError)(_.apply()))
+                ).render
+              case (Some(UsernameNotFound(Username(username))), nested) =>
+                span(
+                  nested(translatedDynamic(Translations.Game.usernameNotFoundError)(_.apply())),
+                  span(" ", b(username))
+                ).render
+              case (None, _) =>
                 span.render
             })
           ),
@@ -996,6 +1048,66 @@ class GameView(
               attr("data-bs-dismiss") := "modal",
               nested(translatedDynamic(Translations.Game.closeButton)(_.apply()))
             )
+          )
+        )
+      )
+    ).render
+
+  private val acceptPlayerInviteModalId: String = "accept-player-invite-modal"
+  def acceptPlayerInviteModal(nested: NestedInterceptor): Div =
+    div(
+      `class` := "modal fade",
+      id := acceptPlayerInviteModalId,
+      attr("data-bs-backdrop") := "static",
+      div(
+        `class` := "modal-dialog",
+        div(
+          `class` := "modal-content",
+          div(
+            `class` := "modal-header",
+            h5(nested(translatedDynamic(Translations.Game.invitePlayerModalTitle)(_.apply()))),
+            span(
+              style := "cursor: pointer",
+              FontAwesome.Solid.times,
+              FontAwesome.Modifiers.Sizing.x2,
+              attr("data-bs-dismiss") := "modal"
+            )
+          ),
+          div(
+            `class` := "modal-body",
+            nested(produceWithNested(presenter.enemyUsernameProperty) {
+              case (Some(enemyUsername), nested) =>
+                span(
+                  nested(
+                    translatedDynamic(Translations.Game.invitePlayerModalBodyStart)(_.apply())
+                  ),
+                  " ",
+                  b(enemyUsername.username),
+                  " ",
+                  nested(translatedDynamic(Translations.Game.invitePlayerModalBody)(_.apply()))
+                ).render
+              case _ =>
+                span.render
+            })
+          ),
+          div(
+            `class` := "modal-footer",
+            button(
+              `class` := "btn btn-danger",
+              `type` := "button",
+              attr("data-bs-dismiss") := "modal",
+              nested(translatedDynamic(Translations.Game.modalDecline)(_.apply()))
+            ).render,
+            button(
+              `class` := "btn btn-success",
+              `type` := "button",
+              attr("data-bs-dismiss") := "modal",
+              nested(translatedDynamic(Translations.Game.modalAccept)(_.apply()))
+            ).render.tap {
+              _.onclick = _ => {
+                presenter.answerInvitePlayerRequest(true)
+              }
+            }
           )
         )
       )
@@ -1121,14 +1233,36 @@ class GameView(
       Globals.modalToggle(editRulesModalId)
   }
 
+  preGameModel.subProp(_.inviterUsername).listen {
+    case None =>
+      Globals.modalHide(acceptPlayerInviteModalId)
+    case Some(_) =>
+      Globals.modalToggle(acceptPlayerInviteModalId)
+  }
+
   override def getTemplate: Modifier = div(
     UdashCard(componentId = ComponentId("game-panel"))(factory =>
       Seq(
         factory.header(nested =>
           div(
             `class` := "row justify-content-between",
-            startGameErrorModal(nested),
+            generalGameErrorModal(nested).tap {
+              _.addEventListener(
+                "hidden.bs.modal",
+                (_: Event) => {
+                  screenModel.subProp(_.errorModalType).set(None)
+                }
+              )
+            },
             quitGameModal(nested),
+            acceptPlayerInviteModal(nested).tap {
+              _.addEventListener(
+                "hidden.bs.modal",
+                (_: Event) => {
+                  presenter.answerInvitePlayerRequest(false)
+                }
+              )
+            },
             acceptEditRulesModal(nested).tap {
               _.addEventListener(
                 "hidden.bs.modal",

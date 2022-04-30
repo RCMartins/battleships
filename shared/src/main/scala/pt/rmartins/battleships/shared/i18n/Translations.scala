@@ -30,6 +30,7 @@ object Translations {
 
   object Game {
     val chooseEnemyPlaceholder = key("game.pregame.choose_enemy_placeholder")
+    val waitingPlayerInvitation = key("game.pregame.waiting_player_invitation")
     val placeShips = key("game.header.place_ships")
     val placeShipsWaitEnemy = key("game.header.place_ships_wait_enemy")
     val placeShipsEnemyReady = key("game.header.place_ships_enemy_ready")
@@ -45,6 +46,7 @@ object Translations {
 
     val startGameVsBot = key("game.buttons.start_game_bot")
     val invitePlayerButton = key("game.buttons.invite_player")
+    val cancelInvitePlayerButton = key("game.buttons.cancel_invite_player")
     val confirmRulesButton = key("game.buttons.confirm_rules")
     val solvePuzzleButton = key("game.buttons.solve_puzzle")
     val sendPuzzleAnswerButton = key("game.buttons.send_puzzle_answer")
@@ -80,8 +82,14 @@ object Translations {
     val disabledMoves = key("game.tab.disabled_moves")
 
     val cannotStartGameTitle = key("game.modal.cannot_start_game_title")
+    val generalErrorTitle = key("game.modal.general_error_title")
     val startGameBoardSizeError = key("game.modal.start_game_board_size_error")
     val startGameEmptyFleetError = key("game.modal.start_game_empty_fleet_error")
+    val inviteItselfError = key("game.modal.invite_itself_error")
+    val usernameNotFoundError = key("game.modal.username_not_found_error")
+    val invitePlayerModalTitle = key("game.modal.invite_player_title")
+    val invitePlayerModalBodyStart = key("game.modal.invite_player_body_start")
+    val invitePlayerModalBody = key("game.modal.invite_player_body")
     val editRulesModalTitle = key("game.modal.edit_rules_title")
     val editRulesModalBodyStart = key("game.modal.edit_rules_body_start")
     val editRulesModalBody = key("game.modal.edit_rules_body")
