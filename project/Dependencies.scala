@@ -1,10 +1,9 @@
-import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
 import org.scalajs.jsdependencies.sbtplugin.JSDependenciesPlugin.autoImport._
 import sbt._
 
 object Dependencies {
-  val versionOfScala = "2.13.7"
+  val versionOfScala = "2.13.8"
 
   // Udash
   val udashVersion = "0.9.0-M24"

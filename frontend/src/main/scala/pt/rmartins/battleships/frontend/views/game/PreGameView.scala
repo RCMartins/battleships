@@ -1,11 +1,11 @@
 package pt.rmartins.battleships.frontend.views.game
 
+import io.udash._
 import io.udash.bindings.modifiers.Binding
 import io.udash.bindings.modifiers.Binding.NestedInterceptor
 import io.udash.bootstrap.utils.UdashIcons.FontAwesome
 import io.udash.css._
 import io.udash.i18n.translatedDynamic
-import io.udash._
 import org.scalajs.dom._
 import org.scalajs.dom.html.{Canvas, Div, Select}
 import pt.rmartins.battleships.frontend.services.TranslationsService

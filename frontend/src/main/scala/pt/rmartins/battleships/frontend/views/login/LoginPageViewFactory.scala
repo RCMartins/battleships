@@ -1,8 +1,8 @@
 package pt.rmartins.battleships.frontend.views.login
 
+import io.udash._
 import pt.rmartins.battleships.frontend.routing.{RoutingLoginPageState, RoutingState}
 import pt.rmartins.battleships.frontend.services._
-import io.udash._
 import pt.rmartins.battleships.shared.model.game.Username
 
 /** Prepares model, view and presenter for demo view. */

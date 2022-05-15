@@ -1,13 +1,13 @@
 package pt.rmartins.battleships.frontend
 
+import io.udash._
+import io.udash.rpc._
 import pt.rmartins.battleships.frontend.routing._
 import pt.rmartins.battleships.frontend.services.rpc.{NotificationsCenter, RPCService}
 import pt.rmartins.battleships.frontend.services.{TranslationsService, UserContextService}
 import pt.rmartins.battleships.shared.model.SharedExceptions
 import pt.rmartins.battleships.shared.rpc.client.MainClientRPC
 import pt.rmartins.battleships.shared.rpc.server.MainServerRPC
-import io.udash._
-import io.udash.rpc._
 
 object ApplicationContext {
   import scala.concurrent.ExecutionContext.Implicits.global
