@@ -16,7 +16,7 @@ trait GameRPC {
 
   def sendPlayerInviteAnswer(inviterUsername: Username, answer: Boolean): Future[Unit]
 
-  def startGameWithPlayer(otherPlayerUsername: Username, rules: Rules): Future[Unit]
+  def startPreGameWithPlayer(otherPlayerUsername: Username, rules: Rules): Future[Unit]
 
   def confirmRules(gameId: GameId): Future[Unit]
 

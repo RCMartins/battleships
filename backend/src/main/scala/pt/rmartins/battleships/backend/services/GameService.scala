@@ -421,7 +421,7 @@ class GameService(rpcClientsService: RpcClientsService) {
       }
     }
 
-  def startGameWithPlayer(
+  def startPreGameWithPlayer(
       player1Username: Username,
       player2Username: Username,
       rules: Rules
@@ -705,7 +705,7 @@ class GameService(rpcClientsService: RpcClientsService) {
         if (!oldGame.player2.isHuman)
           startGameWithBots(oldGame.player1.username, oldGame.rules)
         else
-          startGameWithPlayer(
+          startPreGameWithPlayer(
             oldGame.player1.username,
             oldGame.player2.username,
             oldGame.rules
