@@ -10,15 +10,6 @@ case class Player(
     turnPlayHistory: List[TurnPlay]
 ) {
 
-  def updateBoardMark(boardCoor: Coordinate, updatedBoardMark: BoardMark): Player =
-    copy(enemyBoardMarks =
-      BoardUtils.updateBoardMarksUsing(
-        enemyBoardMarks,
-        boardCoor,
-        { case (turnNumberOpt, _) => (turnNumberOpt, updatedBoardMark) }
-      )
-    )
-
   def enemyBoardMarksWithCoor: Vector[(Coordinate, Option[Turn], BoardMark)] =
     enemyBoardMarks.zipWithIndex.flatMap { case (vectorY, x) =>
       vectorY.zipWithIndex.map { case ((turnNumberOpt, boardMark), y) =>

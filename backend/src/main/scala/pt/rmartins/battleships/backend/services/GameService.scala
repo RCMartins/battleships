@@ -590,7 +590,7 @@ class GameService(rpcClientsService: RpcClientsService) {
     if (rules.gameFleet.shipAmount == 0)
       None
     else {
-      val simplifiedRules =
+      val simplifiedRules: Rules =
         rules.modify(_.gameFleet).using { case Fleet(shipCounterList) =>
           Fleet(shipCounterList.filterNot(_._2._1 == 0))
         }
