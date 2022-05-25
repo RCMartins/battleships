@@ -530,8 +530,12 @@ class GameService(rpcClientsService: RpcClientsService) {
                     .setTo(false)
 
                 updateServerPreGame(finalPreGame)
-                sendPreGameConfirmState(finalPreGame)
-                sendPreGameRulesPatch(finalPreGame.getEnemy(player).clientId, simpleRulesPatch)
+                if (
+                  updatedPreGame.player1.acceptedRules ||
+                  updatedPreGame.player2.acceptedRules
+                )
+                  sendPreGameConfirmState(finalPreGame)
+                sendPreGameRulesPatch(updatedPreGame.getEnemy(player).clientId, simpleRulesPatch)
             }
           }
 
@@ -1224,7 +1228,7 @@ object GameService {
       else None
 
     def getEnemy(player: PreGamePlayer): PreGamePlayer =
-      if (player == player1) player2 else player1
+      if (player.clientId == player1.clientId) player2 else player1
 
     def getPlayers(playerUsername: Username): Option[(PreGamePlayer, PreGamePlayer)] =
       getPlayer(playerUsername).map(player => (player, getEnemy(player)))
