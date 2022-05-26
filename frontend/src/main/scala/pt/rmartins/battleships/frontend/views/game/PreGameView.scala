@@ -123,7 +123,8 @@ class PreGameView(
         ship,
         destroyed = false,
         centerXCanvas = true,
-        centerYCanvas = true
+        centerYCanvas = true,
+        drawRadar = false
       )
 
     Ship.allShipsFleetMaxX.shipsList.map { ship =>
@@ -436,74 +437,85 @@ class PreGameView(
   }
 
   def createCustomShots(nested: NestedInterceptor): Modifier = {
-    val missilesSize = Coordinate(50, 50)
+    val imageSize = Coordinate.square(50)
     val missilesDistance = 30
     val MaxMissiles = 5
+    val DistanceBetweenMissileTypes = 20
+    val radarBetweenDist = 5
 
+    val canvasMaxWidth: Int =
+      (imageSize.x + missilesDistance * (MaxMissiles - 1)) +
+        DistanceBetweenMissileTypes +
+        imageSize.x * MaxMissiles + radarBetweenDist * (MaxMissiles - 1)
     val customShotsCanvas = canvas.render
-    customShotsCanvas.setAttribute(
-      "width",
-      (missilesSize.x + missilesDistance * (MaxMissiles - 1)).toString
-    )
-    customShotsCanvas.setAttribute("height", missilesSize.y.toString)
+    customShotsCanvas.setAttribute("width", canvasMaxWidth.toString)
+    customShotsCanvas.setAttribute("height", imageSize.y.toString)
 
-    def redrawCanvas(missileAmount: Int): Unit = {
-      val renderingCtx = customShotsCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
-      renderingCtx.clearRect(0, 0, customShotsCanvas.width, customShotsCanvas.height)
-
-      (0 until missileAmount).foreach { index =>
-        drawImageAbs(
-          renderingCtx,
-          attackSimpleImage.element,
-          x = missilesDistance * index,
-          y = 0,
-          missilesSize.x,
-          missilesSize.y,
-          useAntiAliasing = true
-        )
-      }
-    }
-
-    val amountCustomShots: Select =
+    val amountCustomShotsSimple: Select =
       select(
-        `class` := "form-select px-3",
-        id := "amount-custom-shots-input"
+        `class` := "form-select px-2",
+        id := "amount-custom-shots-simple-input"
       ).render
     (1 to MaxMissiles).foreach(amount =>
-      amountCustomShots.appendChild(option(amount.toString).render)
+      amountCustomShotsSimple.appendChild(option(b(amount.toString)).render)
     )
 
-    amountCustomShots.onchange = _ => {
-      val missileAmount = amountCustomShots.value.toInt
-      defaultTurnAttacksProperty.set(List.fill(missileAmount)(AttackType.Simple))
+    val amountCustomShotsRadar: Select =
+      select(
+        `class` := "form-select px-2",
+        id := "amount-custom-shots-radar-input"
+      ).render
+    (0 to MaxMissiles).foreach(amount =>
+      amountCustomShotsRadar.appendChild(option(b(amount.toString)).render)
+    )
+
+    def updateDefaultTurnAttacks(): Unit = {
+      val simpleMissileAmount = amountCustomShotsSimple.value.toInt
+      val radarAmount = amountCustomShotsRadar.value.toInt
+      defaultTurnAttacksProperty.set(
+        List.fill(simpleMissileAmount)(AttackType.Simple) ++
+          List.fill(radarAmount)(AttackType.Radar)
+      )
     }
+
+    amountCustomShotsSimple.onchange = _ => updateDefaultTurnAttacks()
+    amountCustomShotsRadar.onchange = _ => updateDefaultTurnAttacks()
+
+    def reloadDefaultTurnAttacks(defaultTurnAttacks: List[AttackType]): Unit = {
+      amountCustomShotsSimple.value = defaultTurnAttacks.count(_ == AttackType.Simple).toString
+      amountCustomShotsRadar.value = defaultTurnAttacks.count(_ == AttackType.Radar).toString
+    }
+
     defaultTurnAttacksProperty.listen(
-      { defaultTurnAttacks =>
-        amountCustomShots.value = defaultTurnAttacks.size.toString
-        redrawCanvas(amountCustomShots.value.toInt)
-      },
+      { defaultTurnAttacks => reloadDefaultTurnAttacks(defaultTurnAttacks) },
       initUpdate = true
     )
 
-    // TODO how to fix this?
-    window.setTimeout(
-      () => redrawCanvas(defaultTurnAttacksProperty.get.size),
-      100
-    )
+    val attackSimpleImageCanvas: Canvas =
+      CanvasUtils.createCanvasImage(attackSimpleImage, imageSize)
+
+    val radarImageCanvas: Canvas =
+      CanvasUtils.createCanvasImage(radarImage, imageSize)
 
     div(
       `class` := "col-6",
       div(
         `class` := "d-flex flex-wrap",
         div(
-          `class` := "btn-group m-3",
-          customShotsCanvas,
-          label(
-            `class` := "input-group-text",
-            `for` := amountCustomShots.id,
-            nested(translatedDynamic(Translations.Game.amountOfShots)(_.apply()))
-          ),
-          amountCustomShots
+          `class` := "row",
+          div(
+            `class` := "col btn-group m-3",
+            label(
+              `class` := "input-group-text",
+              `for` := amountCustomShotsSimple.id,
+              nested(translatedDynamic(Translations.Game.amountOfShots)(_.apply()))
+            ),
+            attackSimpleImageCanvas,
+            amountCustomShotsSimple,
+            div(`class` := "mx-3"),
+            radarImageCanvas,
+            amountCustomShotsRadar
+          )
         )
       )
     )

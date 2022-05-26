@@ -17,6 +17,7 @@ import org.scalajs.dom
 import org.scalajs.dom._
 import org.scalajs.dom.html.{Canvas, Div, Input, LI, Span}
 import pt.rmartins.battleships.frontend.services.TranslationsService
+import pt.rmartins.battleships.frontend.views.game.CanvasUtils.{drawImageAbs, radarImage}
 import pt.rmartins.battleships.frontend.views.game.ErrorModalType._
 import pt.rmartins.battleships.frontend.views.game.JoinedPreGame.PlayingAgainstPlayer
 import pt.rmartins.battleships.frontend.views.game.ModeType._
@@ -808,33 +809,63 @@ class GameView(
         `type` := "checkbox"
       ).render
 
-    val turnHits: Div =
+    def createWaterCanvas(drawRadar: Boolean): Seq[Modifier] =
+      Seq[Modifier](
+        viewUtils.createWaterCanvas(
+          canvasSize,
+          sqSize,
+          centerXCanvas = false,
+          centerYCanvas = true,
+          drawRadar = drawRadar
+        ),
+        viewUtils.createEmptyCanvas(x = sqSize * 2, y = canvasSize.y)
+      )
+
+    def createShitHit(shipId: ShipId, destroyed: Boolean, drawRadar: Boolean): Seq[Modifier] =
+      Seq[Modifier](
+        viewUtils.createShipCanvas(
+          canvasSize,
+          sqSize,
+          Ship.shipMaxXMessagesMap(shipId),
+          destroyed,
+          centerXCanvas = false,
+          centerYCanvas = true,
+          drawRadar = drawRadar
+        ),
+        viewUtils.createEmptyCanvas(x = sqSize * 2, y = canvasSize.y)
+      )
+
+    val turnHits: Div = {
+      val radarShots: Seq[Modifier] =
+        turnPlay.turnAttacks
+          .filter(_.attackType == AttackType.Radar)
+          .flatMap(turnAttack => turnAttack.coordinateOpt)
+          .flatMap { coor =>
+            val isHit =
+              gameStateModel.subProp(_.gameState).get match {
+                case Some(GameState(_, _, me, _, _)) =>
+                  import pt.rmartins.battleships.shared.model.utils.BoardUtils._
+                  me.enemyBoardMarks.getMarkAt(coor) == BoardMark.ShipHit
+                case _ =>
+                  false
+              }
+
+            if (isHit)
+              createShitHit(Ship.Submarine.shipId, destroyed = false, drawRadar = true)
+            else
+              createWaterCanvas(drawRadar = true)
+          }
+
       div(
         turnPlay.hitHints.flatMap {
           case HitHint.Water =>
-            Seq[Modifier](
-              viewUtils.createWaterCanvas(
-                canvasSize,
-                sqSize,
-                centerXCanvas = false,
-                centerYCanvas = true
-              ),
-              viewUtils.createEmptyCanvas(x = sqSize * 2, y = canvasSize.y)
-            )
+            createWaterCanvas(drawRadar = false)
           case HitHint.ShipHit(shipId, destroyed) =>
-            Seq[Modifier](
-              viewUtils.createShipCanvas(
-                canvasSize,
-                sqSize,
-                Ship.shipMaxXMessagesMap(shipId),
-                destroyed,
-                centerXCanvas = false,
-                centerYCanvas = true
-              ),
-              viewUtils.createEmptyCanvas(x = sqSize * 2, y = canvasSize.y)
-            )
-        }
+            createShitHit(shipId, destroyed, drawRadar = false)
+        } ++
+          radarShots
       ).render
+    }
 
     if (showCheckbox) {
       if (!screenModel.get.disabledMovesSet(turnPlay.turn))

@@ -39,4 +39,11 @@ object BoardUtils {
       y <- 0 until boardSize.y
     } yield (Coordinate(x, y), boardMarks(x)(y)._2)).toList
 
+  implicit class BoardMarksExtensions(boardMarks: BoardMarks) {
+
+    def getMarkAt(coordinate: Coordinate): BoardMark =
+      boardMarks(coordinate.x)(coordinate.y)._2
+
+  }
+
 }

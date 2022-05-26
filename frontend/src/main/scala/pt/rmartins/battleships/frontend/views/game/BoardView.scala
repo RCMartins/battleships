@@ -888,24 +888,39 @@ class BoardView(
     }
 
     turnPlayHistory.zipWithIndex.foreach { case (TurnPlay(turn, turnAttacks, _), index) =>
-      turnAttacks.flatMap(_.coordinateOpt).foreach { coor =>
-        val textSize = Math.max((MinTextSize * 0.6).toInt, (squareSize * 0.6).toInt)
-        drawTurnNumberCoor(
-          renderingCtx = renderingCtx,
-          boardPosition = boardPosition,
-          coor = coor,
-          size = squareSize,
-          turn = turn,
-          textSize = textSize
-        )
-        if (index == 0)
-          drawBoardSquare(
-            renderingCtx,
-            boardPosition,
-            coor,
-            squareSize,
-            CanvasColor.White(CanvasBorder.RedBold())
-          )
+      turnAttacks.foreach {
+        case Attack(attackType, Some(coor)) =>
+          val textSize = Math.max((MinTextSize * 0.6).toInt, (squareSize * 0.6).toInt)
+          if (attackType == AttackType.Simple)
+            drawTurnNumberCoor(
+              renderingCtx = renderingCtx,
+              boardPosition = boardPosition,
+              coor = coor,
+              size = squareSize,
+              turn = turn,
+              textSize = textSize
+            )
+          if (index == 0) {
+            if (attackType == AttackType.Radar)
+              drawImageAbs(
+                renderingCtx,
+                radarImage.element,
+                x = boardPosition.x + coor.x * squareSize + 2,
+                y = boardPosition.y + coor.y * squareSize + 2,
+                squareSize - 4,
+                squareSize - 4,
+                useAntiAliasing = true
+              )
+
+            drawBoardSquare(
+              renderingCtx,
+              boardPosition,
+              coor,
+              squareSize,
+              CanvasColor.White(CanvasBorder.RedBold())
+            )
+          }
+        case _ =>
       }
     }
 
@@ -1028,14 +1043,31 @@ class BoardView(
         case GameAction.ShotSelector
             if turnAttacks.exists(!_.isPlaced) &&
               gamePresenter.isValidCoordinateTarget(enemyBoardCoor) =>
-          drawCrosshair(
-            renderingCtx,
-            boardPosition,
-            enemyBoardCoor,
-            squareSize,
-            lineWidth = 2.0,
-            alpha = 0.5
-          )
+//          drawCrosshair(
+//            renderingCtx,
+//            boardPosition,
+//            enemyBoardCoor,
+//            squareSize,
+//            lineWidth = 2.0,
+//            alpha = 0.5
+//          )
+
+          turnAttacks.find(_.coordinateOpt.isEmpty) match {
+            case Some(Attack(attackType, _)) =>
+              val image: CanvasImage =
+                if (attackType == AttackType.Simple) attackSimpleImage else radarImage
+
+              drawImageAbs(
+                renderingCtx,
+                image.element,
+                x = boardPosition.x + enemyBoardCoor.x * squareSize + 2,
+                y = boardPosition.y + enemyBoardCoor.y * squareSize + 2,
+                squareSize - 4,
+                squareSize - 4,
+                useAntiAliasing = true
+              )
+            case None =>
+          }
         case _ =>
           val boardMark = me.enemyBoardMarks(enemyBoardCoor.x)(enemyBoardCoor.y)._2
           (boardMark, selectedAction) match {
@@ -1066,14 +1098,27 @@ class BoardView(
     }
 
     turnAttacks.foreach {
-      case Attack(_, Some(enemyBoardCoor)) =>
-        drawCrosshairAbs(
+      case Attack(attackType, Some(enemyBoardCoor)) =>
+//        drawCrosshairAbs(
+//          renderingCtx,
+//          boardPosition + enemyBoardCoor * squareSize + Coordinate.square(2),
+//          squareSize - 4,
+//          lineWidth = 2.0,
+//          alpha = 1.0,
+//          red = attacksQueuedStatus != AttacksQueuedStatus.Queued
+//        )
+
+        val image: CanvasImage =
+          if (attackType == AttackType.Simple) attackSimpleImage else radarImage
+
+        drawImageAbs(
           renderingCtx,
-          boardPosition + enemyBoardCoor * squareSize + Coordinate.square(2),
+          image.element,
+          x = boardPosition.x + enemyBoardCoor.x * squareSize + 2,
+          y = boardPosition.y + enemyBoardCoor.y * squareSize + 2,
           squareSize - 4,
-          lineWidth = 2.0,
-          alpha = 1.0,
-          red = attacksQueuedStatus != AttacksQueuedStatus.Queued
+          squareSize - 4,
+          useAntiAliasing = true
         )
       case _ =>
     }
@@ -1172,15 +1217,18 @@ class BoardView(
       Coordinate.square((currentMissilesSize - missilesSize) / 2)
 
     turnAttacks.zipWithIndex.foreach {
-      case (Attack(AttackType.Simple, coorOpt), index) =>
+      case (Attack(attackType, coorOpt), index) =>
         if (coorOpt.nonEmpty)
           renderingCtx.globalAlpha = 0.25
         else
           renderingCtx.globalAlpha = 1.0
 
+        val image: CanvasImage =
+          if (attackType == AttackType.Simple) attackSimpleImage else radarImage
+
         drawImageAbs(
           renderingCtx,
-          attackSimpleImage.element,
+          image.element,
           missilesPos.x + index * missilesPosDiff.x - currentMissilesDiff.x,
           missilesPos.y + index * missilesPosDiff.y - currentMissilesDiff.y,
           currentMissilesSize,
@@ -1225,10 +1273,13 @@ class BoardView(
         renderingCtx.fillText(extraTurnPopupText, middleX, bottomY)
 
         renderingCtx.globalAlpha = fadeAlpha
-        turnAttacks.zipWithIndex.foreach { case (Attack(_, _), index) =>
+        turnAttacks.zipWithIndex.foreach { case (Attack(attackType, _), index) =>
+          val image: CanvasImage =
+            if (attackType == AttackType.Simple) attackSimpleImage else radarImage
+
           drawImageAbs(
             renderingCtx,
-            attackSimpleImage.element,
+            image.element,
             middleX + missilesInitialPos.x + (missilesDiff * index).x,
             bottomY + missilesInitialPos.y + (missilesDiff * index).y,
             extraTurnPopupMissileSize,

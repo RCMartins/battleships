@@ -1,12 +1,13 @@
 package pt.rmartins.battleships.frontend.views.game
 
 import org.scalajs.dom
-import org.scalajs.dom.CanvasRenderingContext2D
-import org.scalajs.dom.html.Image
+import org.scalajs.dom.{CanvasRenderingContext2D, Event}
+import org.scalajs.dom.html.{Canvas, Image}
 import org.scalajs.dom.raw.HTMLImageElement
 import pt.rmartins.battleships.frontend.views.game.BoardView.MinTextSize
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasColor
 import pt.rmartins.battleships.shared.model.game.{Coordinate, Turn}
+import scalatags.JsDom.all.canvas
 
 class CanvasUtils(gamePresenter: GamePresenter) {
 
@@ -279,6 +280,9 @@ object CanvasUtils {
   val fillWaterImage: CanvasImage =
     new CanvasImage("icons/fill-water.png")
 
+  val radarImage: CanvasImage =
+    new CanvasImage("icons/radar.png")
+
   def drawImageAbs(
       renderingCtx: CanvasRenderingContext2D,
       image: Image,
@@ -290,6 +294,28 @@ object CanvasUtils {
   ): Unit = {
     renderingCtx.imageSmoothingEnabled = useAntiAliasing
     renderingCtx.drawImage(image, 0, 0, 500, 500, x, y, width, height)
+  }
+
+  def createCanvasImage(canvasImage: CanvasImage, size: Coordinate): Canvas = {
+    val newImageCanvas: Canvas = canvas.render
+    newImageCanvas.setAttribute("width", size.x.toString)
+    newImageCanvas.setAttribute("height", size.y.toString)
+
+    val renderingCtx = newImageCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+
+    canvasImage.element.onload = { (_: Event) =>
+      drawImageAbs(
+        renderingCtx,
+        canvasImage.element,
+        x = 1,
+        y = 1,
+        size.x - 2,
+        size.y - 2,
+        useAntiAliasing = true
+      )
+    }
+
+    newImageCanvas
   }
 
 }

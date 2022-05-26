@@ -21,6 +21,21 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
 
   "placeAttacks" should {
 
+    "shoot only one missile and ignore the 2 radars" in {
+      val rules = Rules(
+        boardSize = Coordinate(3, 3),
+        gameFleet = Fleet.fromShips(List(Ranger -> 1)),
+        defaultTurnAttacks = List(Simple, Radar, Radar),
+        turnBonuses = Nil,
+        timeLimit = WithoutRuleTimeLimit
+      )
+      val botHelper = createBotHelper(rules)
+
+      val result = placeAttacks(botHelper, Nil)
+
+      result.map(_.attackType) should be(List(Simple))
+    }
+
     "find Ranger ship with only 1 possible position" in {
       val rules = Rules(
         boardSize = Coordinate(3, 3),

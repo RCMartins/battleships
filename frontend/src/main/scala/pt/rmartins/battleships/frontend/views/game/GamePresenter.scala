@@ -1163,7 +1163,7 @@ class GamePresenter(
       case Some(GameState(_, _, me, _, _: PlayingMode)) =>
         val Coordinate(x, y) = enemyBoardCoor
         val (turnNumberOpt, boardMark) = me.enemyBoardMarks(x)(y)
-        turnNumberOpt.isEmpty && !boardMark.isPermanent
+        turnNumberOpt.isEmpty && boardMark != BoardMark.Water
       case _ =>
         false
     }
