@@ -1043,20 +1043,10 @@ class BoardView(
         case GameAction.ShotSelector
             if turnAttacks.exists(!_.isPlaced) &&
               gamePresenter.isValidCoordinateTarget(enemyBoardCoor) =>
-//          drawCrosshair(
-//            renderingCtx,
-//            boardPosition,
-//            enemyBoardCoor,
-//            squareSize,
-//            lineWidth = 2.0,
-//            alpha = 0.5
-//          )
-
           turnAttacks.find(_.coordinateOpt.isEmpty) match {
             case Some(Attack(attackType, _)) =>
               val image: CanvasImage =
                 if (attackType == AttackType.Simple) attackSimpleImage else radarImage
-
               drawImageAbs(
                 renderingCtx,
                 image.element,
@@ -1099,15 +1089,6 @@ class BoardView(
 
     turnAttacks.foreach {
       case Attack(attackType, Some(enemyBoardCoor)) =>
-//        drawCrosshairAbs(
-//          renderingCtx,
-//          boardPosition + enemyBoardCoor * squareSize + Coordinate.square(2),
-//          squareSize - 4,
-//          lineWidth = 2.0,
-//          alpha = 1.0,
-//          red = attacksQueuedStatus != AttacksQueuedStatus.Queued
-//        )
-
         val image: CanvasImage =
           if (attackType == AttackType.Simple) attackSimpleImage else radarImage
 
