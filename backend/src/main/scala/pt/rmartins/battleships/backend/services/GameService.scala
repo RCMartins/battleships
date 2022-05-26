@@ -820,7 +820,7 @@ class GameService(rpcClientsService: RpcClientsService) {
         case (Attack(attackType, Some(Coordinate(x, y))), expectedAttackType)
             if attackType == expectedAttackType =>
           val (hitTurnOpt, boardMark) = me.enemyBoard.boardMarks(x)(y)
-          hitTurnOpt.isEmpty && !boardMark.isPermanent
+          hitTurnOpt.isEmpty && boardMark != BoardMark.Water
         case _ =>
           false
       }
@@ -1116,6 +1116,15 @@ object GameService {
       shipsLeft: Int
   ) {
 
+    def updateMarksSimple(newForcedBoardMarks: List[(Coordinate, BoardMark)]): ServerEnemyBoard = {
+      val updatedBoardMarks: BoardMarks =
+        newForcedBoardMarks.foldLeft(boardMarks) { case (marks, (coor, boardMark)) =>
+          updateBoardMarksUsing(marks, coor, { case (turnOpt, _) => (turnOpt, boardMark) })
+        }
+
+      copy(boardMarks = updatedBoardMarks)
+    }
+
     def updateMarks(
         turn: Turn,
         hits: List[(Coordinate, Option[ShipInBoard])]
@@ -1155,7 +1164,7 @@ object GameService {
 
     lazy val hasNFreeSpaces: Int =
       boardMarks.map {
-        _.count { case (opt, boardMark) => opt.isEmpty && !boardMark.isPermanent }
+        _.count { case (opt, boardMark) => opt.isEmpty && boardMark != BoardMark.Water }
       }.sum
 
   }
@@ -1430,8 +1439,24 @@ object GameService {
   ): Game = {
     val enemy = game.enemyPlayer(player)
     val hits: List[(Coordinate, Option[ShipInBoard])] =
-      turnAttacks.map(_.coordinateOpt.get).map { case coor @ Coordinate(x, y) =>
-        coor -> enemy.myBoard.efficientShipCheck(x)(y)
+      turnAttacks
+        .filter(_.attackType == AttackType.Simple)
+        .map(_.coordinateOpt.get)
+        .map { case coor @ Coordinate(x, y) =>
+          coor -> enemy.myBoard.efficientShipCheck(x)(y)
+        }
+
+    val radarShots: List[(Coordinate, BoardMark)] =
+      turnAttacks.flatMap {
+        case Attack(AttackType.Radar, Some(coor @ Coordinate(x, y))) =>
+          val boardMark: BoardMark =
+            enemy.myBoard.efficientShipCheck(x)(y) match {
+              case Some(_) => BoardMark.ShipHit
+              case None    => BoardMark.Water
+            }
+          Some(coor -> boardMark)
+        case _ =>
+          None
       }
 
     val hitHints: List[HitHint] =
@@ -1470,6 +1495,8 @@ object GameService {
       player
         .modify(_.turnPlayHistory)
         .using(turnPlay :: _)
+        .modify(_.enemyBoard)
+        .using(_.updateMarksSimple(radarShots))
         .modify(_.enemyBoard)
         .using(_.updateMarks(currentTurn, hits))
         .modify(_.enemyBoard.shipsLeft)

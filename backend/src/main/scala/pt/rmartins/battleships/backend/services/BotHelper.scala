@@ -558,6 +558,9 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
     val turnHistory = cachedTurnPlays
     val botBoardMarks = cachedBotBoardMarks
 
+    val filteredCurrentTurnAttackTypes: List[AttackType] =
+      currentTurnAttackTypes.filter(_ == AttackType.Simple)
+
     logBotGame(gameId = gameId, rules = rules, turnHistory = turnHistory)
 
     logLine("+" * 80)
@@ -568,7 +571,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
     val random: Random = randomSeed.map(new Random(_)).getOrElse(Random)
 
     val (updatedBotBoardMarks, attackList) =
-      smarterPlaceAttacks(botBoardMarks, currentTurnAttackTypes, random)
+      smarterPlaceAttacks(botBoardMarks, filteredCurrentTurnAttackTypes, random)
 
     val validAttacks: List[Attack] =
       attackList.filter {
@@ -584,14 +587,19 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
     cachedBotBoardMarks = updatedBotBoardMarks
     if (validAttacks.isEmpty) {
       logLine(s"smarterPlaceAttacks returned an invalid attack list: $attackList")
-      shotAllRandom(botBoardMarks, currentTurnAttackTypes)
-    } else if (validAttacks.sizeIs == currentTurnAttackTypes.size) {
+      shotAllRandom(botBoardMarks, filteredCurrentTurnAttackTypes)
+    } else if (
+      validAttacks.map(_.attackType).groupBy(identity) ==
+        filteredCurrentTurnAttackTypes.groupBy(identity)
+    ) {
       validAttacks
     } else {
       validAttacks ++
         shotAllRandom(
           botBoardMarks,
-          currentTurnAttackTypes.take(currentTurnAttackTypes.size - validAttacks.size)
+          filteredCurrentTurnAttackTypes.take(
+            filteredCurrentTurnAttackTypes.size - validAttacks.size
+          )
         )
     }
   }

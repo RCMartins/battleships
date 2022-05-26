@@ -2,7 +2,7 @@ package pt.rmartins.battleships.frontend.views.game
 
 import org.scalajs.dom.CanvasRenderingContext2D
 import org.scalajs.dom.html.Canvas
-import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasColor
+import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.shared.model.game.{Coordinate, Ship}
 import scalatags.JsDom.all._
 
@@ -24,6 +24,7 @@ class ViewUtils(canvasUtils: CanvasUtils) {
       destroyed: Boolean,
       centerXCanvas: Boolean,
       centerYCanvas: Boolean,
+      drawRadar: Boolean,
       margin: Coordinate = defaultMargin
   ): Canvas = {
     val shipCanvas = canvas.render
@@ -32,16 +33,19 @@ class ViewUtils(canvasUtils: CanvasUtils) {
     shipCanvas.setAttribute("height", sizeWithMargin.y.toString)
     val renderingCtx = shipCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
     val realShipSize = ship.size * sqSize
-    val initialPosition =
+    val baseInitialPosition: Coordinate =
       margin / 2 +
         Coordinate(
           if (centerXCanvas) canvasSize.x / 2 - realShipSize.x / 2 else 0,
           if (centerYCanvas) canvasSize.y / 2 - realShipSize.y / 2 else 0
         )
+    val initialPositionShip: Coordinate =
+      baseInitialPosition +
+        (if (drawRadar) Coordinate(sqSize * 2 + margin.x, 0) else Coordinate.origin)
     ship.pieces.foreach { shipPiece =>
       canvasUtils.drawBoardSquare(
         renderingCtx,
-        initialPosition,
+        initialPositionShip,
         shipPiece,
         sqSize,
         CanvasColor.Ship()
@@ -49,12 +53,26 @@ class ViewUtils(canvasUtils: CanvasUtils) {
       if (destroyed)
         CanvasUtils.drawCrosshair(
           renderingCtx,
-          initialPosition,
+          initialPositionShip,
           shipPiece,
           sqSize,
           lineWidth = 1.5,
           alpha = 1.0
         )
+    }
+    if (drawRadar) {
+      val initialPositionRadar: Coordinate =
+        baseInitialPosition + Coordinate(0, -sqSize / 2)
+
+      drawImageAbs(
+        renderingCtx,
+        radarImage.element,
+        initialPositionRadar.x,
+        initialPositionRadar.y,
+        sqSize * 2,
+        sqSize * 2,
+        useAntiAliasing = true
+      )
     }
     shipCanvas
   }
@@ -64,6 +82,7 @@ class ViewUtils(canvasUtils: CanvasUtils) {
       sqSize: Int,
       centerXCanvas: Boolean,
       centerYCanvas: Boolean,
+      drawRadar: Boolean,
       margin: Coordinate = defaultMargin
   ): Canvas = {
     val waterCanvas = canvas.render
@@ -71,12 +90,15 @@ class ViewUtils(canvasUtils: CanvasUtils) {
     waterCanvas.setAttribute("width", sizeWithMargin.x.toString)
     waterCanvas.setAttribute("height", sizeWithMargin.y.toString)
     val renderingCtx = waterCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
-    val initialPosition =
+    val baseInitialPosition: Coordinate =
       margin / 2 +
         Coordinate(
           if (centerXCanvas) canvasSize.x / 2 - sqSize / 2 else 0,
           if (centerYCanvas) canvasSize.y / 2 - sqSize / 2 else 0
         )
+    val initialPosition: Coordinate =
+      baseInitialPosition +
+        (if (drawRadar) Coordinate(sqSize * 2 + margin.x, 0) else Coordinate.origin)
     canvasUtils.drawBoardSquare(
       renderingCtx,
       initialPosition,
@@ -84,6 +106,20 @@ class ViewUtils(canvasUtils: CanvasUtils) {
       sqSize,
       CanvasColor.Water()
     )
+    if (drawRadar) {
+      val initialPositionRadar: Coordinate =
+        baseInitialPosition + Coordinate(0, -sqSize / 2)
+
+      drawImageAbs(
+        renderingCtx,
+        radarImage.element,
+        initialPositionRadar.x,
+        initialPositionRadar.y,
+        sqSize * 2,
+        sqSize * 2,
+        useAntiAliasing = true
+      )
+    }
     waterCanvas
   }
 

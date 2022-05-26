@@ -8,4 +8,6 @@ object AttackType extends HasGenCodec[AttackType] {
 
   case object Simple extends AttackType
 
+  case object Radar extends AttackType
+
 }
