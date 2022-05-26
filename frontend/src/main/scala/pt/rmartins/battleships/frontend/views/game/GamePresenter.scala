@@ -174,7 +174,7 @@ class GamePresenter(
           preGameModel.subProp(_.invitedUsername).set(None)
           modeTypeOrPuzzleProperty.get match {
             case (None, false) if inviteAnswer =>
-              gameRpc.startGameWithPlayer(invitedUsername, preGameRulesProperty.get)
+              gameRpc.startPreGameWithPlayer(invitedUsername, preGameRulesProperty.get)
             case _ =>
           }
         case _ =>

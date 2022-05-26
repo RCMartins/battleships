@@ -421,7 +421,7 @@ class GameService(rpcClientsService: RpcClientsService) {
       }
     }
 
-  def startGameWithPlayer(
+  def startPreGameWithPlayer(
       player1Username: Username,
       player2Username: Username,
       rules: Rules
@@ -530,8 +530,12 @@ class GameService(rpcClientsService: RpcClientsService) {
                     .setTo(false)
 
                 updateServerPreGame(finalPreGame)
-                sendPreGameConfirmState(finalPreGame)
-                sendPreGameRulesPatch(finalPreGame.getEnemy(player).clientId, simpleRulesPatch)
+                if (
+                  updatedPreGame.player1.acceptedRules ||
+                  updatedPreGame.player2.acceptedRules
+                )
+                  sendPreGameConfirmState(finalPreGame)
+                sendPreGameRulesPatch(updatedPreGame.getEnemy(player).clientId, simpleRulesPatch)
             }
           }
 
@@ -590,7 +594,7 @@ class GameService(rpcClientsService: RpcClientsService) {
     if (rules.gameFleet.shipAmount == 0)
       None
     else {
-      val simplifiedRules =
+      val simplifiedRules: Rules =
         rules.modify(_.gameFleet).using { case Fleet(shipCounterList) =>
           Fleet(shipCounterList.filterNot(_._2._1 == 0))
         }
@@ -705,7 +709,7 @@ class GameService(rpcClientsService: RpcClientsService) {
         if (!oldGame.player2.isHuman)
           startGameWithBots(oldGame.player1.username, oldGame.rules)
         else
-          startGameWithPlayer(
+          startPreGameWithPlayer(
             oldGame.player1.username,
             oldGame.player2.username,
             oldGame.rules
@@ -1224,7 +1228,7 @@ object GameService {
       else None
 
     def getEnemy(player: PreGamePlayer): PreGamePlayer =
-      if (player == player1) player2 else player1
+      if (player.clientId == player1.clientId) player2 else player1
 
     def getPlayers(playerUsername: Username): Option[(PreGamePlayer, PreGamePlayer)] =
       getPlayer(playerUsername).map(player => (player, getEnemy(player)))

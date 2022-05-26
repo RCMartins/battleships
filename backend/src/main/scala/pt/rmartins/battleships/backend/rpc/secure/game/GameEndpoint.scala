@@ -29,8 +29,8 @@ class GameEndpoint(implicit
   override def sendPlayerInviteAnswer(inviterUsername: Username, answer: Boolean): Future[Unit] =
     gameService.playerInviteAnswer(ctx.username, inviterUsername, answer)
 
-  override def startGameWithPlayer(otherPlayerUsername: Username, rules: Rules): Future[Unit] =
-    gameService.startGameWithPlayer(ctx.username, otherPlayerUsername, rules)
+  override def startPreGameWithPlayer(otherPlayerUsername: Username, rules: Rules): Future[Unit] =
+    gameService.startPreGameWithPlayer(ctx.username, otherPlayerUsername, rules)
 
   override def confirmRules(gameId: GameId): Future[Unit] =
     gameService.confirmRules(gameId, ctx.username)
