@@ -17,8 +17,12 @@ jobs:
       with:
         java-version: '11'
         distribution: 'temurin'
-    - name: Deploy to production
+
+    - name: Get branch name
+      id: branch-name
       uses: tj-actions/branch-names@v5.2
+
+    - name: Deploy to production
       env: # Set Oracle credentials secret as an input
         credentials: ${{ secrets.ORACLE_CREDENTIALS_DEV }}
         branch_name: ${{ steps.branch-name.outputs.current_branch }}
