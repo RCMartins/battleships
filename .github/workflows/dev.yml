@@ -1,8 +1,6 @@
-name: Scala Production Deploy
+name: Scala Dev Deploy
 
-on:
-  push:
-    branches: [ master ]
+on: push
 
 permissions:
   contents: read
@@ -21,11 +19,11 @@ jobs:
         distribution: 'temurin'
     - name: Deploy to production
       env: # Set Oracle credentials secret as an input
-        credentials: ${{ secrets.ORACLE_CREDENTIALS_PRODUCTION }}
+        credentials: ${{ secrets.ORACLE_CREDENTIALS_DEV }}
+        branch_name: ${{ github.head_ref }}
       run: |
-        echo "$credentials" | base64 -d > ssh-key.key
-        chmod 400 ssh-key.key
-        ssh -o StrictHostKeyChecking=no -i ssh-key.key ubuntu@140.238.89.127 << EOF
+        echo "$credentials" | ssh-key.key
+        ssh -o StrictHostKeyChecking=no -i ssh-key.key ubuntu@144.21.49.17 << EOF
         sudo su -
-        ./runUpdate || (echo "Retry..." && ./runUpdate)
+        ./runUpdate "$branch_name" || (echo "Retry..." && ./runUpdate "$branch_name")
         EOF
