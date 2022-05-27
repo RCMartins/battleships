@@ -7,6 +7,7 @@ import io.udash.bootstrap.{BootstrapStyles, UdashBootstrap}
 import io.udash.component.ComponentId
 import io.udash.css.CssView
 import io.udash.i18n.Lang
+import pt.rmartins.battleships.BuildInfo
 import pt.rmartins.battleships.frontend.routing.RoutingRootState
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.shared.css.GlobalStyles
@@ -40,6 +41,7 @@ class RootView(translationsService: TranslationsService) extends ContainerView w
     BootstrapStyles.container,
     div(
       GlobalStyles.floatRight,
+      span(`class` := "small text-black-50 mr-5", s"v${BuildInfo.version}"),
       Translations.langs.map(v => langChangeButton(Lang(v)))
     ),
     h2("battleships"), //, BootstrapStyles.Spacing.margin()),

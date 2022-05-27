@@ -15,7 +15,6 @@ val forIdeaImport =
 
 inThisBuild(
   Seq(
-    version := "0.1.0-SNAPSHOT",
     scalaVersion := Dependencies.versionOfScala,
     organization := "pt.rmartins.battleships",
     scalacOptions ++= Seq(
@@ -101,6 +100,14 @@ def sourceDirsSettings(baseMapper: File => File): Seq[Def.Setting[Seq[File]]] = 
   )
 }
 
+lazy val buildInfoSettings: Seq[Def.Setting[_]] =
+  Seq(
+    buildInfoPackage := "pt.rmartins.battleships",
+    buildInfoKeys := Seq[BuildInfoKey](
+      version
+    )
+  )
+
 lazy val root = project
   .in(file("."))
   .aggregate(`shared-js`, `shared`, frontend, backend, packager)
@@ -133,16 +140,23 @@ def jsProjectFor(jvmProj: Project, jsProj: Project): Project = {
     )
 }
 
-lazy val shared = jvmProject(project).settings(
-  libraryDependencies ++= Dependencies.crossDeps.value,
-  libraryDependencies ++= Dependencies.crossTestDeps.value
-)
+lazy val shared =
+  jvmProject(project)
+    .enablePlugins(BuildInfoPlugin)
+    .settings(
+      libraryDependencies ++= Dependencies.crossDeps.value,
+      libraryDependencies ++= Dependencies.crossTestDeps.value,
+      buildInfoSettings
+    )
 
-lazy val `shared-js` = jsProjectFor(shared, project)
-  .settings(
-    libraryDependencies ++= Dependencies.crossDeps.value,
-    libraryDependencies ++= Dependencies.crossTestDeps.value
-  )
+lazy val `shared-js` =
+  jsProjectFor(shared, project)
+    .enablePlugins(BuildInfoPlugin)
+    .settings(
+      libraryDependencies ++= Dependencies.crossDeps.value,
+      libraryDependencies ++= Dependencies.crossTestDeps.value,
+      buildInfoSettings
+    )
 
 val frontendWebContent = "UdashStatics/WebContent"
 lazy val frontend = project
