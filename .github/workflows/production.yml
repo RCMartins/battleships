@@ -19,6 +19,7 @@ jobs:
       with:
         java-version: '11'
         distribution: 'temurin'
+
     - name: Deploy to production
       env: # Set Oracle credentials secret as an input
         credentials: ${{ secrets.ORACLE_CREDENTIALS_PRODUCTION }}
