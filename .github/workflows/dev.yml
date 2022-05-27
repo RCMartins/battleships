@@ -18,9 +18,10 @@ jobs:
         java-version: '11'
         distribution: 'temurin'
     - name: Deploy to production
+      uses: tj-actions/branch-names@v5.2
       env: # Set Oracle credentials secret as an input
         credentials: ${{ secrets.ORACLE_CREDENTIALS_DEV }}
-        branch_name: ${{ github.head_ref }}
+        branch_name: ${{ steps.branch-name.outputs.current_branch }}
       run: |
         echo "$credentials" >> ssh-key.key
         chmod 400 ssh-key.key
