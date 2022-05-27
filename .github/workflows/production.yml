@@ -21,7 +21,7 @@ jobs:
         distribution: 'temurin'
 
     - name: Deploy to production
-      env: # Set Oracle credentials secret as an input
+      env:
         credentials: ${{ secrets.ORACLE_CREDENTIALS_PRODUCTION }}
       run: |
         echo "$credentials" >> ssh-key.key
