@@ -1,4 +1,4 @@
-name: Scala Deploy
+name: Scala Production Deploy
 
 on:
   push:
@@ -19,11 +19,12 @@ jobs:
       with:
         java-version: '11'
         distribution: 'temurin'
+
     - name: Deploy to production
-      env: # Set Oracle credentials secret as an input
-        credentials: ${{ secrets.ORACLE_CREDENTIALS }}
+      env:
+        credentials: ${{ secrets.ORACLE_CREDENTIALS_PRODUCTION }}
       run: |
-        echo "$credentials" | base64 -d > ssh-key.key
+        echo "$credentials" >> ssh-key.key
         chmod 400 ssh-key.key
         ssh -o StrictHostKeyChecking=no -i ssh-key.key ubuntu@140.238.89.127 << EOF
         sudo su -

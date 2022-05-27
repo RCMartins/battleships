@@ -21,3 +21,19 @@ jobs:
         distribution: 'temurin'
     - name: Run tests
       run: sbt test
+
+    - name: Get branch name
+      id: branch-name
+      uses: tj-actions/branch-names@v5.2
+
+    - name: Deploy to dev server
+      env:
+        credentials: ${{ secrets.ORACLE_CREDENTIALS_DEV }}
+        branch_name: ${{ steps.branch-name.outputs.current_branch }}
+      run: |
+        echo "$credentials" >> ssh-key.key
+        chmod 400 ssh-key.key
+        ssh -o StrictHostKeyChecking=no -i ssh-key.key ubuntu@144.21.49.17 << EOF
+        sudo su -
+        ./runUpdate "$branch_name" || (echo "Retry..." && ./runUpdate "$branch_name")
+        EOF
