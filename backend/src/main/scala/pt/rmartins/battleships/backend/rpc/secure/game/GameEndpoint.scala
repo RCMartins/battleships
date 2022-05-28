@@ -23,11 +23,18 @@ class GameEndpoint(implicit
   override def startGameWithBots(rules: Rules): Future[Unit] =
     gameService.startGameWithBots(ctx.username, rules)
 
-  override def invitePlayer(otherPlayerUsername: Username): Future[Unit] =
-    gameService.invitePlayer(ctx.username, otherPlayerUsername)
+  override def invitePlayer(
+      otherPlayerUsername: Username,
+      playerInviteType: PlayerInviteType
+  ): Future[Unit] =
+    gameService.invitePlayer(ctx.username, otherPlayerUsername, playerInviteType)
 
-  override def sendPlayerInviteAnswer(inviterUsername: Username, answer: Boolean): Future[Unit] =
-    gameService.playerInviteAnswer(ctx.username, inviterUsername, answer)
+  override def sendPlayerInviteAnswer(
+      inviterUsername: Username,
+      answer: Boolean,
+      playerInviteType: PlayerInviteType
+  ): Future[Unit] =
+    gameService.playerInviteAnswer(ctx.username, inviterUsername, answer, playerInviteType)
 
   override def startPreGameWithPlayer(otherPlayerUsername: Username, rules: Rules): Future[Unit] =
     gameService.startPreGameWithPlayer(ctx.username, otherPlayerUsername, rules)
@@ -59,9 +66,6 @@ class GameEndpoint(implicit
 
   override def getAllMessages: Future[Seq[ChatMessage]] =
     gameService.getAllMessages(ctx.username)
-
-  override def rematchGame(gameId: GameId): Future[Unit] =
-    gameService.rematchGame(gameId, ctx.username)
 
   override def confirmShips(
       gameId: GameId,

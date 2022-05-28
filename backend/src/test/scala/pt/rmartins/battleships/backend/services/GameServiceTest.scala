@@ -64,6 +64,81 @@ class GameServiceTest extends AsyncWordSpec with Matchers with AsyncMockFactory 
 
   }
 
+  "reload" should {}
+
+  "startGameWithBots" should {
+
+    "Return an error if the player is not found" in {
+      val player1Username = Username("player1")
+
+      val clientMock = mock[RpcClientsService]
+      (clientMock.getClientIdByUsername _)
+        .expects(player1Username)
+        .returning(None)
+        .twice()
+      val service = new GameService(clientMock)
+
+      for {
+        _ <- service.startGameWithBots(player1Username, BattleshipsMocks.default10v10Rules)
+      } yield {
+        succeed
+      }
+    }
+
+    "Start a game against bot if the player is found" in {
+      val playerUsername = Username("player1")
+      val playerId = ClientId("id1")
+      val rules = BattleshipsMocks.default10v10Rules
+
+      val gameState = CaptureOne[GameState]()
+
+      val clientMock = mock[RpcClientsService]
+      (clientMock.getClientIdByUsername _)
+        .expects(playerUsername)
+        .returning(Some(playerId))
+      (clientMock.sendGameState _)
+        .expects(playerId, capture(gameState))
+        .returning(())
+      val service = new GameService(clientMock)
+
+      for {
+        _ <- service.startGameWithBots(playerUsername, rules)
+      } yield {
+        val simplifiedRules: Rules =
+          rules.modify(_.gameFleet).using { case Fleet(shipCounterList) =>
+            Fleet(shipCounterList.filterNot(_._2._1 == 0))
+          }
+
+        val board: Board =
+          Board(boardSize = rules.boardSize, ships = Nil)
+        val player: Player =
+          Player(
+            myBoard = board,
+            enemyBoardMarks = Vector.empty,
+            turnPlayHistory = Nil
+          )
+        val bot: SimplePlayer =
+          SimplePlayer(
+            username = Username("Bot"),
+            isHuman = false,
+            boardSize = rules.boardSize,
+            turnPlayHistory = Nil
+          )
+
+        gameState.value should be(
+          GameState(
+            gameId = gameState.value.gameId,
+            rules = simplifiedRules,
+            me = player,
+            enemy = bot,
+            gameMode = GameMode.PlacingShipsMode(iPlacedShips = false, enemyPlacedShips = false)
+          )
+        )
+      }
+    }
+
+  }
+
   "invitePlayer" should {
 
     "Return an error if the player is inviting himself" in {
@@ -81,34 +156,36 @@ class GameServiceTest extends AsyncWordSpec with Matchers with AsyncMockFactory 
       val service = new GameService(clientMock)
 
       for {
-        _ <- service.invitePlayer(player1Username, player1Username)
+        _ <- service.invitePlayer(player1Username, player1Username, PlayerInviteType.Play)
       } yield {
         succeed
       }
     }
 
-    "Send an invite request from player1 to player2" in {
-      val player1Username = Username("player1")
-      val player2Username = Username("player2")
-      val player1Id = ClientId("id1")
-      val player2Id = ClientId("id2")
+    List(PlayerInviteType.Play, PlayerInviteType.Rematch).foreach { playerInviteType =>
+      s"Send an invite request from player1 to player2 ($playerInviteType)" in {
+        val player1Username = Username("player1")
+        val player2Username = Username("player2")
+        val player1Id = ClientId("id1")
+        val player2Id = ClientId("id2")
 
-      val clientMock = mock[RpcClientsService]
-      (clientMock.getClientIdByUsername _)
-        .expects(player1Username)
-        .returning(Some(player1Id))
-      (clientMock.getClientIdByUsername _)
-        .expects(player2Username)
-        .returning(Some(player2Id))
-      (clientMock.sendInviteRequest _)
-        .expects(player2Id, player1Username)
-        .returning(())
-      val service = new GameService(clientMock)
+        val clientMock = mock[RpcClientsService]
+        (clientMock.getClientIdByUsername _)
+          .expects(player1Username)
+          .returning(Some(player1Id))
+        (clientMock.getClientIdByUsername _)
+          .expects(player2Username)
+          .returning(Some(player2Id))
+        (clientMock.sendInviteRequest _)
+          .expects(player2Id, player1Username, playerInviteType)
+          .returning(())
+        val service = new GameService(clientMock)
 
-      for {
-        _ <- service.invitePlayer(player1Username, player2Username)
-      } yield {
-        succeed
+        for {
+          _ <- service.invitePlayer(player1Username, player2Username, playerInviteType)
+        } yield {
+          succeed
+        }
       }
     }
 
@@ -133,7 +210,7 @@ class GameServiceTest extends AsyncWordSpec with Matchers with AsyncMockFactory 
       val service = new GameService(clientMock)
 
       for {
-        _ <- service.invitePlayer(player1Username, player2Username)
+        _ <- service.invitePlayer(player1Username, player2Username, PlayerInviteType.Play)
       } yield {
         succeed
       }
@@ -163,7 +240,12 @@ class GameServiceTest extends AsyncWordSpec with Matchers with AsyncMockFactory 
       val service = new GameService(clientMock)
 
       for {
-        _ <- service.playerInviteAnswer(player1Username, player2Username, inviteAnswer)
+        _ <- service.playerInviteAnswer(
+          player1Username,
+          player2Username,
+          inviteAnswer,
+          PlayerInviteType.Play
+        )
       } yield {
         succeed
       }
@@ -266,7 +348,8 @@ class GameServiceTest extends AsyncWordSpec with Matchers with AsyncMockFactory 
         _ <- service.playerInviteAnswer(
           player2Username,
           player1Username,
-          inviteAnswer = true
+          inviteAnswer = true,
+          PlayerInviteType.Play
         )
         _ <- service.startPreGameWithPlayer(
           player1Username,
@@ -782,7 +865,8 @@ class GameServiceTest extends AsyncWordSpec with Matchers with AsyncMockFactory 
           _ <- service.playerInviteAnswer(
             player2Username,
             player1Username,
-            inviteAnswer = true
+            inviteAnswer = true,
+            PlayerInviteType.Play
           )
           _ <- service.startPreGameWithPlayer(
             player1Username,

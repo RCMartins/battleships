@@ -57,10 +57,14 @@ class RpcClientsService(sendToClientFactory: ClientRPCTarget => MainClientRPC) {
     authClients.remove(clientId).foreach(ctx => clientUsernames.remove(ctx.username.toLowerCase))
   }
 
-  def sendInviteRequest(clientId: ClientId, inviterUsername: Username): Unit =
+  def sendInviteRequest(
+      clientId: ClientId,
+      inviterUsername: Username,
+      playerInviteType: PlayerInviteType
+  ): Unit =
     authClients.get(clientId) match {
       case Some(_) =>
-        sendToClient(clientId).game().sendInviteRequest(inviterUsername)
+        sendToClient(clientId).game().sendInviteRequest(inviterUsername, playerInviteType)
       case _ =>
     }
 

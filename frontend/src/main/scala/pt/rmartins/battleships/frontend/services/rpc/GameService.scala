@@ -5,7 +5,7 @@ import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.rpc.client.game.GameNotificationsRPC
 
 class GameService(
-    sendInviteRequestListeners: CallbacksHandler[Username],
+    sendInviteRequestListeners: CallbacksHandler[(Username, PlayerInviteType)],
     sendInviteResponseListeners: CallbacksHandler[(Username, Boolean)],
     preGameStateListeners: CallbacksHandler[PreGameState],
     preGameConfirmStateListeners: CallbacksHandler[(Boolean, Boolean)],
@@ -18,8 +18,11 @@ class GameService(
     userErrorMessageListeners: CallbacksHandler[UserError]
 ) extends GameNotificationsRPC {
 
-  override def sendInviteRequest(inviterUsername: Username): Unit =
-    sendInviteRequestListeners.fire(inviterUsername)
+  override def sendInviteRequest(
+      inviterUsername: Username,
+      playerInviteType: PlayerInviteType
+  ): Unit =
+    sendInviteRequestListeners.fire((inviterUsername, playerInviteType))
 
   override def sendInviteResponse(invitedUsername: Username, inviteAnswer: Boolean): Unit =
     sendInviteResponseListeners.fire((invitedUsername, inviteAnswer))

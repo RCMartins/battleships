@@ -17,7 +17,6 @@ import org.scalajs.dom
 import org.scalajs.dom._
 import org.scalajs.dom.html.{Canvas, Div, Input, LI, Span}
 import pt.rmartins.battleships.frontend.services.TranslationsService
-import pt.rmartins.battleships.frontend.views.game.CanvasUtils.{drawImageAbs, radarImage}
 import pt.rmartins.battleships.frontend.views.game.ErrorModalType._
 import pt.rmartins.battleships.frontend.views.game.JoinedPreGame.PlayingAgainstPlayer
 import pt.rmartins.battleships.frontend.views.game.ModeType._
@@ -26,6 +25,7 @@ import pt.rmartins.battleships.shared.css.ChatStyles
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game._
+import pt.rmartins.battleships.shared.model.utils.BoardUtils._
 import scalatags.JsDom
 import scalatags.JsDom.all._
 
@@ -844,7 +844,6 @@ class GameView(
             val isHit =
               gameStateModel.subProp(_.gameState).get match {
                 case Some(GameState(_, _, me, _, _)) =>
-                  import pt.rmartins.battleships.shared.model.utils.BoardUtils._
                   me.enemyBoardMarks.getMarkAt(coor) == BoardMark.ShipHit
                 case _ =>
                   false
@@ -1096,7 +1095,22 @@ class GameView(
           `class` := "modal-content",
           div(
             `class` := "modal-header",
-            h5(nested(translatedDynamic(Translations.Game.invitePlayerModalTitle)(_.apply()))),
+            nested(produceWithNested(preGameModel.subProp(_.inviter)) {
+              case (Some((_, PlayerInviteType.Play)), nested) =>
+                h5(
+                  nested(
+                    translatedDynamic(Translations.Game.invitePlayerModalTitle)(_.apply())
+                  )
+                ).render
+              case (Some((_, PlayerInviteType.Rematch)), nested) =>
+                h5(
+                  nested(
+                    translatedDynamic(Translations.Game.invitePlayerRematchModalTitle)(_.apply())
+                  )
+                ).render
+              case _ =>
+                h5.render
+            }),
             span(
               style := "cursor: pointer",
               FontAwesome.Solid.times,
@@ -1115,7 +1129,24 @@ class GameView(
                   " ",
                   b(enemyUsername.username),
                   " ",
-                  nested(translatedDynamic(Translations.Game.invitePlayerModalBody)(_.apply()))
+                  nested(produceWithNested(preGameModel.subProp(_.inviter)) {
+                    case (Some((_, PlayerInviteType.Play)), nested) =>
+                      span(
+                        nested(
+                          translatedDynamic(Translations.Game.invitePlayerModalBody)(_.apply())
+                        )
+                      ).render
+                    case (Some((_, PlayerInviteType.Rematch)), nested) =>
+                      span(
+                        nested(
+                          translatedDynamic(Translations.Game.invitePlayerRematchModalBody)(
+                            _.apply()
+                          )
+                        )
+                      ).render
+                    case _ =>
+                      span.render
+                  })
                 ).render
               case _ =>
                 span.render
@@ -1264,7 +1295,7 @@ class GameView(
       Globals.modalToggle(editRulesModalId)
   }
 
-  preGameModel.subProp(_.inviterUsername).listen {
+  preGameModel.subProp(_.inviter).listen {
     case None =>
       Globals.modalHide(acceptPlayerInviteModalId)
     case Some(_) =>

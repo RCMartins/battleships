@@ -12,9 +12,16 @@ trait GameRPC {
 
   def startGameWithBots(rules: Rules): Future[Unit]
 
-  def invitePlayer(otherPlayerUsername: Username): Future[Unit]
+  def invitePlayer(
+      otherPlayerUsername: Username,
+      playerInviteType: PlayerInviteType
+  ): Future[Unit]
 
-  def sendPlayerInviteAnswer(inviterUsername: Username, answer: Boolean): Future[Unit]
+  def sendPlayerInviteAnswer(
+      inviterUsername: Username,
+      answer: Boolean,
+      playerInviteType: PlayerInviteType
+  ): Future[Unit]
 
   def startPreGameWithPlayer(otherPlayerUsername: Username, rules: Rules): Future[Unit]
 
@@ -37,8 +44,6 @@ trait GameRPC {
   def logout(): Future[Unit]
 
   def getAllMessages: Future[Seq[ChatMessage]]
-
-  def rematchGame(gameId: GameId): Future[Unit]
 
   def confirmShips(gameId: GameId, shipPositions: List[ShipInBoard]): Future[Unit]
 
