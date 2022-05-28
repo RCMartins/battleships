@@ -5,7 +5,10 @@ import pt.rmartins.battleships.shared.model.game._
 
 trait GameNotificationsRPC {
 
-  def sendInviteRequest(inviterUsername: Username): Unit
+  def sendInviteRequest(
+      inviterUsername: Username,
+      playerInviteType: PlayerInviteType
+  ): Unit
 
   def sendInviteResponse(invitedUsername: Username, inviteAnswer: Boolean): Unit
 

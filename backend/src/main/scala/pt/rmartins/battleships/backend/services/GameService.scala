@@ -1,5 +1,6 @@
 package pt.rmartins.battleships.backend.services
 
+import better.files.File
 import com.softwaremill.quicklens.ModifyPimp
 import io.udash.rpc.ClientId
 import pt.rmartins.battleships.backend.services.GameService._
@@ -26,7 +27,8 @@ class GameService(rpcClientsService: RpcClientsService) {
   private val activeGamesByPlayer: mutable.Map[Username, GameId] = mutable.Map.empty
   private val activeGames: mutable.Map[GameId, Game] = mutable.Map.empty
   private val activePreGames: mutable.Map[GameId, PreGame] = mutable.Map.empty
-  private val acceptedInviteRequests: mutable.Map[ClientId, ClientId] = mutable.Map.empty
+  private val acceptedInviteRequests: mutable.Map[ClientId, (ClientId, PlayerInviteType)] =
+    mutable.Map.empty
 
   PuzzlesGenerator.initialize()
 
@@ -286,6 +288,11 @@ class GameService(rpcClientsService: RpcClientsService) {
     Future {
       rpcClientsService.getClientIdByUsername(playerUsername) match {
         case Some(playerId) =>
+          activeGamesByPlayer.get(playerUsername).flatMap(activeGames.get).foreach { game =>
+            removeServerGameCompletely(game)
+            sendBothQuitGame(game)
+          }
+
           createNewGame(
             GameId(UUID.randomUUID().toString),
             (playerId, playerUsername),
@@ -378,7 +385,8 @@ class GameService(rpcClientsService: RpcClientsService) {
 
   def invitePlayer(
       player1Username: Username,
-      player2Username: Username
+      player2Username: Username,
+      playerInviteType: PlayerInviteType
   ): Future[Unit] =
     Future {
       (
@@ -388,7 +396,7 @@ class GameService(rpcClientsService: RpcClientsService) {
         case (Some(player1Id), Some(player2Id)) if player1Id == player2Id =>
           rpcClientsService.sendUserErrorMessage(player1Id, UserError.InviteItself)
         case (Some(_), Some(player2Id)) =>
-          rpcClientsService.sendInviteRequest(player2Id, player1Username)
+          rpcClientsService.sendInviteRequest(player2Id, player1Username, playerInviteType)
         case (Some(player1Id), None) =>
           rpcClientsService.sendInviteResponse(
             player1Id,
@@ -406,7 +414,8 @@ class GameService(rpcClientsService: RpcClientsService) {
   def playerInviteAnswer(
       player1Username: Username,
       player2Username: Username,
-      inviteAnswer: Boolean
+      inviteAnswer: Boolean,
+      playerInviteType: PlayerInviteType
   ): Future[Unit] =
     Future {
       (
@@ -415,7 +424,7 @@ class GameService(rpcClientsService: RpcClientsService) {
       ) match {
         case (Some(player1Id), Some(player2Id)) =>
           if (inviteAnswer)
-            acceptedInviteRequests.update(player1Id, player2Id)
+            acceptedInviteRequests.update(player1Id, (player2Id, playerInviteType))
           rpcClientsService.sendInviteResponse(player2Id, player1Username, inviteAnswer)
         case _ =>
       }
@@ -433,7 +442,7 @@ class GameService(rpcClientsService: RpcClientsService) {
       ) match {
         case (Some(player1Id), Some(player2Id))
             if player1Id != player2Id &&
-              acceptedInviteRequests.get(player2Id).contains(player1Id) =>
+              acceptedInviteRequests.get(player2Id).exists(_._1 == player1Id) =>
           val preGame: PreGame =
             createNewPreGame(
               (player1Id, player1Username),
@@ -450,7 +459,7 @@ class GameService(rpcClientsService: RpcClientsService) {
             UserError.UsernameNotFound(player2Username)
           )
         case _ =>
-          sendSystemMessage(player1Username, "Invalid request!")
+          invalidRequest(player1Username)
       }
     }
 
@@ -695,28 +704,6 @@ class GameService(rpcClientsService: RpcClientsService) {
       }
     }
 
-  def rematchGame(gameId: GameId, playerUsername: Username): Future[Unit] =
-    Future {
-      activeGames.get(gameId).tap {
-        case None =>
-          sendSystemMessage(playerUsername, "Error finding game!")
-        case Some(game) =>
-          removeServerGameCompletely(game)
-          sendBothQuitGame(game)
-      }
-    }.map {
-      case Some(oldGame) =>
-        if (!oldGame.player2.isHuman)
-          startGameWithBots(oldGame.player1.username, oldGame.rules)
-        else
-          startPreGameWithPlayer(
-            oldGame.player1.username,
-            oldGame.player2.username,
-            oldGame.rules
-          )
-      case None =>
-    }
-
   def confirmShips(
       gameId: GameId,
       playerUsername: Username,
@@ -776,7 +763,7 @@ class GameService(rpcClientsService: RpcClientsService) {
           else
             sendBothGameMode(gameWithUpdatedMode)
         case _ =>
-          sendSystemMessage(playerUsername, "Invalid request!")
+          invalidRequest(playerUsername)
       }
     }
   }
@@ -796,7 +783,7 @@ class GameService(rpcClientsService: RpcClientsService) {
           updateServerState(updatedGame)
           sendBothGameMode(updatedGame)
         case _ =>
-          sendSystemMessage(playerUsername, "Invalid request!")
+          invalidRequest(playerUsername)
       }
     }
 
@@ -839,8 +826,7 @@ class GameService(rpcClientsService: RpcClientsService) {
             } =>
           unsafeSendTurnAttacks(game, player, currentTurn, turnAttacks)
         case Some((game, _)) =>
-          sendSystemMessage(
-            playerUsername,
+          logMessage(
             (
               "Invalid request!",
               game,
@@ -849,6 +835,7 @@ class GameService(rpcClientsService: RpcClientsService) {
               turnAttacks
             ).toString
           )
+          invalidRequest(playerUsername)
       }
     }
   }
@@ -904,7 +891,7 @@ class GameService(rpcClientsService: RpcClientsService) {
           val updatedGame: Game = game.updatePlayer(updatedPlayer)
           updateServerState(updatedGame)
         case _ =>
-          sendSystemMessage(playerUsername, "Invalid request!")
+          invalidRequest(playerUsername)
       }
     }
 
@@ -933,7 +920,7 @@ class GameService(rpcClientsService: RpcClientsService) {
           updateServerState(updatedGame)
           sendBothGameState(updatedGame)
         case _ =>
-          sendSystemMessage(playerUsername, "Invalid request!")
+          invalidRequest(playerUsername)
       }
     }
 
@@ -1083,6 +1070,9 @@ class GameService(rpcClientsService: RpcClientsService) {
       answer
     )
   }
+
+  private def invalidRequest(playerUsername: Username): Unit =
+    sendSystemMessage(playerUsername, "Invalid request!")
 
 }
 
@@ -1592,5 +1582,10 @@ object GameService {
   private def simpleSetGameOver(game: Game, whoWonUsername: Username): Game = {
     game.modify(_.playerWhoWonOpt).setTo(Some(whoWonUsername))
   }
+
+  val logFile: File = (File("log") / "errors.log").touch()
+
+  def logMessage(message: String): Unit =
+    logFile.appendLine(message)
 
 }

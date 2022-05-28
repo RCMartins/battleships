@@ -62,11 +62,11 @@ class GamePresenter(
 
   val enemyUsernameProperty: ReadableProperty[Option[Username]] =
     combine(
-      preGameModel.subProp(_.inviterUsername),
+      preGameModel.subProp(_.inviter),
       preGameModel.subProp(_.inJoinedPreGame).transform(_.flatMap(_.enemyUsernameOpt)),
       gameStateModel.transform(_.gameState.map(_.enemy.username))
-    ).transform { case (inviterUsername, preGameEnemy, inGameEnemy) =>
-      inviterUsername.orElse(preGameEnemy.orElse(inGameEnemy))
+    ).transform { case (inviter, preGameEnemy, inGameEnemy) =>
+      inviter.map(_._1).orElse(preGameEnemy.orElse(inGameEnemy))
     }
 
   val gameModeProperty: Property[Option[GameMode]] =
@@ -161,22 +161,23 @@ class GamePresenter(
   }
 
   private val onSendInviteRequestCallback = notificationsCenter.onSendInviteRequest {
-    inviterUsername =>
+    case (inviterUsername, playerInviteType) =>
       preGameModel
-        .subProp(_.inviterUsername)
-        .set(Some(inviterUsername))
+        .subProp(_.inviter)
+        .set(Some((inviterUsername, playerInviteType)))
   }
 
-  private val onSendInviteAnswerCallback = notificationsCenter.onSendInviteAnwser {
+  private val onSendInviteAnswerCallback = notificationsCenter.onSendInviteAnswer {
     case (invitedUsername, inviteAnswer) =>
       preGameModel.subProp(_.invitedUsername).get match {
         case Some(currentInvitesUsername) if currentInvitesUsername == invitedUsername =>
           preGameModel.subProp(_.invitedUsername).set(None)
-          modeTypeOrPuzzleProperty.get match {
-            case (None, false) if inviteAnswer =>
-              gameRpc.startPreGameWithPlayer(invitedUsername, preGameRulesProperty.get)
-            case _ =>
-          }
+          if (inviteAnswer)
+            modeTypeOrPuzzleProperty.get match {
+              case (None, false) | (Some(ModeType.GameOverModeType), _) =>
+                gameRpc.startPreGameWithPlayer(invitedUsername, preGameRulesProperty.get)
+              case _ =>
+            }
         case _ =>
       }
   }
@@ -903,7 +904,7 @@ class GamePresenter(
   def invitePlayer(otherPlayerUsername: Username): Unit =
     if (otherPlayerUsername.username.nonEmpty) {
       preGameModel.subProp(_.invitedUsername).set(Some(otherPlayerUsername))
-      gameRpc.invitePlayer(otherPlayerUsername)
+      gameRpc.invitePlayer(otherPlayerUsername, PlayerInviteType.Play)
     }
 
   def confirmRules(): Unit =
@@ -933,8 +934,11 @@ class GamePresenter(
 
   def rematchGame(): Unit =
     gameStateProperty.get match {
-      case Some(GameState(gameId, _, _, _, _)) =>
-        gameRpc.rematchGame(gameId)
+      case Some(GameState(_, _, _, enemy, _)) if enemy.isHuman =>
+        preGameModel.subProp(_.invitedUsername).set(Some(enemy.username))
+        gameRpc.invitePlayer(enemy.username, PlayerInviteType.Rematch)
+      case Some(_) =>
+        startGameWithBots()
       case _ =>
     }
 
@@ -1193,9 +1197,9 @@ class GamePresenter(
     }
 
   def answerInvitePlayerRequest(answer: Boolean): Unit = {
-    preGameModel.subProp(_.inviterUsername).get.foreach { inviterUsername =>
-      preGameModel.subProp(_.inviterUsername).set(None)
-      gameRpc.sendPlayerInviteAnswer(inviterUsername, answer)
+    preGameModel.subProp(_.inviter).get.foreach { case (inviterUsername, playerInviteType) =>
+      preGameModel.subProp(_.inviter).set(None)
+      gameRpc.sendPlayerInviteAnswer(inviterUsername, answer, playerInviteType)
     }
   }
 

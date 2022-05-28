@@ -8,7 +8,7 @@ import pt.rmartins.battleships.shared.model.game._
 case class PreGameModel(
     enemyUsernameText: Username,
     invitedUsername: Option[Username],
-    inviterUsername: Option[Username],
+    inviter: Option[(Username, PlayerInviteType)],
     inJoinedPreGame: Option[JoinedPreGame],
     rules: Rules,
     previewBoardOpt: Option[(Board, Int)] // TODO change int to double 0.0 to 1.0,
@@ -25,7 +25,7 @@ object PreGameModel extends HasModelPropertyCreator[PreGameModel] {
     PreGameModel(
       enemyUsernameText = Username(""),
       invitedUsername = None,
-      inviterUsername = None,
+      inviter = None,
       inJoinedPreGame = None,
       rules = Rules(
         boardSize = Fleet.default10By10._1,

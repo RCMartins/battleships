@@ -11,8 +11,8 @@ class NotificationsCenter {
     new CallbacksHandler[String]
   private[rpc] val msgListeners: CallbacksHandler[ChatMessage] =
     new CallbacksHandler[ChatMessage]
-  private[rpc] val sendInviteRequestListeners: CallbacksHandler[Username] =
-    new CallbacksHandler[Username]
+  private[rpc] val sendInviteRequestListeners: CallbacksHandler[(Username, PlayerInviteType)] =
+    new CallbacksHandler[(Username, PlayerInviteType)]
   private[rpc] val sendInviteResponseListeners: CallbacksHandler[(Username, Boolean)] =
     new CallbacksHandler[(Username, Boolean)]
   private[rpc] val preGameStateListeners: CallbacksHandler[PreGameState] =
@@ -51,7 +51,7 @@ class NotificationsCenter {
   ): Registration =
     sendInviteRequestListeners.register(callback)
 
-  def onSendInviteAnwser(
+  def onSendInviteAnswer(
       callback: sendInviteResponseListeners.CallbackType
   ): Registration =
     sendInviteResponseListeners.register(callback)
