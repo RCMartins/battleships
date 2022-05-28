@@ -1583,7 +1583,7 @@ object GameService {
     game.modify(_.playerWhoWonOpt).setTo(Some(whoWonUsername))
   }
 
-  val logFile: File = (File("log") / "errors.log").touch()
+  lazy val logFile: File = (File("log").createDirectoryIfNotExists() / "errors.log")
 
   def logMessage(message: String): Unit =
     logFile.appendLine(message)
