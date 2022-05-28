@@ -11,6 +11,7 @@ import scala.concurrent.Future
 import scala.util.matching.Regex
 
 class AuthService() {
+
   private val usersLogged: MHashSet[Username] = MHashSet.empty
   private val tokens: MMap[UserToken, UserContext] = MMap.empty
 
@@ -18,7 +19,7 @@ class AuthService() {
 
   private def validUsername(username: Username): Boolean =
     username.username.exists(_.isLetterOrDigit) && ValidUsernameRegex.matches(username.username) &&
-      username != GameService.BotUsername
+      username.toLowerCase != GameService.BotUsername.toLowerCase
 
   def logout(userToken: UserToken): Future[Unit] = Future {
     tokens.synchronized {
@@ -66,4 +67,5 @@ class AuthService() {
 
   def findUserCtx(userToken: UserToken): Option[UserContext] =
     tokens.synchronized { tokens.get(userToken) }
+
 }
