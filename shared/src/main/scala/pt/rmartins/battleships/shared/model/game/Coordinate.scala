@@ -1,6 +1,7 @@
 package pt.rmartins.battleships.shared.model.game
 
 import com.avsystem.commons.serialization.HasGenCodec
+import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
 
 case class Coordinate(x: Int, y: Int) {
 
@@ -55,6 +56,12 @@ case class Coordinate(x: Int, y: Int) {
 }
 
 object Coordinate extends HasGenCodec[Coordinate] {
+
+  implicit val coordinateEncoder: JsonEncoder[Coordinate] =
+    DeriveJsonEncoder.gen[Coordinate]
+
+  implicit val coordinateDecoder: JsonDecoder[Coordinate] =
+    DeriveJsonDecoder.gen[Coordinate]
 
   val origin: Coordinate = Coordinate(0, 0)
 

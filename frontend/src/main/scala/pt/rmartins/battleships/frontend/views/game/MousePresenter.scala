@@ -4,7 +4,8 @@ import com.softwaremill.quicklens.ModifyPimp
 import io.udash._
 import pt.rmartins.battleships.frontend.views.game.BoardView.GameAction
 import pt.rmartins.battleships.frontend.views.game.BoardView.GameAction._
-import pt.rmartins.battleships.frontend.views.game.ModeType._
+import pt.rmartins.battleships.frontend.views.model.AttacksQueuedStatus
+import pt.rmartins.battleships.frontend.views.model.ModeType._
 import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.BoardUtils

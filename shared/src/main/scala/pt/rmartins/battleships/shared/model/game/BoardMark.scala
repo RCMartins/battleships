@@ -1,6 +1,7 @@
 package pt.rmartins.battleships.shared.model.game
 
 import com.avsystem.commons.serialization.HasGenCodec
+import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
 
 sealed trait BoardMark {
 
@@ -15,6 +16,12 @@ sealed trait BoardMark {
 }
 
 object BoardMark extends HasGenCodec[BoardMark] {
+
+  implicit val boardMarkEncoder: JsonEncoder[BoardMark] =
+    DeriveJsonEncoder.gen[BoardMark]
+
+  implicit val boardMarkDecoder: JsonDecoder[BoardMark] =
+    DeriveJsonDecoder.gen[BoardMark]
 
   case object Empty extends BoardMark
 

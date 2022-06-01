@@ -28,6 +28,33 @@ object Translations {
     val inputPlaceholder = key("chat.input.placeholder")
   }
 
+  object PreGame {
+    val yourFleets = key("game.pregame.your_fleets")
+    val defaultFleets = key("game.pregame.default_fleets")
+    val createNewFleet = key("game.pregame.create_new_fleet")
+    val saveFleet = key("game.pregame.save_fleet")
+    val clearAllShips = key("game.pregame.clear_all_ships")
+    val chooseFleetNameTitle = key("game.modal.choose_fleet_name_title")
+
+    val fleet = key("game.pregame.fleet")
+    val options = key("game.pregame.options")
+    val previewBoardTitle = key("game.pregame.previewBoardTitle")
+    val timeLimit = key("game.pregame.timeLimit")
+    val turnTimeLimit = key("game.pregame.turnTimeLimit")
+    val withTimeLimit = key("game.pregame.withTimeLimit")
+    val withoutTimeLimit = key("game.pregame.withoutTimeLimit")
+    val seconds = key("game.pregame.seconds")
+    val totalTime = key("game.pregame.totalTime")
+    val eachTurn = key("game.pregame.eachTurn")
+    val amountOfShots = key("game.pregame.amountOfShots")
+    val enemyAcceptedRules = key("game.pregame.enemy_accepted_rules")
+    val bonuses = key("game.pregame.bonuses")
+    val bonusFirstBlood = key("game.pregame.bonusFirstBlood")
+    val bonusDoubleKill = key("game.pregame.bonusDoubleKill")
+    val bonusTripleKill = key("game.pregame.bonusTripleKill")
+    val shots = key("game.pregame.shots")
+  }
+
   object Game {
     val chooseEnemyPlaceholder = key("game.pregame.choose_enemy_placeholder")
     val waitingPlayerInvitation = key("game.pregame.waiting_player_invitation")
@@ -98,25 +125,9 @@ object Translations {
     val modalAccept = key("game.modal.accept")
     val modalDecline = key("game.modal.decline")
     val confirmQuitGameTitle = key("game.modal.confirm_quit_game_title")
+  }
 
-    val fleet = key("game.pregame.fleet")
-    val options = key("game.pregame.options")
-    val previewBoardTitle = key("game.pregame.previewBoardTitle")
-    val timeLimit = key("game.pregame.timeLimit")
-    val turnTimeLimit = key("game.pregame.turnTimeLimit")
-    val withTimeLimit = key("game.pregame.withTimeLimit")
-    val withoutTimeLimit = key("game.pregame.withoutTimeLimit")
-    val seconds = key("game.pregame.seconds")
-    val totalTime = key("game.pregame.totalTime")
-    val eachTurn = key("game.pregame.eachTurn")
-    val amountOfShots = key("game.pregame.amountOfShots")
-    val enemyAcceptedRules = key("game.pregame.enemy_accepted_rules")
-    val bonuses = key("game.pregame.bonuses")
-    val bonusFirstBlood = key("game.pregame.bonusFirstBlood")
-    val bonusDoubleKill = key("game.pregame.bonusDoubleKill")
-    val bonusTripleKill = key("game.pregame.bonusTripleKill")
-    val shots = key("game.pregame.shots")
-
+  object Puzzles {
     val solvedPuzzles = key("game.puzzles.solved_puzzles")
     val placeMarksCorrectly1 = key("game.puzzles.place_marks_correctly1")
     val placeMarksCorrectly2 = key("game.puzzles.place_marks_correctly2")

@@ -20,7 +20,7 @@ class LoginPagePresenter(
     extends Presenter[RoutingLoginPageState.type] {
 
   override def handleState(state: RoutingLoginPageState.type): Unit = {
-    Cookies.getCookieData().foreach { case (userToken, username) =>
+    Cookies.getLoginCookieData().foreach { case (userToken, username) =>
       loggingIn(username, userService.loginToken(userToken, username))
     }
   }
@@ -40,7 +40,7 @@ class LoginPagePresenter(
 
     def failure(): Unit = {
       model.subProp(_.waitingForResponse).set(false)
-      Cookies.clearCookies()
+      Cookies.clearLoginCookieData()
     }
 
     loginF
@@ -50,7 +50,7 @@ class LoginPagePresenter(
           Left(error)
         case Right(ctx) =>
           model.subProp(_.waitingForResponse).set(false)
-          Cookies.saveCookieData(ctx.token, ctx.username)
+          Cookies.saveLoginCookieData(ctx.token, ctx.username)
           Right(ctx)
       }
       .andThen {

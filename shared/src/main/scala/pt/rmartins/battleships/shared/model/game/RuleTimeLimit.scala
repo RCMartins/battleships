@@ -1,6 +1,7 @@
 package pt.rmartins.battleships.shared.model.game
 
 import com.avsystem.commons.serialization.HasGenCodec
+import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
 
 sealed trait RuleTimeLimit {
 
@@ -15,6 +16,12 @@ sealed trait RuleTimeLimit {
 }
 
 object RuleTimeLimit extends HasGenCodec[RuleTimeLimit] {
+
+  implicit val ruleTimeLimitEncoder: JsonEncoder[RuleTimeLimit] =
+    DeriveJsonEncoder.gen[RuleTimeLimit]
+
+  implicit val ruleTimeLimitDecoder: JsonDecoder[RuleTimeLimit] =
+    DeriveJsonDecoder.gen[RuleTimeLimit]
 
   case object WithoutRuleTimeLimit extends RuleTimeLimit
 

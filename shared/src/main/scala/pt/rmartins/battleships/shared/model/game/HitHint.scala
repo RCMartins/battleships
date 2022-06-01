@@ -1,6 +1,7 @@
 package pt.rmartins.battleships.shared.model.game
 
 import com.avsystem.commons.serialization.HasGenCodec
+import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
 
 sealed trait HitHint {
 
@@ -17,6 +18,12 @@ sealed trait HitHint {
 }
 
 object HitHint extends HasGenCodec[HitHint] {
+
+  implicit val hitHintEncoder: JsonEncoder[HitHint] =
+    DeriveJsonEncoder.gen[HitHint]
+
+  implicit val hitHintDecoder: JsonDecoder[HitHint] =
+    DeriveJsonDecoder.gen[HitHint]
 
   case object Water extends HitHint {
     val isWater: Boolean = true

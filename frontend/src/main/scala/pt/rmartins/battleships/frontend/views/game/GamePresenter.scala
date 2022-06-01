@@ -10,9 +10,10 @@ import pt.rmartins.battleships.frontend.routing.{RoutingInGameState, RoutingLogi
 import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
 import pt.rmartins.battleships.frontend.services.{TranslationsService, UserContextService}
 import pt.rmartins.battleships.frontend.views.game.BoardView.GameAction
-import pt.rmartins.battleships.frontend.views.game.JoinedPreGame.PlayingAgainstPlayer
-import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
+import pt.rmartins.battleships.frontend.views.model.JoinedPreGame.PlayingAgainstPlayer
+import pt.rmartins.battleships.frontend.views.model.ModeType._
+import pt.rmartins.battleships.frontend.views.model._
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.chat.ChatMessage
 import pt.rmartins.battleships.shared.model.game.GameMode._
@@ -23,6 +24,7 @@ import pt.rmartins.battleships.shared.rpc.server.game.GameRPC
 import scalatags.JsDom.all.span
 
 import scala.annotation.tailrec
+import scala.collection.immutable.SortedMap
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Random, Success}
 
@@ -43,6 +45,9 @@ class GamePresenter(
     with AuthRequires {
 
   import translationsService._
+
+  val previewBoardCache: Cache[String, Option[(Board, Int)]] =
+    new Cache[String, Option[(Board, Int)]]
 
   val preGameRulesProperty: Property[Rules] =
     preGameModel.subProp(_.rules)
@@ -615,58 +620,58 @@ class GamePresenter(
       .set(span(translatedDynamic(Translations.Game.realEnemyBoardTitle)(_.apply())).render)
     translationsModel
       .subProp(_.previewBoardTitle)
-      .set(span(translatedDynamic(Translations.Game.previewBoardTitle)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.PreGame.previewBoardTitle)(_.apply())).render)
     translationsModel
       .subProp(_.withoutRuleTimeLimit)
-      .set(span(translatedDynamic(Translations.Game.withoutTimeLimit)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.PreGame.withoutTimeLimit)(_.apply())).render)
     translationsModel
       .subProp(_.withRuleTimeLimit)
-      .set(span(translatedDynamic(Translations.Game.withTimeLimit)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.PreGame.withTimeLimit)(_.apply())).render)
     translationsModel
       .subProp(_.seconds)
-      .set(span(translatedDynamic(Translations.Game.seconds)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.PreGame.seconds)(_.apply())).render)
     translationsModel
       .subProp(_.totalTime)
-      .set(span(translatedDynamic(Translations.Game.totalTime)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.PreGame.totalTime)(_.apply())).render)
     translationsModel
       .subProp(_.eachTurn)
-      .set(span(translatedDynamic(Translations.Game.eachTurn)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.PreGame.eachTurn)(_.apply())).render)
     translationsModel
       .subProp(_.amountOfShots)
-      .set(span(translatedDynamic(Translations.Game.amountOfShots)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.PreGame.amountOfShots)(_.apply())).render)
     translationsModel
       .subProp(_.bonuses)
-      .set(span(translatedDynamic(Translations.Game.bonuses)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.PreGame.bonuses)(_.apply())).render)
     translationsModel
       .subProp(_.bonusFirstBlood)
-      .set(span(translatedDynamic(Translations.Game.bonusFirstBlood)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.PreGame.bonusFirstBlood)(_.apply())).render)
     translationsModel
       .subProp(_.bonusDoubleKill)
-      .set(span(translatedDynamic(Translations.Game.bonusDoubleKill)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.PreGame.bonusDoubleKill)(_.apply())).render)
     translationsModel
       .subProp(_.bonusTripleKill)
-      .set(span(translatedDynamic(Translations.Game.bonusTripleKill)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.PreGame.bonusTripleKill)(_.apply())).render)
     translationsModel
       .subProp(_.shots)
-      .set(span(translatedDynamic(Translations.Game.shots)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.PreGame.shots)(_.apply())).render)
     translationsModel
       .subProp(_.placeMarksCorrectly1)
-      .set(span(translatedDynamic(Translations.Game.placeMarksCorrectly1)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.Puzzles.placeMarksCorrectly1)(_.apply())).render)
     translationsModel
       .subProp(_.placeMarksCorrectly2)
-      .set(span(translatedDynamic(Translations.Game.placeMarksCorrectly2)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.Puzzles.placeMarksCorrectly2)(_.apply())).render)
     translationsModel
       .subProp(_.sendPuzzleAnswer)
       .set(span(translatedDynamic(Translations.Game.sendPuzzleAnswerButton)(_.apply())).render)
     translationsModel
       .subProp(_.solvedPuzzles)
-      .set(span(translatedDynamic(Translations.Game.solvedPuzzles)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.Puzzles.solvedPuzzles)(_.apply())).render)
     translationsModel
       .subProp(_.puzzleCorrect)
-      .set(span(translatedDynamic(Translations.Game.puzzleCorrect)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.Puzzles.puzzleCorrect)(_.apply())).render)
     translationsModel
       .subProp(_.puzzleIncorrect)
-      .set(span(translatedDynamic(Translations.Game.puzzleIncorrect)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.Puzzles.puzzleIncorrect)(_.apply())).render)
 
     initializePreGameModel()
   }
@@ -680,6 +685,14 @@ class GamePresenter(
         case Some(PlayingAgainstPlayer(gameId, _, _, _)) => Some(gameId)
         case _                                           => None
       }
+
+    preGameModel
+      .subProp(_.customNamedRulesMap)
+      .set(
+        SortedMap(
+          Cookies.getAllNamedRulesCookieData().map(namedRules => (namedRules.name, namedRules)): _*
+        )
+      )
 
     combinedShipCounters.listen { _ =>
       val gameFleet: Fleet =
@@ -735,104 +748,118 @@ class GamePresenter(
       }
     }
 
-    combine(combinedShipCounters, preGameRulesProperty.transform(_.boardSize)).listen(
-      { case (_, boardSize) =>
-        val possibleCoorLazyList: LazyList[(Coordinate, Rotation)] =
-          LazyList.from(
-            for {
-              x <- 0 until boardSize.x
-              y <- 0 until boardSize.y
-              rotation <- Rotation.all
-            } yield (Coordinate(x, y), rotation)
-          )
-
-        val fixedRandomGenerator = new Random(seed = 0L)
-
-        def tryPlacingAllPreviewShips(): Option[(Board, Int)] = {
+    combine(
+      combinedShipCounters,
+      preGameRulesProperty.transform(_.boardSize),
+      preGameModel.subProp(_.previewEnabled)
+    ).listen(
+      {
+        case (_, boardSize, true) =>
           val sortedShipCounters: List[(ShipId, Property[Int])] =
-            allShipCounters.sortBy { case (shipId, _) => -Ship.allShipsMap(shipId).piecesSize }
-
-          val initialBoard = Board(boardSize, Nil)
-
-          def placePreviewShip(board: Board, ship: Ship): Option[Board] = {
-            val result: Option[(Coordinate, Ship)] =
-              fixedRandomGenerator
-                .shuffle(possibleCoorLazyList)
-                .map { case (coordinate, rotation) => (coordinate, ship.rotateTo(rotation)) }
-                .find { case (coordinate, shipRotated) =>
-                  canPlaceInBoard(board, shipRotated, coordinate)
-                }
-
-            result match {
-              case None =>
-                None
-              case Some((coordinate, shipRotated)) =>
-                Some(board.addShip(ShipInBoard(shipRotated, coordinate)))
+            allShipCounters.sortBy { case (shipId, _) =>
+              (-Ship.allShipsMap(shipId).piecesSize, -shipId.id)
             }
-          }
 
-          @tailrec
-          def placeAll(board: Board, ships: List[Ship]): Option[Board] = {
-            ships match {
-              case Nil =>
-                Some(board)
-              case headShip :: next =>
-                placePreviewShip(board, headShip) match {
-                  case None =>
-                    None
-                  case Some(updatedBoard) =>
-                    placeAll(updatedBoard, next)
-                }
-            }
-          }
+          val fleetKey: String =
+            sortedShipCounters
+              .map { case (shipId, countProperty) => s"$shipId-${countProperty.get}" }
+              .mkString(boardSize.toString, ",", "")
 
-          @tailrec
-          def placeAllLimited(
-              initialBoard: Board,
-              initialShips: List[Ship],
-              tryCounter: Int,
-              foundBoardOpt: Option[Board],
-              successCounter: Int
-          ): Option[(Board, Int)] =
-            if (tryCounter < PreGameModel.MaxPreviewTries)
-              placeAll(initialBoard, initialShips) match {
+          val fixedRandomGenerator = new Random(seed = fleetKey.hashCode)
+
+          def tryPlacingAllPreviewShips(): Option[(Board, Int)] = {
+            val possibleCoorLazyList: LazyList[(Coordinate, Rotation)] =
+              LazyList.from(
+                for {
+                  x <- 0 until boardSize.x
+                  y <- 0 until boardSize.y
+                  rotation <- Rotation.all
+                } yield (Coordinate(x, y), rotation)
+              )
+
+            val initialBoard = Board(boardSize, Nil)
+
+            def placePreviewShip(board: Board, ship: Ship): Option[Board] = {
+              val result: Option[(Coordinate, Ship)] =
+                fixedRandomGenerator
+                  .shuffle(possibleCoorLazyList)
+                  .map { case (coordinate, rotation) => (coordinate, ship.rotateTo(rotation)) }
+                  .find { case (coordinate, shipRotated) =>
+                    canPlaceInBoard(board, shipRotated, coordinate)
+                  }
+
+              result match {
                 case None =>
-                  placeAllLimited(
-                    initialBoard,
-                    initialShips,
-                    tryCounter + 1,
-                    foundBoardOpt,
-                    successCounter
-                  )
-                case Some(updatedBoard) =>
-                  placeAllLimited(
-                    initialBoard,
-                    initialShips,
-                    tryCounter + 1,
-                    foundBoardOpt.orElse(Some(updatedBoard)),
-                    successCounter + 1
-                  )
+                  None
+                case Some((coordinate, shipRotated)) =>
+                  Some(board.addShip(ShipInBoard(shipRotated, coordinate)))
               }
-            else
-              foundBoardOpt.map((_, successCounter))
+            }
 
-          placeAllLimited(
-            initialBoard,
-            sortedShipCounters.flatMap { case (shipId, countProperty) =>
-              List.fill(countProperty.get)(Ship.allShipsMap(shipId))
-            },
-            tryCounter = 0,
-            foundBoardOpt = None,
-            successCounter = 0
-          )
-        }
+            @tailrec
+            def placeAll(board: Board, ships: List[Ship]): Option[Board] = {
+              ships match {
+                case Nil =>
+                  Some(board)
+                case headShip :: next =>
+                  placePreviewShip(board, headShip) match {
+                    case None =>
+                      None
+                    case Some(updatedBoard) =>
+                      placeAll(updatedBoard, next)
+                  }
+              }
+            }
 
-        val previewBoardOptProperty: Property[Option[(Board, Int)]] =
-          preGameModel.subProp(_.previewBoardOpt)
-        val updatedPreviewBoardOpt: Option[(Board, Int)] =
-          tryPlacingAllPreviewShips()
+            @tailrec
+            def placeAllLimited(
+                initialBoard: Board,
+                initialShips: List[Ship],
+                tryCounter: Int,
+                foundBoardOpt: Option[Board],
+                successCounter: Int
+            ): Option[(Board, Int)] =
+              if (tryCounter < PreGameModel.MaxPreviewTries)
+                placeAll(initialBoard, initialShips) match {
+                  case None =>
+                    placeAllLimited(
+                      initialBoard,
+                      initialShips,
+                      tryCounter + 1,
+                      foundBoardOpt,
+                      successCounter
+                    )
+                  case Some(updatedBoard) =>
+                    placeAllLimited(
+                      initialBoard,
+                      initialShips,
+                      tryCounter + 1,
+                      foundBoardOpt.orElse(Some(updatedBoard)),
+                      successCounter + 1
+                    )
+                }
+              else
+                foundBoardOpt.map((_, successCounter))
 
-        previewBoardOptProperty.set(updatedPreviewBoardOpt, force = true)
+            placeAllLimited(
+              initialBoard,
+              sortedShipCounters.flatMap { case (shipId, countProperty) =>
+                List.fill(countProperty.get)(Ship.allShipsMap(shipId))
+              },
+              tryCounter = 0,
+              foundBoardOpt = None,
+              successCounter = 0
+            )
+          }
+
+          val updatedPreviewBoardOpt: Option[(Board, Int)] =
+            previewBoardCache.getOrUpdate(
+              fleetKey,
+              tryPlacingAllPreviewShips()
+            )
+
+          preGameModel.subProp(_.previewBoardOpt).set(updatedPreviewBoardOpt, force = true)
+        case _ =>
       },
       initUpdate = true
     )
@@ -945,7 +972,7 @@ class GamePresenter(
   def logout(): Unit =
     gameStateProperty.get match {
       case None =>
-        Cookies.clearCookies()
+        Cookies.clearLoginCookieData()
         for {
           _ <- gameRpc.logout()
           _ <- userService.logout()
@@ -1318,5 +1345,28 @@ class GamePresenter(
           lastMarksPlaced.map { case (coor, before, _) => (coor, before) }.toList
         )
     }
+
+  def saveNewNamedRules(): Unit = {
+    val name = screenModel.subProp(_.namedRuleName).get
+    if (name.nonEmpty) {
+      val preGame = preGameModel.get
+
+      val updatedNamedRules: NamedRules = NamedRules(name, preGame.rules)
+      val updatedCustomNamedRules: SortedMap[String, NamedRules] =
+        screenModel.subProp(_.namedRuleNameBefore).get match {
+          case Some(namedRuleNameBefore) =>
+            preGame.customNamedRulesMap
+              .removed(namedRuleNameBefore)
+              .updated(name, updatedNamedRules)
+          case None =>
+            preGame.customNamedRulesMap
+              .updated(name, updatedNamedRules)
+        }
+
+      preGameModel.subProp(_.customNamedRulesMap).set(updatedCustomNamedRules)
+      Cookies.saveAllNamedRulesCookieData(updatedCustomNamedRules.toList.map(_._2))
+      preGameModel.subProp(_.selectedNamedRule).set(Some(updatedNamedRules))
+    }
+  }
 
 }

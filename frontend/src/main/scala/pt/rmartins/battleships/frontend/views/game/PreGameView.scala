@@ -6,15 +6,17 @@ import io.udash.bindings.modifiers.Binding.NestedInterceptor
 import io.udash.bootstrap.utils.UdashIcons.FontAwesome
 import io.udash.css._
 import io.udash.i18n.translatedDynamic
-import org.scalajs.dom._
+import org.scalajs.dom.{html, _}
 import org.scalajs.dom.html.{Canvas, Div, Select}
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
+import pt.rmartins.battleships.frontend.views.model.NamedRules
 import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game.RuleTimeLimit._
 import pt.rmartins.battleships.shared.model.game._
+import scalatags.JsDom
 import scalatags.JsDom.all._
 
 class PreGameView(
@@ -29,7 +31,9 @@ class PreGameView(
 
   import translationsService._
 
-  private val defaultHeight = 332
+  private val MaxCustomNamedRules = 5
+
+  private val defaultHeight = 300
   private val fleetMaxSize: Coordinate = Ship.allShipsFleetMaxX.maxSize
   private val sqSize: Int = Math.min(100 / fleetMaxSize.x, 50 / fleetMaxSize.y)
   private val canvasSize: Coordinate = fleetMaxSize * sqSize + Coordinate.square(4)
@@ -64,7 +68,7 @@ class PreGameView(
           attr("data-bs-target") := "#nav-pregame-fleet",
           `type` := "button",
           role := "tab",
-          nested(translatedDynamic(Translations.Game.fleet)(_.apply()))
+          nested(translatedDynamic(Translations.PreGame.fleet)(_.apply()))
         ),
         button(
           `class` := "nav-link btn",
@@ -72,7 +76,7 @@ class PreGameView(
           attr("data-bs-target") := "#nav-pregame-options",
           `type` := "button",
           role := "tab",
-          nested(translatedDynamic(Translations.Game.options)(_.apply()))
+          nested(translatedDynamic(Translations.PreGame.options)(_.apply()))
         )
       ),
       div(
@@ -83,19 +87,25 @@ class PreGameView(
           role := "tabpanel",
           div(
             `class` := "row mx-0 my-2",
-            height := defaultHeight,
+            height := "100%",
             div(
               `class` := "col-6 px-0 overflow-auto",
-              GameStyles.flexContainer,
-              height := defaultHeight,
               div(
-                `class` := "row my-0 mx-1",
-                GameStyles.hideScrollX,
-                createAllShipElems
+                createFleetSaveLoadPanel(nested)
+              ),
+              hr(`class` := "my-2"),
+              div(
+                GameStyles.flexContainer,
+                height := defaultHeight,
+                div(
+                  `class` := "row my-0 mx-1",
+                  GameStyles.hideScrollX,
+                  createAllShipElems
+                )
               )
             ),
             div(
-              `class` := "col-6",
+              `class` := "col-5",
               createCanvasPreview(divElement, nested)
             )
           )
@@ -168,6 +178,230 @@ class PreGameView(
       )
     }
   }
+
+  def createFleetSaveLoadPanel(nested: NestedInterceptor): Modifier =
+    nested(
+      produceWithNested(
+        combine(
+          preGameModel.subProp(_.customNamedRulesMap),
+          preGameModel.subProp(_.selectedNamedRule),
+          preGameModel.subProp(_.rules)
+        )
+      ) { case ((customNamedRulesMap, selectedNamedRuleOpt, rules), nested) =>
+        val unsavedFleetName = "<no-name>"
+
+        val customFleets: Seq[(String, Option[NamedRules])] =
+          (
+            selectedNamedRuleOpt match {
+              case None    => Seq((unsavedFleetName, None))
+              case Some(_) => Seq()
+            }
+          ) ++
+            customNamedRulesMap.toList.map { case (name, namedRules) => (name, Some(namedRules)) }
+
+        val activateSaveChanges: Boolean =
+          selectedNamedRuleOpt match {
+            case None =>
+              true
+            case Some(NamedRules(name, selectedNamedRule))
+                if customNamedRulesMap.contains(name) && selectedNamedRule != rules =>
+              true
+            case _ =>
+              false
+          }
+
+        val allSelectorItems: Seq[JsDom.TypedTag[html.Option]] =
+          (if (customFleets.nonEmpty)
+             Seq(
+               option(
+                 disabled,
+                 "# ",
+                 span(nested(translatedDynamic(Translations.PreGame.yourFleets)(_.apply()))),
+                 ":"
+               )
+             )
+           else
+             Seq.empty) ++
+            customFleets.map { case (fleetName, _) =>
+              option(fleetName)
+            } ++
+            Seq(
+              option(
+                disabled,
+                "# ",
+                span(nested(translatedDynamic(Translations.PreGame.defaultFleets)(_.apply()))),
+                ":"
+              )
+            ) ++
+            PreGameModel.allDefaultNamedRules.map { case NamedRules(fleetName, _) =>
+              option(fleetName)
+            } ++ {
+              if (customNamedRulesMap.sizeIs >= MaxCustomNamedRules)
+                Seq.empty
+              else
+                Seq(
+                  option(disabled, "-" * 20),
+                  option(
+                    span(nested(translatedDynamic(Translations.PreGame.createNewFleet)(_.apply())))
+                  )
+                )
+            }
+        val lastIndex: Int =
+          allSelectorItems.size - 1
+
+        val fleetSelector: Select =
+          select(
+            `class` := "custom-select",
+            allSelectorItems
+          ).render
+
+        val editButton =
+          button(
+            `class` := "btn btn-info",
+            span(FontAwesome.Solid.pencilAlt)
+          ).render
+
+        editButton.onclick = _ => {
+          selectedNamedRuleOpt.foreach { case NamedRules(name, _) =>
+            screenModel.subProp(_.namedRuleNameBefore).set(Some(name))
+            screenModel.subProp(_.namedRuleName).set(name)
+            Globals.modalToggle("fleet-name-modal")
+          }
+        }
+
+        val saveButton =
+          button(
+            `class` := "btn btn-primary p-1",
+            span(nested(translatedDynamic(Translations.PreGame.saveFleet)(_.apply())))
+          ).render
+
+        println(activateSaveChanges)
+        if (!activateSaveChanges)
+          saveButton.classList.add("invisible")
+
+        fleetSelector.onchange = _ => {
+          fleetSelector.selectedIndex match {
+            case `lastIndex` if customNamedRulesMap.sizeIs < MaxCustomNamedRules =>
+              preGameModel.subProp(_.selectedNamedRule).set(None)
+              preGameModel.subProp(_.selectedNamedRuleChanges).set(true)
+              fleetSelector.value = unsavedFleetName
+            case _ =>
+              customNamedRulesMap
+                .get(fleetSelector.value)
+                .orElse(
+                  PreGameModel.allDefaultNamedRules.find(_.name == fleetSelector.value)
+                ) match {
+                case Some(namedRules @ NamedRules(_, rules)) =>
+                  preGameModel.subProp(_.previewEnabled).set(false)
+                  preGameModel.subProp(_.rules).set(rules)
+                  gamePresenter.shipCounter.foreach(_._2.set(0))
+                  rules.gameFleet.shipCounterList.foreach { case (shipId, (counter, _)) =>
+                    gamePresenter.getPreGameShipProperty(shipId).set(counter)
+                  }
+                  preGameModel.subProp(_.previewEnabled).set(true)
+                  preGameModel.subProp(_.selectedNamedRule).set(Some(namedRules))
+                  preGameModel.subProp(_.selectedNamedRuleChanges).set(false)
+                  saveButton.classList.add("invisible")
+                case None =>
+              }
+          }
+        }
+
+        fleetSelector.value = selectedNamedRuleOpt match {
+          case None                      => unsavedFleetName
+          case Some(NamedRules(name, _)) => name
+        }
+
+        saveButton.onclick = _ => {
+          selectedNamedRuleOpt match {
+            case None =>
+              screenModel.subProp(_.namedRuleNameBefore).set(None)
+              screenModel.subProp(_.namedRuleName).set("")
+              Globals.modalToggle("fleet-name-modal")
+            case Some(NamedRules(name, _)) =>
+              screenModel.subProp(_.namedRuleName).set(name)
+              gamePresenter.saveNewNamedRules()
+          }
+        }
+
+        val clearButton =
+          button(
+            `class` := "btn btn-danger p-1",
+            span(FontAwesome.Solid.trash),
+            span(" "),
+            span(nested(translatedDynamic(Translations.PreGame.clearAllShips)(_.apply())))
+          ).render
+
+        clearButton.onclick = _ => {
+          preGameModel.subProp(_.previewEnabled).set(false)
+          gamePresenter.shipCounter.foreach(_._2.set(0))
+          preGameModel.subProp(_.previewEnabled).set(true)
+        }
+
+        val selectedCustomNamedRule: Boolean =
+          selectedNamedRuleOpt.exists(namedRules => customNamedRulesMap.contains(namedRules.name))
+
+        val editAndSaveButtons: Seq[Modifier] =
+          selectedNamedRuleOpt match {
+            case None =>
+              Seq(
+                div(
+                  `class` := "input-group-append",
+                  saveButton
+                ),
+                div(
+                  `class` := "input-group-append invisible",
+                  editButton
+                )
+              )
+            case _ if selectedCustomNamedRule =>
+              Seq(
+                div(
+                  `class` := "input-group-append",
+                  editButton
+                ),
+                div(
+                  `class` := "input-group-append",
+                  saveButton
+                )
+              )
+            case _ =>
+              Seq(
+                div(
+                  `class` := "input-group-append invisible",
+                  editButton
+                ),
+                div(
+                  `class` := "input-group-append",
+                  saveButton
+                )
+              )
+          }
+
+        div(
+          `class` := "row",
+          div(
+            `class` := "input-group d-flex justify-content-center",
+            div(
+              `class` := "input-group-prepend",
+              span(
+                `class` := "input-group-text",
+                style := "user-select: none",
+                nested(translatedDynamic(Translations.PreGame.fleet)(_.apply()))
+              )
+            ),
+            div(
+              fleetSelector
+            ),
+            editAndSaveButtons,
+            div(
+              `class` := "ml-4",
+              clearButton
+            )
+          )
+        ).render
+      }
+    )
 
   def createCanvasPreview(divElement: Element, nested: NestedInterceptor): Binding =
     nested(
@@ -417,7 +651,7 @@ class PreGameView(
           label(
             `class` := "input-group-text",
             `for` := totalTimeLimit.id,
-            nested(translatedDynamic(Translations.Game.timeLimit)(_.apply()))
+            nested(translatedDynamic(Translations.PreGame.timeLimit)(_.apply()))
           ),
           totalTimeLimit
         ),
@@ -428,7 +662,7 @@ class PreGameView(
           label(
             `class` := "input-group-text",
             `for` := turnTimeLimit.id,
-            nested(translatedDynamic(Translations.Game.turnTimeLimit)(_.apply()))
+            nested(translatedDynamic(Translations.PreGame.turnTimeLimit)(_.apply()))
           ),
           turnTimeLimit
         )
@@ -508,7 +742,7 @@ class PreGameView(
             label(
               `class` := "input-group-text",
               `for` := amountCustomShotsSimple.id,
-              nested(translatedDynamic(Translations.Game.amountOfShots)(_.apply()))
+              nested(translatedDynamic(Translations.PreGame.amountOfShots)(_.apply()))
             ),
             attackSimpleImageCanvas,
             amountCustomShotsSimple,

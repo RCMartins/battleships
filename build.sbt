@@ -232,31 +232,35 @@ lazy val frontend = project
       .value
   )
 
-lazy val backend = project
-  .in(file("backend"))
-  .dependsOn(shared % TestAndCompileDep)
-  .settings(commonSettings)
-  .settings(
-    libraryDependencies ++= Dependencies.backendDeps.value,
-    Compile / mainClass := Some("pt.rmartins.battleships.backend.Launcher")
-  )
+lazy val backend =
+  project
+    .in(file("backend"))
+    .dependsOn(shared % TestAndCompileDep)
+    .settings(commonSettings)
+    .settings(
+      libraryDependencies ++= Dependencies.backendDeps.value,
+      Compile / mainClass := Some("pt.rmartins.battleships.backend.Launcher")
+    )
 
-lazy val packager = project
-  .in(file("packager"))
-  .dependsOn(backend)
-  .enablePlugins(JavaServerAppPackaging)
-  .settings(commonSettings)
-  .settings(
-    normalizedName := "battleships",
-    Compile / mainClass := (backend / Compile / mainClass).value,
+lazy val packager =
+  project
+    .in(file("packager"))
+    .dependsOn(backend)
+    .enablePlugins(JavaServerAppPackaging)
+    .settings(commonSettings)
+    .settings(
+      normalizedName := "battleships",
+      Compile / mainClass := (backend / Compile / mainClass).value,
 
-    // add frontend statics to the package
-    Universal / mappings ++= {
-      import Path.relativeTo
-      val frontendStatics = (frontend / Compile / compileAndOptimizeStatics).value
-      (frontendStatics.allPaths --- frontendStatics) pair relativeTo(frontendStatics.getParentFile)
-    }
-  )
+      // add frontend statics to the package
+      Universal / mappings ++= {
+        import Path.relativeTo
+        val frontendStatics = (frontend / Compile / compileAndOptimizeStatics).value
+        (frontendStatics.allPaths --- frontendStatics) pair relativeTo(
+          frontendStatics.getParentFile
+        )
+      }
+    )
 
 Global / excludeLintKeys ++= Set(
   ideBasePackages,
