@@ -6,7 +6,7 @@ import io.udash.bindings.modifiers.Binding.NestedInterceptor
 import io.udash.bootstrap.utils.UdashIcons.FontAwesome
 import io.udash.css._
 import io.udash.i18n.translatedDynamic
-import org.scalajs.dom.{html, _}
+import org.scalajs.dom._
 import org.scalajs.dom.html.{Canvas, Div, Select}
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
@@ -210,7 +210,7 @@ class PreGameView(
               false
           }
 
-        val allSelectorItems: Seq[JsDom.TypedTag[html.Option]] =
+        val allSelectorItems =
           (if (customFleets.nonEmpty)
              Seq(
                option(
@@ -246,8 +246,6 @@ class PreGameView(
                   )
                 )
             }
-        val lastIndex: Int =
-          allSelectorItems.size - 1
 
         val fleetSelector: Select =
           select(
@@ -275,36 +273,35 @@ class PreGameView(
             span(nested(translatedDynamic(Translations.PreGame.saveFleet)(_.apply())))
           ).render
 
-        println(activateSaveChanges)
         if (!activateSaveChanges)
           saveButton.classList.add("invisible")
 
         fleetSelector.onchange = _ => {
-          fleetSelector.selectedIndex match {
-            case `lastIndex` if customNamedRulesMap.sizeIs < MaxCustomNamedRules =>
-              preGameModel.subProp(_.selectedNamedRule).set(None)
-              preGameModel.subProp(_.selectedNamedRuleChanges).set(true)
-              fleetSelector.value = unsavedFleetName
-            case _ =>
-              customNamedRulesMap
-                .get(fleetSelector.value)
-                .orElse(
-                  PreGameModel.allDefaultNamedRules.find(_.name == fleetSelector.value)
-                ) match {
-                case Some(namedRules @ NamedRules(_, rules)) =>
-                  preGameModel.subProp(_.previewEnabled).set(false)
-                  preGameModel.subProp(_.rules).set(rules)
-                  gamePresenter.shipCounter.foreach(_._2.set(0))
-                  rules.gameFleet.shipCounterList.foreach { case (shipId, (counter, _)) =>
-                    gamePresenter.getPreGameShipProperty(shipId).set(counter)
-                  }
-                  preGameModel.subProp(_.previewEnabled).set(true)
-                  preGameModel.subProp(_.selectedNamedRule).set(Some(namedRules))
-                  preGameModel.subProp(_.selectedNamedRuleChanges).set(false)
-                  saveButton.classList.add("invisible")
-                case None =>
+          if (
+            fleetSelector.selectedIndex == allSelectorItems.size - 1 &&
+            customNamedRulesMap.sizeIs < MaxCustomNamedRules
+          ) {
+            preGameModel.subProp(_.selectedNamedRule).set(None)
+            preGameModel.subProp(_.selectedNamedRuleChanges).set(true)
+            fleetSelector.value = unsavedFleetName
+          } else
+            customNamedRulesMap
+              .get(fleetSelector.value)
+              .orElse(
+                PreGameModel.allDefaultNamedRules.find(_.name == fleetSelector.value)
+              )
+              .foreach { case namedRules @ NamedRules(_, rules) =>
+                preGameModel.subProp(_.previewEnabled).set(false)
+                preGameModel.subProp(_.rules).set(rules)
+                gamePresenter.shipCounter.foreach(_._2.set(0))
+                rules.gameFleet.shipCounterList.foreach { case (shipId, (counter, _)) =>
+                  gamePresenter.getPreGameShipProperty(shipId).set(counter)
+                }
+                preGameModel.subProp(_.previewEnabled).set(true)
+                preGameModel.subProp(_.selectedNamedRule).set(Some(namedRules))
+                preGameModel.subProp(_.selectedNamedRuleChanges).set(false)
+                saveButton.classList.add("invisible")
               }
-          }
         }
 
         fleetSelector.value = selectedNamedRuleOpt match {
@@ -338,9 +335,6 @@ class PreGameView(
           preGameModel.subProp(_.previewEnabled).set(true)
         }
 
-        val selectedCustomNamedRule: Boolean =
-          selectedNamedRuleOpt.exists(namedRules => customNamedRulesMap.contains(namedRules.name))
-
         val editAndSaveButtons: Seq[Modifier] =
           selectedNamedRuleOpt match {
             case None =>
@@ -354,7 +348,7 @@ class PreGameView(
                   editButton
                 )
               )
-            case _ if selectedCustomNamedRule =>
+            case Some(NamedRules(name, _)) if customNamedRulesMap.contains(name) =>
               Seq(
                 div(
                   `class` := "input-group-append",
