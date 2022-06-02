@@ -16,7 +16,6 @@ import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game.RuleTimeLimit._
 import pt.rmartins.battleships.shared.model.game._
-import scalatags.JsDom
 import scalatags.JsDom.all._
 
 class PreGameView(
@@ -91,7 +90,7 @@ class PreGameView(
             div(
               `class` := "col-6 px-0 overflow-auto",
               div(
-                createFleetSaveLoadPanel(nested)
+                createFleetSaveLoadDiv(nested)
               ),
               hr(`class` := "my-2"),
               div(
@@ -179,7 +178,7 @@ class PreGameView(
     }
   }
 
-  def createFleetSaveLoadPanel(nested: NestedInterceptor): Modifier =
+  private def createFleetSaveLoadDiv(nested: NestedInterceptor): Modifier =
     nested(
       produceWithNested(
         combine(
@@ -397,7 +396,7 @@ class PreGameView(
       }
     )
 
-  def createCanvasPreview(divElement: Element, nested: NestedInterceptor): Binding =
+  private def createCanvasPreview(divElement: Element, nested: NestedInterceptor): Binding =
     nested(
       produce(
         combine(
@@ -521,7 +520,7 @@ class PreGameView(
       }
     )
 
-  def createTimeLimitOptions(nested: NestedInterceptor): Modifier = {
+  private def createTimeLimitOptions(nested: NestedInterceptor): Modifier = {
     def selectOptionToSeconds(str: String): Int = {
       val s"$minutes:$seconds" = str
       minutes.toInt * 60 + seconds.toInt
@@ -664,7 +663,7 @@ class PreGameView(
     )
   }
 
-  def createCustomShots(nested: NestedInterceptor): Modifier = {
+  private def createCustomShots(nested: NestedInterceptor): Modifier = {
     val imageSize = Coordinate.square(50)
     val missilesDistance = 30
     val MaxMissiles = 5
