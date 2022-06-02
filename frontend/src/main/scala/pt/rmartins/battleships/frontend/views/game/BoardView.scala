@@ -6,8 +6,9 @@ import org.scalajs.dom._
 import org.scalajs.dom.html.{Canvas, Div}
 import pt.rmartins.battleships.frontend.views.game.BoardView._
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
-import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
+import pt.rmartins.battleships.frontend.views.model.AttacksQueuedStatus
+import pt.rmartins.battleships.frontend.views.model.ModeType._
 import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit

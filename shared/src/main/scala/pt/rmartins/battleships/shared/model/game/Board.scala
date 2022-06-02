@@ -1,6 +1,7 @@
 package pt.rmartins.battleships.shared.model.game
 
 import com.avsystem.commons.serialization.HasGenCodec
+import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
 
 import scala.annotation.tailrec
 
@@ -52,4 +53,12 @@ case class Board(
 
 }
 
-object Board extends HasGenCodec[Board]
+object Board extends HasGenCodec[Board] {
+
+  implicit val boardEncoder: JsonEncoder[Board] =
+    DeriveJsonEncoder.gen[Board]
+
+  implicit val boardDecoder: JsonDecoder[Board] =
+    DeriveJsonDecoder.gen[Board]
+
+}

@@ -2,6 +2,7 @@ package pt.rmartins.battleships.frontend.views.game
 
 import io.udash.HasModelPropertyCreator
 import pt.rmartins.battleships.frontend.views.game.BoardView.GameAction
+import pt.rmartins.battleships.frontend.views.model.AttacksQueuedStatus
 import pt.rmartins.battleships.shared.model.game._
 
 case class GameModel(

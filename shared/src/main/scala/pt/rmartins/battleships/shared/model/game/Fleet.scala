@@ -1,6 +1,7 @@
 package pt.rmartins.battleships.shared.model.game
 
 import com.avsystem.commons.serialization.HasGenCodec
+import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
 
 case class Fleet(shipCounterList: List[(ShipId, (Int, Rotation))]) {
 
@@ -40,6 +41,14 @@ case class Fleet(shipCounterList: List[(ShipId, (Int, Rotation))]) {
 
 object Fleet extends HasGenCodec[Fleet] {
 
+  implicit val fleetEncoder: JsonEncoder[Fleet] =
+    DeriveJsonEncoder.gen[Fleet]
+
+  implicit val fleetDecoder: JsonDecoder[Fleet] =
+    DeriveJsonDecoder.gen[Fleet]
+
+  val empty: Fleet = Fleet(Nil)
+
   def fromShips(initialShips: List[(Ship, Int)]): Fleet =
     Fleet(
       initialShips.map { case (ship, amount) =>
@@ -59,36 +68,6 @@ object Fleet extends HasGenCodec[Fleet] {
       initialShips.groupBy(_.shipId).toList.map { case (shipId, list) =>
         shipId -> ((list.size, Rotation.Rotation0))
       }
-    )
-
-  val default10By10: (Coordinate, Fleet) =
-    (
-      Coordinate.square(10),
-      fromShips(
-        List(
-          Ship.Submarine -> 4,
-          Ship.Skeeter -> 3,
-          Ship.Ranger -> 2,
-          Ship.Conqueror -> 1,
-          Ship.AircraftCarrier -> 1
-        )
-      )
-    )
-
-  val default15By15: (Coordinate, Fleet) =
-    (
-      Coordinate.square(15),
-      fromShips(
-        List(
-          Ship.Skeeter -> 4,
-          Ship.Ranger -> 3,
-          Ship.Conqueror -> 2,
-          Ship.TorpedoBoat -> 2,
-          Ship.Cruiser -> 2,
-          Ship.Epoch -> 1,
-          Ship.Battleship -> 1
-        )
-      )
     )
 
 }

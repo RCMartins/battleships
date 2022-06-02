@@ -1,6 +1,7 @@
 package pt.rmartins.battleships.frontend.views.game
 
 import io.udash.HasModelPropertyCreator
+import pt.rmartins.battleships.frontend.views.model.ErrorModalType
 import pt.rmartins.battleships.shared.model.game.{Coordinate, Turn}
 
 case class ScreenModel(
@@ -21,7 +22,9 @@ case class ScreenModel(
     disabledMovesSet: Set[Turn],
     hoverMove: Option[Turn],
     tick: Int,
-    receiveEditRequest: Option[Unit]
+    receiveEditRequest: Option[Unit],
+    namedRuleNameBefore: Option[String],
+    namedRuleName: String
 )
 
 object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
@@ -49,7 +52,9 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
       disabledMovesSet = Set.empty,
       hoverMove = None,
       tick = 0,
-      receiveEditRequest = None
+      receiveEditRequest = None,
+      namedRuleNameBefore = None,
+      namedRuleName = ""
     )
 
   def resetScreenModel(model: ScreenModel): ScreenModel = {
@@ -66,7 +71,9 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
       disabledMovesSet = Set.empty,
       hoverMove = None,
       tick = 0,
-      receiveEditRequest = None
+      receiveEditRequest = None,
+      namedRuleNameBefore = None,
+      namedRuleName = ""
     )
   }
 

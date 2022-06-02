@@ -1,6 +1,7 @@
 package pt.rmartins.battleships.shared.model.game
 
 import com.avsystem.commons.serialization.HasGenCodec
+import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
 
 case class Turn(
     currentTurn: Int,
@@ -26,4 +27,12 @@ case class Turn(
 
 }
 
-object Turn extends HasGenCodec[Turn]
+object Turn extends HasGenCodec[Turn] {
+
+  implicit val turnEncoder: JsonEncoder[Turn] =
+    DeriveJsonEncoder.gen[Turn]
+
+  implicit val turnDecoder: JsonDecoder[Turn] =
+    DeriveJsonDecoder.gen[Turn]
+
+}

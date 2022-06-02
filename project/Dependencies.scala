@@ -35,7 +35,8 @@ object Dependencies {
       "io.udash" %%% "udash-i18n" % udashVersion,
       "io.udash" %%% "udash-css" % udashVersion,
       "io.udash" %%% "udash-auth" % udashVersion,
-      "com.softwaremill.quicklens" %%% "quicklens" % quicklensVersion
+      "com.softwaremill.quicklens" %%% "quicklens" % quicklensVersion,
+      "dev.zio" %%% "zio-json" % zioJsonVersion
     )
   )
 
@@ -91,7 +92,6 @@ object Dependencies {
       "org.eclipse.jetty.websocket" % "websocket-server" % jettyVersion,
       "com.typesafe" % "config" % typesafeConfigVersion,
       "com.github.pathikrit" %% "better-files" % betterFilesVersion,
-      "dev.zio" %% "zio-json" % zioJsonVersion,
       // server logging backend
       "ch.qos.logback" % "logback-classic" % logbackVersion
     )

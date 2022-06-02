@@ -17,10 +17,11 @@ import org.scalajs.dom
 import org.scalajs.dom._
 import org.scalajs.dom.html.{Canvas, Div, Input, LI, Span}
 import pt.rmartins.battleships.frontend.services.TranslationsService
-import pt.rmartins.battleships.frontend.views.game.ErrorModalType._
-import pt.rmartins.battleships.frontend.views.game.JoinedPreGame.PlayingAgainstPlayer
-import pt.rmartins.battleships.frontend.views.game.ModeType._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
+import pt.rmartins.battleships.frontend.views.model.{AttacksQueuedStatus, NamedRules}
+import pt.rmartins.battleships.frontend.views.model.ErrorModalType._
+import pt.rmartins.battleships.frontend.views.model.JoinedPreGame.PlayingAgainstPlayer
+import pt.rmartins.battleships.frontend.views.model.ModeType._
 import pt.rmartins.battleships.shared.css.ChatStyles
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game.GameMode._
@@ -406,7 +407,7 @@ class GameView(
                 case (Some(PlayingAgainstPlayer(_, _, true, _)), nested) =>
                   div(
                     `class` := "mx-3 mt-1",
-                    nested(translatedDynamic(Translations.Game.enemyAcceptedRules)(_.apply()))
+                    nested(translatedDynamic(Translations.PreGame.enemyAcceptedRules)(_.apply()))
                   ).render
                 case _ =>
                   div.render
@@ -1041,6 +1042,7 @@ class GameView(
                 ).render
             }),
             span(
+              style := "cursor: pointer",
               FontAwesome.Solid.times,
               FontAwesome.Modifiers.Sizing.x2,
               attr("data-bs-dismiss") := "modal"
@@ -1226,6 +1228,94 @@ class GameView(
       )
     ).render
 
+  private val fleetNameInput: Input =
+    input(
+      id := "fleet-name-modal-input",
+      `class` := "form-control",
+      `type` := "text",
+      autofocus
+    ).render
+
+  fleetNameInput.onkeypress = event => {
+    if (event.key == "Enter" || event.keyCode == 13)
+      Globals.modalHide(fleetNameModalId)
+    else if (
+      fleetNameInput.value.length >= NamedRules.MaxNamedRulesLength &&
+      fleetNameInput.selectionStart == fleetNameInput.selectionEnd
+    )
+      event.preventDefault()
+  }
+
+  fleetNameInput.onchange = _ => {
+    fleetNameInput.value = fleetNameInput.value.take(NamedRules.MaxNamedRulesLength).trim
+    screenModel.subProp(_.namedRuleName).set(fleetNameInput.value)
+  }
+
+  screenModel.subProp(_.namedRuleName).listen { newFleetName =>
+    fleetNameInput.value = newFleetName
+  }
+
+  private val fleetNameModalId: String = "fleet-name-modal"
+  def fleetNameModal(nested: NestedInterceptor): Div = {
+    div(
+      `class` := "modal fade",
+      id := fleetNameModalId,
+      div(
+        `class` := "modal-dialog modal-dialog-centered",
+        div(
+          `class` := "modal-content",
+          div(
+            `class` := "modal-header",
+            h5(nested(translatedDynamic(Translations.PreGame.chooseFleetNameTitle)(_.apply()))),
+            span(
+              style := "cursor: pointer",
+              FontAwesome.Solid.times,
+              FontAwesome.Modifiers.Sizing.x2,
+              attr("data-bs-dismiss") := "modal"
+            ).render.tap {
+              _.onclick = _ => {
+                screenModel.subProp(_.namedRuleName).set("")
+              }
+            }
+          ),
+          div(
+            `class` := "modal-body",
+            div(
+              `class` := "form-group",
+              fleetNameInput
+            )
+          ),
+          div(
+            `class` := "modal-footer",
+            button(
+              `class` := "btn btn-secondary",
+              `type` := "button",
+              attr("data-bs-dismiss") := "modal",
+              nested(translatedDynamic(Translations.Game.closeButton)(_.apply()))
+            ).render.tap {
+              _.onclick = _ => {
+                screenModel.subProp(_.namedRuleName).set("")
+              }
+            },
+            button(
+              `class` := "btn btn-primary",
+              `type` := "button",
+              nested(translatedDynamic(Translations.PreGame.saveFleet)(_.apply()))
+            ).render.tap {
+              _.onclick = _ => {
+                if (
+                  fleetNameInput.value.nonEmpty &&
+                  fleetNameInput.value.sizeIs <= NamedRules.MaxNamedRulesLength
+                )
+                  Globals.modalHide(fleetNameModalId)
+              }
+            }
+          )
+        )
+      )
+    ).render
+  }
+
   private val quitGameModalId: String = "quit-game-modal"
   def quitGameModal(nested: NestedInterceptor): Div =
     div(
@@ -1239,6 +1329,7 @@ class GameView(
             `class` := "modal-header",
             h5(nested(translatedDynamic(Translations.Game.confirmQuitGameTitle)(_.apply()))),
             span(
+              style := "cursor: pointer",
               FontAwesome.Solid.times,
               FontAwesome.Modifiers.Sizing.x2,
               attr("data-bs-dismiss") := "modal"
@@ -1316,6 +1407,23 @@ class GameView(
                 }
               )
             },
+            fleetNameModal(nested)
+              .tap {
+                _.addEventListener(
+                  "shown.bs.modal",
+                  (_: Event) => {
+                    fleetNameInput.focus()
+                  }
+                )
+              }
+              .tap {
+                _.addEventListener(
+                  "hidden.bs.modal",
+                  (_: Event) => {
+                    presenter.saveNewNamedRules()
+                  }
+                )
+              },
             quitGameModal(nested),
             acceptPlayerInviteModal(nested).tap {
               _.addEventListener(

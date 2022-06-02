@@ -1,4 +1,4 @@
-package pt.rmartins.battleships.frontend.views.game
+package pt.rmartins.battleships.frontend.views.model
 
 import com.avsystem.commons.serialization.HasGenCodec
 import pt.rmartins.battleships.shared.model.game._

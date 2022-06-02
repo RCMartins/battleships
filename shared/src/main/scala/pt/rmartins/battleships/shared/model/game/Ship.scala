@@ -2,6 +2,7 @@ package pt.rmartins.battleships.shared.model.game
 
 import com.avsystem.commons.serialization.HasGenCodec
 import pt.rmartins.battleships.shared.model.game.Rotation._
+import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
 
 import scala.collection.mutable
 import scala.util.chaining.scalaUtilChainingOps
@@ -34,6 +35,12 @@ case class Ship(shipId: ShipId, pieces: List[Coordinate], rotation: Rotation) {
 }
 
 object Ship extends HasGenCodec[Ship] {
+
+  implicit val shipEncoder: JsonEncoder[Ship] =
+    DeriveJsonEncoder.gen[Ship]
+
+  implicit val shipDecoder: JsonDecoder[Ship] =
+    DeriveJsonDecoder.gen[Ship]
 
   private var id: Int = 0
 
