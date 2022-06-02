@@ -1347,7 +1347,7 @@ class GamePresenter(
     }
 
   def saveNewNamedRules(): Unit = {
-    val name = screenModel.subProp(_.namedRuleName).get
+    val name = screenModel.subProp(_.namedRuleName).get.trim
     if (name.nonEmpty) {
       val preGame = preGameModel.get
 

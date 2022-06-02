@@ -1237,12 +1237,17 @@ class GameView(
     ).render
 
   fleetNameInput.onkeypress = event => {
-    if (fleetNameInput.value.length >= NamedRules.MaxNamedRulesLength)
+    if (event.key == "Enter" || event.keyCode == 13)
+      Globals.modalHide(fleetNameModalId)
+    else if (
+      fleetNameInput.value.length >= NamedRules.MaxNamedRulesLength &&
+      fleetNameInput.selectionStart == fleetNameInput.selectionEnd
+    )
       event.preventDefault()
   }
 
   fleetNameInput.onchange = _ => {
-    fleetNameInput.value = fleetNameInput.value.take(NamedRules.MaxNamedRulesLength)
+    fleetNameInput.value = fleetNameInput.value.take(NamedRules.MaxNamedRulesLength).trim
     screenModel.subProp(_.namedRuleName).set(fleetNameInput.value)
   }
 
