@@ -61,6 +61,10 @@ class LoginPagePresenter(
           model.subProp(_.errors).set(Seq(Translations.Auth.userAlreadyExists))
         case Success(Left(AuthError.UsernameInvalid)) =>
           model.subProp(_.errors).set(Seq(Translations.Auth.userNotFound))
+        case Success(Left(AuthError.UsernameTooLong)) =>
+          model
+            .subProp(_.errors)
+            .set(Seq(Translations.Auth.usernameTooLong.apply(Username.MaximumUserNameLength)))
         case _ =>
           model.subProp(_.errors).set(Seq(Translations.Global.unknownError))
       }

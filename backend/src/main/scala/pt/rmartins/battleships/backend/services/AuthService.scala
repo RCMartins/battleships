@@ -1,7 +1,6 @@
 package pt.rmartins.battleships.backend.services
 
 import com.avsystem.commons._
-import com.softwaremill.quicklens.ModifyPimp
 import pt.rmartins.battleships.shared.model.auth.{UserContext, UserToken}
 import pt.rmartins.battleships.shared.model.game.{AuthError, Username}
 
@@ -15,7 +14,6 @@ class AuthService() {
   private val usersLogged: MHashSet[Username] = MHashSet.empty
   private val tokens: MMap[UserToken, UserContext] = MMap.empty
 
-  private val MaximumUserNameLength: Int = 25
   private val ValidNonLettersRegex: Regex = "[ \\d\\-+*=_!@#$%&<>.\"']*".r
 
   private def validUsername(username: Username): Boolean =
@@ -35,7 +33,7 @@ class AuthService() {
   def loginUsername(username: Username): Future[Either[AuthError, UserContext]] = Future {
     val usernameLower = username.toLowerCase
 
-    if (usernameLower.username.length > MaximumUserNameLength)
+    if (usernameLower.username.length > Username.MaximumUserNameLength)
       Left(AuthError.UsernameTooLong)
     else if (!validUsername(usernameLower))
       Left(AuthError.UsernameInvalid)
