@@ -12,4 +12,8 @@ case class Username(username: String) {
 
 }
 
-object Username extends HasGenCodec[Username]
+object Username extends HasGenCodec[Username] {
+
+  val MaximumUserNameLength: Int = 25
+
+}

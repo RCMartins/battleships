@@ -21,6 +21,7 @@ object Translations {
     val submitButton = key("auth.submit.label")
 
     val userNotFound = key("auth.user_not_found")
+    val usernameTooLong = key1[Int]("auth.username_too_long")
     val userAlreadyExists = key("auth.user_already_exists")
   }
 

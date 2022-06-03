@@ -1,7 +1,6 @@
 package pt.rmartins.battleships.backend.services
 
 import com.avsystem.commons._
-import com.softwaremill.quicklens.ModifyPimp
 import pt.rmartins.battleships.shared.model.auth.{UserContext, UserToken}
 import pt.rmartins.battleships.shared.model.game.{AuthError, Username}
 
@@ -15,10 +14,11 @@ class AuthService() {
   private val usersLogged: MHashSet[Username] = MHashSet.empty
   private val tokens: MMap[UserToken, UserContext] = MMap.empty
 
-  private val ValidUsernameRegex: Regex = "[a-zA-Z0-9 \\-+*=_!@#$%&<>.]+".r
+  private val ValidNonLettersRegex: Regex = "[ \\d\\-+*=_!@#$%&<>.\"']*".r
 
   private def validUsername(username: Username): Boolean =
-    username.username.exists(_.isLetterOrDigit) && ValidUsernameRegex.matches(username.username) &&
+    username.username.exists(_.isLetterOrDigit) &&
+      ValidNonLettersRegex.matches(username.username.filterNot(_.isLetter)) &&
       username.toLowerCase != GameService.BotUsername.toLowerCase
 
   def logout(userToken: UserToken): Future[Unit] = Future {
@@ -33,10 +33,12 @@ class AuthService() {
   def loginUsername(username: Username): Future[Either[AuthError, UserContext]] = Future {
     val usernameLower = username.toLowerCase
 
-    if (tokens.synchronized(usersLogged(usernameLower)))
-      Left(AuthError.UserAlreadyExists)
+    if (usernameLower.username.length > Username.MaximumUserNameLength)
+      Left(AuthError.UsernameTooLong)
     else if (!validUsername(usernameLower))
       Left(AuthError.UsernameInvalid)
+    else if (tokens.synchronized(usersLogged(usernameLower)))
+      Left(AuthError.UserAlreadyExists)
     else {
       val token = UserToken(UUID.randomUUID().toString)
       val ctx = UserContext(
