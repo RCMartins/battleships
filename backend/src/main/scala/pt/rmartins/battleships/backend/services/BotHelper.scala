@@ -30,7 +30,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
   private val standardTripleKill: Boolean =
     rules.turnBonuses.exists(turnBonus =>
       turnBonus.bonusType == BonusType.TripleKill &&
-        turnBonus.bonusReward.contains(BonusReward.ExtraTurn(List.fill(3)(AttackType.Simple)))
+        turnBonus.bonusRewardList.contains(BonusReward.ExtraTurn(List.fill(3)(AttackType.Simple)))
     )
 
   private def forceSetBoardMarkUpdated(

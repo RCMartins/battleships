@@ -49,7 +49,7 @@ object Translations {
     val eachTurn = key("game.pregame.eachTurn")
     val amountOfShots = key("game.pregame.amountOfShots")
     val enemyAcceptedRules = key("game.pregame.enemy_accepted_rules")
-    val bonuses = key("game.pregame.bonuses")
+    val turnBonuses = key("game.pregame.turn_bonuses")
     val bonusFirstBlood = key("game.pregame.bonusFirstBlood")
     val bonusDoubleKill = key("game.pregame.bonusDoubleKill")
     val bonusTripleKill = key("game.pregame.bonusTripleKill")

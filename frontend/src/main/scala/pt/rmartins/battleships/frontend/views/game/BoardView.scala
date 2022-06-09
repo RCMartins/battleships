@@ -1421,7 +1421,7 @@ class BoardView(
         List(s"${translationsData.amountOfShots.innerText}: ${rules.defaultTurnAttacks.size}"),
         List(""),
         Some(rules.turnBonuses.nonEmpty)
-          .map(_ => translationsData.bonuses.innerText + ":")
+          .map(_ => translationsData.turnBonuses.innerText + ":")
           .toList, {
           def rewardsToString(bonusRewardList: List[BonusReward]): String =
             bonusRewardList
