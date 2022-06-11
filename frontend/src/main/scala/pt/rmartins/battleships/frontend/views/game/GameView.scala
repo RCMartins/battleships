@@ -1105,6 +1105,7 @@ class GameView(
                 }
               )
             },
+            gameModals.editGameBonusModal(nested),
             div(
               `class` := "col-6",
               span(

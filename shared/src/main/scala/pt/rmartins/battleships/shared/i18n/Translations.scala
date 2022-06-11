@@ -36,6 +36,8 @@ object Translations {
     val saveFleet = key("game.pregame.save_fleet")
     val clearAllShips = key("game.pregame.clear_all_ships")
     val chooseFleetNameTitle = key("game.modal.choose_fleet_name_title")
+    val editGameBonusTitle = key("game.modal.edit_game_bonus_title")
+    val saveChangesButton = key("game.pregame.save_changes")
 
     val fleet = key("game.pregame.fleet")
     val options = key("game.pregame.options")

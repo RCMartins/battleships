@@ -325,6 +325,11 @@ object CanvasUtils {
     val newImageCanvas: Canvas = canvas.render
     newImageCanvas.setAttribute("width", size.x.toString)
     newImageCanvas.setAttribute("height", size.y.toString)
+
+    val renderingCtx = newImageCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+    renderingCtx.fillStyle = "white"
+    renderingCtx.fillRect(0, 0, size.x, size.y)
+
     newImageCanvas
   }
 
@@ -382,13 +387,13 @@ object CanvasUtils {
         canvasImage,
         Coordinate.square(size - 2),
         drawBeforeF = () => {
-          drawSquareAbs(
-            renderingCtx,
-            position,
-            size,
-            CanvasColor.White(alpha = 1.0),
-            0
-          )
+//          drawSquareAbs(
+//            renderingCtx,
+//            position,
+//            size,
+//            CanvasColor.White(bo alpha = 1.0),
+//            0
+//          )
         }
       )
     }

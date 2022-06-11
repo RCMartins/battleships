@@ -50,6 +50,13 @@ class GameViewFactory(
       new CanvasUtils(gamePresenter)
     val viewUtils: ViewUtils =
       new ViewUtils(canvasUtils)
+    val gameModals: GameModals =
+      new GameModals(
+        preGameModel,
+        screenModel,
+        gamePresenter,
+        translationsService
+      )
     val preGameView =
       new PreGameView(
         preGameModel,
@@ -58,9 +65,9 @@ class GameViewFactory(
         gamePresenter,
         canvasUtils,
         viewUtils,
+        gameModals,
         translationsService
       )
-
     val boardView: BoardView =
       new BoardView(
         gameModel,
@@ -69,13 +76,6 @@ class GameViewFactory(
         gamePresenter,
         mousePresenter,
         canvasUtils
-      )
-    val gameModals: GameModals =
-      new GameModals(
-        preGameModel,
-        screenModel,
-        gamePresenter,
-        translationsService
       )
     val gameView: GameView =
       new GameView(

@@ -1,5 +1,6 @@
 package pt.rmartins.battleships.frontend.views.game
 
+import com.softwaremill.quicklens.ModifyPimp
 import io.udash.bindings.modifiers.Binding.NestedInterceptor
 import io.udash.bootstrap.utils.UdashIcons.FontAwesome
 import io.udash.css.CssView
@@ -10,7 +11,12 @@ import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.model.ErrorModalType._
 import pt.rmartins.battleships.frontend.views.model.NamedRules
 import pt.rmartins.battleships.shared.i18n.Translations
-import pt.rmartins.battleships.shared.model.game.{PlayerInviteType, Username}
+import pt.rmartins.battleships.shared.model.game.{
+  BonusReward,
+  PlayerInviteType,
+  TurnBonus,
+  Username
+}
 import scalatags.JsDom.all._
 
 import scala.util.chaining.scalaUtilChainingOps
@@ -312,6 +318,90 @@ class GameModals(
                   fleetNameInput.value.sizeIs <= NamedRules.MaxNamedRulesLength
                 )
                   Globals.modalHide(fleetNameModalId)
+              }
+            }
+          )
+        )
+      )
+    ).render
+
+  val editGameBonusModalId: String = "game-bonus-modal"
+  def editGameBonusModal(nested: NestedInterceptor): Div =
+    div(
+      `class` := "modal fade",
+      id := editGameBonusModalId,
+      div(
+        `class` := "modal-dialog modal-dialog-centered",
+        div(
+          `class` := "modal-content",
+          div(
+            `class` := "modal-header",
+            h5(
+              nested(translatedDynamic(Translations.PreGame.editGameBonusTitle)(_.apply())),
+              nested(
+                produceWithNested(preGameModel.subProp(_.editGameBonusType)) {
+                  case (bonusType, nested) =>
+                    span(" ", b(nested(TranslationUtils.bonusTypeToText(bonusType)))).render
+                }
+              )
+            ),
+            span(
+              style := "cursor: pointer",
+              FontAwesome.Solid.times,
+              FontAwesome.Modifiers.Sizing.x2,
+              attr("data-bs-dismiss") := "modal"
+            )
+          ),
+          div(
+            `class` := "modal-body",
+            div(
+              button(
+                `class` := "btn btn-primary",
+                `type` := "button",
+                "New Bonus" //nested(translatedDynamic(Translations.Game.closeButton)(_.apply()))
+              )
+            ),
+            div(
+              nested(
+                produce(preGameModel.subProp(_.editGameBonusDiv)) { div => div }
+//                produceWithNested(preGameModel.subProp(_.editGameBonusRewards)) {
+//                  case (bonusRewardsList, nested) =>
+//                    bonusRewardsList.map { case BonusReward.ExtraTurn(attackTypes) =>
+//                      div.render
+//                    }
+//                }
+              )
+            )
+          ),
+          div(
+            `class` := "modal-footer",
+            button(
+              `class` := "btn btn-secondary",
+              `type` := "button",
+              attr("data-bs-dismiss") := "modal",
+              nested(translatedDynamic(Translations.Game.closeButton)(_.apply()))
+            ),
+            button(
+              `class` := "btn btn-primary",
+              `type` := "button",
+              attr("data-bs-dismiss") := "modal",
+              nested(translatedDynamic(Translations.PreGame.saveChangesButton)(_.apply()))
+            ).render.tap {
+              _.onclick = _ => {
+                val preGame = preGameModel.get
+                preGameModel
+                  .subProp(_.rules)
+                  .set(
+                    preGame.rules
+                      .modify(_.turnBonuses)
+                      .using { currentTurnBonuses =>
+                        (preGame.editGameBonusRewards match {
+                          case Nil  => Nil
+                          case list => List(TurnBonus(preGame.editGameBonusType, list))
+                        }) ++
+                          currentTurnBonuses.filterNot(_.bonusType == preGame.editGameBonusType)
+                      }
+                  )
               }
             }
           )

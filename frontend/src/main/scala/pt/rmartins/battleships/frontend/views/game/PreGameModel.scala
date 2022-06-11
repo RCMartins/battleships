@@ -1,11 +1,13 @@
 package pt.rmartins.battleships.frontend.views.game
 
 import io.udash.HasModelPropertyCreator
+import org.scalajs.dom.html.Div
 import pt.rmartins.battleships.frontend.views.model.{JoinedPreGame, NamedRules}
 import pt.rmartins.battleships.shared.model.game.BonusReward.ExtraTurn
 import pt.rmartins.battleships.shared.model.game.Fleet.fromShips
 import pt.rmartins.battleships.shared.model.game.RuleTimeLimit.WithRuleTimeLimit
 import pt.rmartins.battleships.shared.model.game._
+import scalatags.JsDom.all.div
 
 import scala.collection.immutable.SortedMap
 
@@ -19,7 +21,10 @@ case class PreGameModel(
     previewBoardOpt: Option[(Board, Int)],
     customNamedRulesMap: SortedMap[String, NamedRules],
     selectedNamedRule: Option[NamedRules],
-    selectedNamedRuleChanges: Boolean
+    selectedNamedRuleChanges: Boolean,
+    editGameBonusType: BonusType,
+    editGameBonusRewards: List[BonusReward],
+    editGameBonusDiv: Div
 )
 
 object PreGameModel extends HasModelPropertyCreator[PreGameModel] {
@@ -104,7 +109,10 @@ object PreGameModel extends HasModelPropertyCreator[PreGameModel] {
       previewBoardOpt = None,
       customNamedRulesMap = SortedMap.empty,
       selectedNamedRule = Some(allDefaultNamedRules.head),
-      selectedNamedRuleChanges = false
+      selectedNamedRuleChanges = false,
+      editGameBonusType = BonusType.FirstBlood,
+      editGameBonusRewards = Nil,
+      editGameBonusDiv = div.render
     )
 
 }
