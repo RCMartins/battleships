@@ -11,12 +11,7 @@ import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.model.ErrorModalType._
 import pt.rmartins.battleships.frontend.views.model.NamedRules
 import pt.rmartins.battleships.shared.i18n.Translations
-import pt.rmartins.battleships.shared.model.game.{
-  BonusReward,
-  PlayerInviteType,
-  TurnBonus,
-  Username
-}
+import pt.rmartins.battleships.shared.model.game._
 import scalatags.JsDom.all._
 
 import scala.util.chaining.scalaUtilChainingOps
@@ -358,18 +353,23 @@ class GameModals(
               button(
                 `class` := "btn btn-primary",
                 `type` := "button",
-                "New Bonus" //nested(translatedDynamic(Translations.Game.closeButton)(_.apply()))
-              )
+                nested(translatedDynamic(Translations.PreGame.newBonusButton)(_.apply()))
+              ).render.tap { button =>
+                preGameModel.subProp(_.editGameBonusRewards).listen {
+                  case Nil => button.disabled = false
+                  case _   => button.disabled = true
+                }
+
+                button.onclick = _ => {
+                  preGameModel
+                    .subProp(_.editGameBonusRewards)
+                    .set(List(BonusReward.ExtraTurn(List(AttackType.Simple))))
+                }
+              }
             ),
             div(
               nested(
                 produce(preGameModel.subProp(_.editGameBonusDiv)) { div => div }
-//                produceWithNested(preGameModel.subProp(_.editGameBonusRewards)) {
-//                  case (bonusRewardsList, nested) =>
-//                    bonusRewardsList.map { case BonusReward.ExtraTurn(attackTypes) =>
-//                      div.render
-//                    }
-//                }
               )
             )
           ),

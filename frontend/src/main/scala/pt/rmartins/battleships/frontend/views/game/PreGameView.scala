@@ -671,20 +671,11 @@ class PreGameView(
     )
   }
 
-  private def createCustomShots(nested: NestedInterceptor): Modifier = {
-    val imageSize = Coordinate.square(50)
-    val missilesDistance = 30
+  private def createEditTurnDivs(
+      imageSize: Coordinate,
+      updateDefaultTurnAttacksF: (Int, Int) => Unit
+  ): (Seq[Modifier], List[AttackType] => Unit) = {
     val MaxMissiles = 5
-    val DistanceBetweenMissileTypes = 20
-    val radarBetweenDist = 5
-
-    val canvasMaxWidth: Int =
-      (imageSize.x + missilesDistance * (MaxMissiles - 1)) +
-        DistanceBetweenMissileTypes +
-        imageSize.x * MaxMissiles + radarBetweenDist * (MaxMissiles - 1)
-    val customShotsCanvas = canvas.render
-    customShotsCanvas.setAttribute("width", canvasMaxWidth.toString)
-    customShotsCanvas.setAttribute("height", imageSize.y.toString)
 
     val amountCustomShotsSimple: Select =
       select(
@@ -704,33 +695,59 @@ class PreGameView(
       amountCustomShotsRadar.appendChild(option(b(amount.toString)).render)
     )
 
-    def updateDefaultTurnAttacks(): Unit = {
-      val simpleMissileAmount = amountCustomShotsSimple.value.toInt
-      val radarAmount = amountCustomShotsRadar.value.toInt
-      defaultTurnAttacksProperty.set(
-        List.fill(simpleMissileAmount)(AttackType.Simple) ++
-          List.fill(radarAmount)(AttackType.Radar)
+    amountCustomShotsSimple.onchange = _ =>
+      updateDefaultTurnAttacksF(
+        amountCustomShotsSimple.value.toInt,
+        amountCustomShotsRadar.value.toInt
       )
-    }
-
-    amountCustomShotsSimple.onchange = _ => updateDefaultTurnAttacks()
-    amountCustomShotsRadar.onchange = _ => updateDefaultTurnAttacks()
+    amountCustomShotsRadar.onchange = _ =>
+      updateDefaultTurnAttacksF(
+        amountCustomShotsSimple.value.toInt,
+        amountCustomShotsRadar.value.toInt
+      )
 
     def reloadDefaultTurnAttacks(defaultTurnAttacks: List[AttackType]): Unit = {
       amountCustomShotsSimple.value = defaultTurnAttacks.count(_ == AttackType.Simple).toString
       amountCustomShotsRadar.value = defaultTurnAttacks.count(_ == AttackType.Radar).toString
     }
 
-    defaultTurnAttacksProperty.listen(
-      { defaultTurnAttacks => reloadDefaultTurnAttacks(defaultTurnAttacks) },
-      initUpdate = true
-    )
-
     val attackSimpleImageCanvas: Canvas =
       CanvasUtils.createCanvasImage(attackSimpleImage, imageSize)
 
     val radarImageCanvas: Canvas =
       CanvasUtils.createCanvasImage(radarImage, imageSize)
+
+    (
+      Seq(
+        attackSimpleImageCanvas,
+        amountCustomShotsSimple,
+        div(`class` := "mx-3"),
+        radarImageCanvas,
+        amountCustomShotsRadar
+      ),
+      attackTypesList => reloadDefaultTurnAttacks(attackTypesList)
+    )
+  }
+
+  private def createCustomShots(nested: NestedInterceptor): Modifier = {
+    val imageSize = Coordinate.square(50)
+
+    def updateDefaultTurnAttacks(simpleMissileAmount: Int, radarAmount: Int): Unit = {
+      defaultTurnAttacksProperty.set(
+        List.fill(simpleMissileAmount)(AttackType.Simple) ++
+          List.fill(radarAmount)(AttackType.Radar)
+      )
+    }
+
+    val (editTurnDivs, reloadMissilesF) = createEditTurnDivs(
+      imageSize,
+      (simpleShots, radarShots) => updateDefaultTurnAttacks(simpleShots, radarShots)
+    )
+
+    defaultTurnAttacksProperty.listen(
+      { defaultTurnAttacks => reloadMissilesF(defaultTurnAttacks) },
+      initUpdate = true
+    )
 
     div(
       `class` := "col-6",
@@ -740,22 +757,13 @@ class PreGameView(
           `class` := "col-12 btn-group justify-content-between",
           label(
             `class` := "input-group-text",
-            `for` := amountCustomShotsSimple.id,
             nested(translatedDynamic(Translations.PreGame.amountOfShots)(_.apply()))
           ),
-//          div(
-          attackSimpleImageCanvas,
-          amountCustomShotsSimple,
-//          ),
-          div(`class` := "mx-3"),
-//          div(
-          radarImageCanvas,
-          amountCustomShotsRadar
-//          )
+          editTurnDivs
         )
       ),
       div(
-        `class` := "row", // justify-content-end",
+        `class` := "row",
         createCustomBonusDiv(nested)
       )
     )
@@ -774,9 +782,9 @@ class PreGameView(
       }.toMap
 
     def createExtraTurnDiv(attackTypes: List[AttackType]): JsDom.TypedTag[Div] = {
-      def createAttackTypeDiv(attackType: AttackType, amount: Int): JsDom.TypedTag[Div] = {
+      def createAttackTypeDiv(attackType: AttackType, amount: Int): JsDom.TypedTag[Div] =
         div(
-          `class` := "mr-2 d-flex align-items-center",
+          `class` := "mr-4 d-flex align-items-center",
           (1 to amount).map { _ =>
             CanvasUtils
               .createCanvasImage(CanvasImage.fromAttackType(attackType), Coordinate.square(25))
@@ -787,7 +795,6 @@ class PreGameView(
               }
           }
         )
-      }
 
       div(
         `class` := "d-flex align-items-center",
@@ -803,6 +810,30 @@ class PreGameView(
       )
     }
 
+    def createExtraTurnEditDiv(
+        attackTypes: List[AttackType],
+        updateBonusReward: Option[BonusReward] => Unit
+    ): JsDom.TypedTag[Div] = {
+      val (editTurnDivs, reloadMissilesF) = createEditTurnDivs(
+        Coordinate.square(32),
+        (simpleMissileAmount, radarAmount) =>
+          updateBonusReward(
+            Some(
+              BonusReward.ExtraTurn(
+                List.fill(simpleMissileAmount)(AttackType.Simple) ++
+                  List.fill(radarAmount)(AttackType.Radar)
+              )
+            )
+          )
+      )
+      reloadMissilesF(attackTypes)
+
+      div(
+        `class` := "btn-group justify-content-between",
+        editTurnDivs
+      )
+    }
+
     def createBonusRewardDiv(bonusReward: BonusReward): JsDom.TypedTag[Div] =
       div(
         bonusReward match {
@@ -812,65 +843,35 @@ class PreGameView(
       )
 
     def createBonusRewardEditDiv(
-        bonusType: BonusType,
-        bonusReward: BonusReward
+        bonusReward: BonusReward,
+        updateBonusReward: Option[BonusReward] => Unit
     ): JsDom.TypedTag[Div] = {
       val deleteSpan: Span =
         span(
-          `class` := "border border-dark p-2 d-flex justify-content-center",
+          `class` := "p-0 d-flex justify-content-center text-danger",
           style := "cursor: pointer",
-          width := "32px",
-          FontAwesome.Solid.times
+          FontAwesome.Solid.trash,
+          FontAwesome.Modifiers.Sizing.x2
         ).render
 
       deleteSpan.onclick = _ => {
-        preGameModel
-          .subProp(_.editGameBonusRewards)
-          .set(
-            preGameModel.subProp(_.editGameBonusRewards).get.filterNot(_ == bonusReward)
-          )
+        updateBonusReward(None)
       }
 
-      val editSpan: Span =
-        span(
-          `class` := "border border-dark p-2",
-          style := "cursor: pointer",
-          FontAwesome.Solid.pencilAlt
-        ).render
-
       div(
-        `class` := "card p-2",
-        bonusReward match {
-          case BonusReward.ExtraTurn(attackTypes) =>
-            div(
-              `class` := "row",
-              div(`class` := "mx-3", deleteSpan),
-              div(`class` := "mr-4", editSpan),
-              createExtraTurnDiv(attackTypes)
-            )
-        }
+        `class` := "card",
+        div(
+          `class` := "row m-2",
+          div(`class` := "ml-3 mr-4", deleteSpan),
+          bonusReward match {
+            case BonusReward.ExtraTurn(attackTypes) =>
+              createExtraTurnEditDiv(attackTypes, updateBonusReward)
+          }
+        )
       )
     }
 
     def createTurnBonusDiv(bonusType: BonusType): JsDom.TypedTag[Anchor] = {
-//      val selectedTurnBonusCheckbox =
-//        input(
-//          `class` := "form-control px-1",
-//          width := "32px",
-//          `type` := "checkbox"
-//        ).render
-
-//      selectedTurnBonusCheckbox.onchange = _ => {
-//        if (!selectedTurnBonusCheckbox.checked)
-//          preGameModel
-//            .subProp(_.rules)
-//            .set(
-//              preGameModel.subProp(_.rules).get.modify(_.turnBonuses).using {
-//                _.filterNot(_.bonusType == bonusType)
-//              }
-//            )
-//      }
-
       val deleteBonusSpan: Span =
         span(
           `class` := "border border-dark p-2 d-flex justify-content-center",
@@ -909,13 +910,36 @@ class PreGameView(
               .map(_.bonusRewardList)
               .getOrElse(Nil)
           )
+
+        val updateBonusRewardF: Int => Option[BonusReward] => Unit =
+          (index: Int) => {
+            case None =>
+              val original = preGameModel.subProp(_.editGameBonusRewards).get
+              preGameModel
+                .subProp(_.editGameBonusRewards)
+                .set(
+                  original.take(index) ++ original.drop(index + 1)
+                )
+            case Some(updatedBonusReward) =>
+              preGameModel
+                .subProp(_.editGameBonusRewards)
+                .set(
+                  preGameModel
+                    .subProp(_.editGameBonusRewards)
+                    .get
+                    .updated(index, updatedBonusReward)
+                )
+          }
+
         preGameModel
           .subProp(_.editGameBonusDiv)
           .set(
             div(
               `class` := "my-2",
               nested(produce(preGameModel.subProp(_.editGameBonusRewards)) { bonusRewardList =>
-                bonusRewardList.map(createBonusRewardEditDiv(bonusType, _)).render
+                bonusRewardList.zipWithIndex.map { case (bonusReward, index) =>
+                  createBonusRewardEditDiv(bonusReward, updateBonusRewardF(index)).render
+                }
               })
             ).render
           )
@@ -928,7 +952,6 @@ class PreGameView(
           `class` := "row",
           div(
             `class` := "col-2 d-flex align-items-center",
-//            selectedTurnBonusCheckbox
             deleteBonusSpan
           ),
           div(
@@ -953,14 +976,6 @@ class PreGameView(
                   case None    => deleteBonusSpan.classList.add("invisible")
                 }
 
-//                selectedTurnBonusCheckbox.checked = bonusRewardOpt.nonEmpty
-//                selectedTurnBonusCheckbox.disabled = bonusRewardOpt.isEmpty
-
-//                if (bonusRewardOpt.nonEmpty)
-//                  selectedTurnBonusCheckbox.checked = true
-//                else
-//                  selectedTurnBonusCheckbox.disabled = true
-
                 bonusRewardOpt.getOrElse(Nil).map(createBonusRewardDiv).render
               }
             )
@@ -968,19 +983,6 @@ class PreGameView(
         )
       )
     }
-
-//    val turnBonusesDiv: Binding =
-//      nested(
-//        produce(preGameModel.subProp(_.rules).transform(_.turnBonuses)) { rulesTurnBonuses =>
-//          AllBonusType.map { bonusType =>
-//            val bonusRewardOpt: Option[List[BonusReward]] =
-//              rulesTurnBonuses
-//                .find(_.bonusType == bonusType)
-//                .map(_.bonusRewardList)
-//            createTurnBonusDiv(bonusType, bonusRewardOpt)
-//          }.render
-//        }
-//      )
 
     div(
       `class` := "col-12",

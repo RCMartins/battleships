@@ -306,7 +306,7 @@ object CanvasUtils {
     new CanvasImage("icons/fill-water.png")
 
   val radarImage: CanvasImage =
-    new CanvasImage("icons/radar2.png")
+    new CanvasImage("icons/radar.png")
 
   def drawImageAbs(
       renderingCtx: CanvasRenderingContext2D,
@@ -337,19 +337,17 @@ object CanvasUtils {
       canvas: Canvas,
       position: Coordinate,
       canvasImage: CanvasImage,
-      size: Coordinate,
-      drawBeforeF: () => Unit = () => ()
+      size: Coordinate
   ): Canvas = {
-    val renderingCtx = canvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
     def draw(): Unit =
       if (!canvasImage.element.complete) {
-        val before = Option(canvasImage.element.onload)
+        val beforeOnLoad = Option(canvasImage.element.onload)
         canvasImage.element.onload = { (event: Event) =>
-          before.foreach(_(event))
+          beforeOnLoad.foreach(_(event))
           draw()
         }
       } else {
-        drawBeforeF()
+        val renderingCtx = canvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
         drawImageAbs(
           renderingCtx,
           canvasImage.element,
@@ -367,37 +365,5 @@ object CanvasUtils {
 
   def createCanvasImage(canvasImage: CanvasImage, size: Coordinate): Canvas =
     drawCanvasImage(createEmptyCanvas(size), Coordinate(1, 1), canvasImage, size - Coordinate(2, 2))
-
-  def createStackedShotsCanvas(
-      canvasImage: CanvasImage,
-      amount: Int,
-      size: Int,
-      stackedDist: Int
-  ): Canvas = {
-    assume(amount >= 1)
-    val canvas =
-      CanvasUtils.createEmptyCanvas(Coordinate(size + (amount - 1) * stackedDist + 2, size + 2))
-    val renderingCtx = canvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
-    (0 until amount).foreach { index =>
-      val position = Coordinate(1 + index * stackedDist, 1)
-
-      drawCanvasImage(
-        canvas,
-        position,
-        canvasImage,
-        Coordinate.square(size - 2),
-        drawBeforeF = () => {
-//          drawSquareAbs(
-//            renderingCtx,
-//            position,
-//            size,
-//            CanvasColor.White(bo alpha = 1.0),
-//            0
-//          )
-        }
-      )
-    }
-    canvas
-  }
 
 }
