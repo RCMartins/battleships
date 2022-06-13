@@ -782,12 +782,14 @@ class PreGameView(
       }.toMap
 
     def createExtraTurnDiv(attackTypes: List[AttackType]): JsDom.TypedTag[Div] = {
+      val imageSize = Coordinate.square(25)
+
       def createAttackTypeDiv(attackType: AttackType, amount: Int): JsDom.TypedTag[Div] =
         div(
           `class` := "mr-4 d-flex align-items-center",
           (1 to amount).map { _ =>
             CanvasUtils
-              .createCanvasImage(CanvasImage.fromAttackType(attackType), Coordinate.square(25))
+              .createCanvasImage(CanvasImage.fromAttackType(attackType), imageSize)
               .tap { canvas =>
                 canvas.classList.add("border")
                 canvas.classList.add("border-dark")
@@ -814,8 +816,10 @@ class PreGameView(
         attackTypes: List[AttackType],
         updateBonusReward: Option[BonusReward] => Unit
     ): JsDom.TypedTag[Div] = {
+      val imageSize = Coordinate.square(40)
+
       val (editTurnDivs, reloadMissilesF) = createEditTurnDivs(
-        Coordinate.square(32),
+        imageSize,
         (simpleMissileAmount, radarAmount) =>
           updateBonusReward(
             Some(
@@ -862,7 +866,7 @@ class PreGameView(
         `class` := "card",
         div(
           `class` := "row m-2",
-          div(`class` := "ml-3 mr-4", deleteSpan),
+          div(`class` := "ml-3 mr-5 d-flex align-items-center", deleteSpan),
           bonusReward match {
             case BonusReward.ExtraTurn(attackTypes) =>
               createExtraTurnEditDiv(attackTypes, updateBonusReward)
