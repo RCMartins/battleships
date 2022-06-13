@@ -93,10 +93,10 @@ class PreGameView(
           id := "nav-pregame-fleet",
           role := "tabpanel",
           div(
-            `class` := "row mx-0 my-2 justify-content-between",
+            `class` := "row m-2 justify-content-between",
             height := "100%",
             div(
-              `class` := "col-6 px-0 overflow-auto",
+              `class` := "col-7 px-0 overflow-auto",
               div(
                 createFleetSaveLoadDiv(nested)
               ),
@@ -122,10 +122,10 @@ class PreGameView(
           id := "nav-pregame-options",
           role := "tabpanel",
           div(
-            `class` := "row my-2",
+            `class` := "row m-2",
             height := defaultHeight,
-            createTimeLimitOptions(nested),
-            createCustomShots(nested)
+            createFirstColumnOptions(nested),
+            createSecondColumnOptions(nested)
           )
         )
       )
@@ -528,6 +528,27 @@ class PreGameView(
       }
     )
 
+  private def createFirstColumnOptions(nested: NestedInterceptor): Modifier = {
+    div(
+      `class` := "col-6",
+      div(
+        `class` := "row",
+        createTimeLimitOptions(nested),
+        createCustomShots(nested)
+      )
+    )
+  }
+
+  private def createSecondColumnOptions(nested: NestedInterceptor): Modifier = {
+    div(
+      `class` := "col-6",
+      div(
+        `class` := "row",
+        createCustomBonusDiv(nested)
+      )
+    )
+  }
+
   private def createTimeLimitOptions(nested: NestedInterceptor): Modifier = {
     def selectOptionToSeconds(str: String): Int = {
       val s"$minutes:$seconds" = str
@@ -642,31 +663,26 @@ class PreGameView(
       updateRuleTimeLimit()
     }
 
-    div(
-      `class` := "col-6",
+    Seq[Modifier](
       div(
-        `class` := "d-flex flex-wrap",
-        div(
-          `class` := "btn-group m-3",
-          totalTimeLimitCheckBox,
-          label(
-            `class` := "input-group-text",
-            `for` := totalTimeLimit.id,
-            nested(translatedDynamic(Translations.PreGame.timeLimit)(_.apply()))
-          ),
-          totalTimeLimit
+        `class` := "col-12 btn-group my-3",
+        totalTimeLimitCheckBox,
+        label(
+          `class` := "input-group-text",
+          `for` := totalTimeLimit.id,
+          nested(translatedDynamic(Translations.PreGame.timeLimit)(_.apply()))
         ),
-        br,
-        div(
-          `class` := "btn-group m-3",
-          turnTimeLimitCheckBox,
-          label(
-            `class` := "input-group-text",
-            `for` := turnTimeLimit.id,
-            nested(translatedDynamic(Translations.PreGame.turnTimeLimit)(_.apply()))
-          ),
-          turnTimeLimit
-        )
+        totalTimeLimit
+      ),
+      div(
+        `class` := "col-12 btn-group my-3",
+        turnTimeLimitCheckBox,
+        label(
+          `class` := "input-group-text",
+          `for` := turnTimeLimit.id,
+          nested(translatedDynamic(Translations.PreGame.turnTimeLimit)(_.apply()))
+        ),
+        turnTimeLimit
       )
     )
   }
@@ -750,22 +766,12 @@ class PreGameView(
     )
 
     div(
-      `class` := "col-6",
-      div(
-        `class` := "row mb-2",
-        div(
-          `class` := "col-12 btn-group justify-content-between",
-          label(
-            `class` := "input-group-text",
-            nested(translatedDynamic(Translations.PreGame.amountOfShots)(_.apply()))
-          ),
-          editTurnDivs
-        )
+      `class` := "col-12 btn-group justify-content-between my-3",
+      label(
+        `class` := "input-group-text",
+        nested(translatedDynamic(Translations.PreGame.amountOfShots)(_.apply()))
       ),
-      div(
-        `class` := "row",
-        createCustomBonusDiv(nested)
-      )
+      editTurnDivs
     )
   }
 
@@ -1003,7 +1009,7 @@ class PreGameView(
             div(
               `class` := "list-group",
               GameStyles.flexContainer,
-              height := 195,
+              height := 250,
               div(
                 AllBonusType.map(createTurnBonusDiv)
               )
