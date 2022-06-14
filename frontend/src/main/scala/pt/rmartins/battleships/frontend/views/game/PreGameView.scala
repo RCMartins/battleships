@@ -528,7 +528,7 @@ class PreGameView(
       }
     )
 
-  private def createFirstColumnOptions(nested: NestedInterceptor): Modifier = {
+  private def createFirstColumnOptions(nested: NestedInterceptor): Modifier =
     div(
       `class` := "col-6",
       div(
@@ -537,9 +537,8 @@ class PreGameView(
         createCustomShots(nested)
       )
     )
-  }
 
-  private def createSecondColumnOptions(nested: NestedInterceptor): Modifier = {
+  private def createSecondColumnOptions(nested: NestedInterceptor): Modifier =
     div(
       `class` := "col-6",
       div(
@@ -547,7 +546,6 @@ class PreGameView(
         createCustomBonusDiv(nested)
       )
     )
-  }
 
   private def createTimeLimitOptions(nested: NestedInterceptor): Modifier = {
     def selectOptionToSeconds(str: String): Int = {
@@ -748,12 +746,11 @@ class PreGameView(
   private def createCustomShots(nested: NestedInterceptor): Modifier = {
     val imageSize = Coordinate.square(50)
 
-    def updateDefaultTurnAttacks(simpleMissileAmount: Int, radarAmount: Int): Unit = {
+    def updateDefaultTurnAttacks(simpleMissileAmount: Int, radarAmount: Int): Unit =
       defaultTurnAttacksProperty.set(
         List.fill(simpleMissileAmount)(AttackType.Simple) ++
           List.fill(radarAmount)(AttackType.Radar)
       )
-    }
 
     val (editTurnDivs, reloadMissilesF) = createEditTurnDivs(
       imageSize,
@@ -858,10 +855,10 @@ class PreGameView(
     ): JsDom.TypedTag[Div] = {
       val deleteSpan: Span =
         span(
-          `class` := "p-0 d-flex justify-content-center text-danger",
+          `class` := "rounded p-2 d-flex justify-content-center bg-danger text-white",
           style := "cursor: pointer",
-          FontAwesome.Solid.trash,
-          FontAwesome.Modifiers.Sizing.x2
+          width := "32px",
+          FontAwesome.Solid.trash
         ).render
 
       deleteSpan.onclick = _ => {
@@ -884,7 +881,7 @@ class PreGameView(
     def createTurnBonusDiv(bonusType: BonusType): JsDom.TypedTag[Anchor] = {
       val deleteBonusSpan: Span =
         span(
-          `class` := "border border-dark p-2 d-flex justify-content-center",
+          `class` := "rounded p-2 d-flex justify-content-center bg-danger text-white",
           style := "cursor: pointer",
           width := "32px",
           FontAwesome.Solid.times
@@ -902,7 +899,7 @@ class PreGameView(
 
       val editSpan: Span =
         span(
-          `class` := "border border-dark p-2",
+          `class` := "rounded p-2 bg-primary text-white",
           style := "cursor: pointer",
           FontAwesome.Solid.pencilAlt
         ).render
@@ -965,14 +962,13 @@ class PreGameView(
             deleteBonusSpan
           ),
           div(
-            `class` := "col-10",
+            `class` := "col-8",
             div(
               `class` := "d-flex w-100 justify-content-between",
               h5(
                 `class` := "mr-3",
                 nested(TranslationUtils.bonusTypeToText(bonusType))
-              ),
-              editSpan
+              )
             ),
             nested(
               produce(preGameModel.subProp(_.rules).transform(_.turnBonuses)) { rulesTurnBonuses =>
@@ -989,6 +985,10 @@ class PreGameView(
                 bonusRewardOpt.getOrElse(Nil).map(createBonusRewardDiv).render
               }
             )
+          ),
+          div(
+            `class` := "col-2 d-flex align-items-center",
+            editSpan
           )
         )
       )
