@@ -687,16 +687,17 @@ class PreGameView(
 
   private def createEditTurnDivs(
       imageSize: Coordinate,
-      updateDefaultTurnAttacksF: (Int, Int) => Unit
+      updateDefaultTurnAttacksF: (Int, Int) => Unit,
+      minimumMissiles: Int,
+      maximumShots: Int
   ): (Seq[Modifier], List[AttackType] => Unit) = {
-    val MaxMissiles = 5
 
     val amountCustomShotsSimple: Select =
       select(
         `class` := "form-select px-2",
         id := "amount-custom-shots-simple-input"
       ).render
-    (1 to MaxMissiles).foreach(amount =>
+    (minimumMissiles to maximumShots).foreach(amount =>
       amountCustomShotsSimple.appendChild(option(b(amount.toString)).render)
     )
 
@@ -705,7 +706,7 @@ class PreGameView(
         `class` := "form-select px-2",
         id := "amount-custom-shots-radar-input"
       ).render
-    (0 to MaxMissiles).foreach(amount =>
+    (0 to maximumShots).foreach(amount =>
       amountCustomShotsRadar.appendChild(option(b(amount.toString)).render)
     )
 
@@ -754,7 +755,9 @@ class PreGameView(
 
     val (editTurnDivs, reloadMissilesF) = createEditTurnDivs(
       imageSize,
-      (simpleShots, radarShots) => updateDefaultTurnAttacks(simpleShots, radarShots)
+      (simpleShots, radarShots) => updateDefaultTurnAttacks(simpleShots, radarShots),
+      minimumMissiles = 1,
+      maximumShots = 5
     )
 
     defaultTurnAttacksProperty.listen(
@@ -796,7 +799,7 @@ class PreGameView(
               .tap { canvas =>
                 canvas.classList.add("border")
                 canvas.classList.add("border-dark")
-                canvas.style.marginLeft = "-12px"
+                canvas.style.marginLeft = "-11px"
               }
           }
         )
@@ -831,7 +834,9 @@ class PreGameView(
                   List.fill(radarAmount)(AttackType.Radar)
               )
             )
-          )
+          ),
+        minimumMissiles = 0,
+        maximumShots = 6
       )
       reloadMissilesF(attackTypes)
 
@@ -963,13 +968,6 @@ class PreGameView(
           ),
           div(
             `class` := "col-8",
-            div(
-              `class` := "d-flex w-100 justify-content-between",
-              h5(
-                `class` := "mr-3",
-                nested(TranslationUtils.bonusTypeToText(bonusType))
-              )
-            ),
             nested(
               produce(preGameModel.subProp(_.rules).transform(_.turnBonuses)) { rulesTurnBonuses =>
                 val bonusRewardOpt: Option[List[BonusReward]] =
@@ -982,7 +980,21 @@ class PreGameView(
                   case None    => deleteBonusSpan.classList.add("invisible")
                 }
 
-                bonusRewardOpt.getOrElse(Nil).map(createBonusRewardDiv).render
+                val bonusTitleClass: String =
+                  bonusRewardOpt match {
+                    case Some(_) => "mr-3"
+                    case None    => "mr-3 text-muted"
+                  }
+
+                (
+                  div(
+                    `class` := "d-flex w-100 justify-content-between",
+                    h5(
+                      `class` := bonusTitleClass,
+                      nested(TranslationUtils.bonusTypeToText(bonusType))
+                    )
+                  ) +: bonusRewardOpt.getOrElse(Nil).map(createBonusRewardDiv)
+                ).render
               }
             )
           ),

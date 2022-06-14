@@ -1,13 +1,17 @@
 package pt.rmartins.battleships.frontend.views.game
 
 import com.softwaremill.quicklens.ModifyPimp
+import io.udash._
 import io.udash.bindings.modifiers.Binding.NestedInterceptor
+import io.udash.bootstrap.button.UdashButton
+import io.udash.bootstrap.utils.BootstrapStyles.Color
 import io.udash.bootstrap.utils.UdashIcons.FontAwesome
+import io.udash.component.ComponentId
 import io.udash.css.CssView
 import io.udash.i18n._
-import io.udash._
 import org.scalajs.dom.html.{Div, Input}
 import pt.rmartins.battleships.frontend.services.TranslationsService
+import pt.rmartins.battleships.frontend.views.game.Utils._
 import pt.rmartins.battleships.frontend.views.model.ErrorModalType._
 import pt.rmartins.battleships.frontend.views.model.NamedRules
 import pt.rmartins.battleships.shared.i18n.Translations
@@ -320,6 +324,43 @@ class GameModals(
       )
     ).render
 
+  private val acceptGameBonusChangesButton = UdashButton(
+    buttonStyle = Color.Success.toProperty,
+    componentId = ComponentId("accept-game-bonus-changes-button"),
+    disabled = combine(
+      preGameModel.subProp(_.rules),
+      preGameModel.subProp(_.editGameBonusType),
+      preGameModel.subProp(_.editGameBonusRewards)
+    ).transform { case (rules, editGameBonusType, editGameBonusRewards) =>
+      rules.turnBonuses
+        .find(_.bonusType == editGameBonusType)
+        .map(_.bonusRewardList)
+        .getOrElse(Nil) == editGameBonusRewards
+    }
+  )(nested =>
+    Seq[Modifier](
+      attr("data-bs-dismiss") := "modal",
+      span(nested(translatedDynamic(Translations.PreGame.saveChangesButton)(_.apply())))
+    )
+  )
+
+  acceptGameBonusChangesButton.listen { _ =>
+    val preGame = preGameModel.get
+    preGameModel
+      .subProp(_.rules)
+      .set(
+        preGame.rules
+          .modify(_.turnBonuses)
+          .using { currentTurnBonuses =>
+            (preGame.editGameBonusRewards match {
+              case Nil  => Nil
+              case list => List(TurnBonus(preGame.editGameBonusType, list))
+            }) ++
+              currentTurnBonuses.filterNot(_.bonusType == preGame.editGameBonusType)
+          }
+      )
+  }
+
   val editGameBonusModalId: String = "game-bonus-modal"
   def editGameBonusModal(nested: NestedInterceptor): Div =
     div(
@@ -381,29 +422,7 @@ class GameModals(
               attr("data-bs-dismiss") := "modal",
               nested(translatedDynamic(Translations.Game.closeButton)(_.apply()))
             ),
-            button(
-              `class` := "btn btn-primary",
-              `type` := "button",
-              attr("data-bs-dismiss") := "modal",
-              nested(translatedDynamic(Translations.PreGame.saveChangesButton)(_.apply()))
-            ).render.tap {
-              _.onclick = _ => {
-                val preGame = preGameModel.get
-                preGameModel
-                  .subProp(_.rules)
-                  .set(
-                    preGame.rules
-                      .modify(_.turnBonuses)
-                      .using { currentTurnBonuses =>
-                        (preGame.editGameBonusRewards match {
-                          case Nil  => Nil
-                          case list => List(TurnBonus(preGame.editGameBonusType, list))
-                        }) ++
-                          currentTurnBonuses.filterNot(_.bonusType == preGame.editGameBonusType)
-                      }
-                  )
-              }
-            }
+            acceptGameBonusChangesButton
           )
         )
       )
