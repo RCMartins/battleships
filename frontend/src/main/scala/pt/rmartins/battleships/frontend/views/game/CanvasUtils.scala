@@ -6,7 +6,7 @@ import org.scalajs.dom.html.{Canvas, Image}
 import org.scalajs.dom.raw.HTMLImageElement
 import pt.rmartins.battleships.frontend.views.game.BoardView.MinTextSize
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasColor
-import pt.rmartins.battleships.shared.model.game.{Coordinate, Turn}
+import pt.rmartins.battleships.shared.model.game.{AttackType, Coordinate, Turn}
 import scalatags.JsDom.all.canvas
 
 class CanvasUtils(gamePresenter: GamePresenter) {
@@ -25,27 +25,14 @@ class CanvasUtils(gamePresenter: GamePresenter) {
       coor: Coordinate,
       size: Int,
       canvasColor: CanvasColor
-  ): Unit = {
-    if (canvasColor.fillColor.nonEmpty) {
-      renderingCtx.fillStyle = s"rgb(${canvasColor.fillColor}, ${canvasColor.alpha})"
-      renderingCtx.fillRect(coor.x, coor.y, size, size)
-    }
-    if (canvasColor.border.lineColor.nonEmpty) {
-      canvasColor.border.lineDash.foreach { lineDash =>
-        renderingCtx.setLineDash(scalajs.js.Array(lineDash: _*))
-        renderingCtx.lineDashOffset = gamePresenter.lineDashOffset.get
-      }
-      renderingCtx.strokeStyle =
-        s"rgb(${canvasColor.border.lineColor}, ${canvasColor.border.alpha})"
-      renderingCtx.lineWidth = canvasColor.border.lineWidth
-      renderingCtx.beginPath()
-      renderingCtx.rect(coor.x, coor.y, size, size)
-      renderingCtx.stroke()
-
-      renderingCtx.setLineDash(scalajs.js.Array())
-      renderingCtx.lineDashOffset = 0
-    }
-  }
+  ): Unit =
+    CanvasUtils.drawSquareAbs(
+      renderingCtx,
+      coor,
+      size,
+      canvasColor,
+      gamePresenter.lineDashOffset.get
+    )
 
   def drawBoardLimits(
       renderingCtx: CanvasRenderingContext2D,
@@ -212,6 +199,34 @@ object CanvasUtils {
 
   }
 
+  def drawSquareAbs(
+      renderingCtx: CanvasRenderingContext2D,
+      coor: Coordinate,
+      size: Int,
+      canvasColor: CanvasColor,
+      lineDashOffset: Int
+  ): Unit = {
+    if (canvasColor.fillColor.nonEmpty) {
+      renderingCtx.fillStyle = s"rgb(${canvasColor.fillColor}, ${canvasColor.alpha})"
+      renderingCtx.fillRect(coor.x, coor.y, size, size)
+    }
+    if (canvasColor.border.lineColor.nonEmpty) {
+      canvasColor.border.lineDash.foreach { lineDash =>
+        renderingCtx.setLineDash(scalajs.js.Array(lineDash: _*))
+        renderingCtx.lineDashOffset = lineDashOffset
+      }
+      renderingCtx.strokeStyle =
+        s"rgb(${canvasColor.border.lineColor}, ${canvasColor.border.alpha})"
+      renderingCtx.lineWidth = canvasColor.border.lineWidth
+      renderingCtx.beginPath()
+      renderingCtx.rect(coor.x, coor.y, size, size)
+      renderingCtx.stroke()
+
+      renderingCtx.setLineDash(scalajs.js.Array())
+      renderingCtx.lineDashOffset = 0
+    }
+  }
+
   def drawTurnNumberCoor(
       renderingCtx: CanvasRenderingContext2D,
       boardPosition: Coordinate,
@@ -274,6 +289,16 @@ object CanvasUtils {
     element.src = src
   }
 
+  object CanvasImage {
+
+    def fromAttackType(attackType: AttackType): CanvasImage =
+      attackType match {
+        case AttackType.Simple => attackSimpleImage
+        case AttackType.Radar  => radarImage
+      }
+
+  }
+
   val attackSimpleImage: CanvasImage =
     new CanvasImage("icons/missile-simple.png")
 
@@ -296,26 +321,49 @@ object CanvasUtils {
     renderingCtx.drawImage(image, 0, 0, 500, 500, x, y, width, height)
   }
 
-  def createCanvasImage(canvasImage: CanvasImage, size: Coordinate): Canvas = {
+  def createEmptyCanvas(size: Coordinate): Canvas = {
     val newImageCanvas: Canvas = canvas.render
     newImageCanvas.setAttribute("width", size.x.toString)
     newImageCanvas.setAttribute("height", size.y.toString)
 
     val renderingCtx = newImageCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
-
-    canvasImage.element.onload = { (_: Event) =>
-      drawImageAbs(
-        renderingCtx,
-        canvasImage.element,
-        x = 1,
-        y = 1,
-        size.x - 2,
-        size.y - 2,
-        useAntiAliasing = true
-      )
-    }
+    renderingCtx.fillStyle = "white"
+    renderingCtx.fillRect(0, 0, size.x, size.y)
 
     newImageCanvas
   }
+
+  def drawCanvasImage(
+      canvas: Canvas,
+      position: Coordinate,
+      canvasImage: CanvasImage,
+      size: Coordinate
+  ): Canvas = {
+    def draw(): Unit =
+      if (!canvasImage.element.complete) {
+        val beforeOnLoad = Option(canvasImage.element.onload)
+        canvasImage.element.onload = { (event: Event) =>
+          beforeOnLoad.foreach(_(event))
+          draw()
+        }
+      } else {
+        val renderingCtx = canvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+        drawImageAbs(
+          renderingCtx,
+          canvasImage.element,
+          x = position.x,
+          y = position.y,
+          size.x,
+          size.y,
+          useAntiAliasing = true
+        )
+      }
+
+    draw()
+    canvas
+  }
+
+  def createCanvasImage(canvasImage: CanvasImage, size: Coordinate): Canvas =
+    drawCanvasImage(createEmptyCanvas(size), Coordinate(1, 1), canvasImage, size - Coordinate(2, 2))
 
 }

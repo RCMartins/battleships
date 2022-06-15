@@ -36,6 +36,9 @@ object Translations {
     val saveFleet = key("game.pregame.save_fleet")
     val clearAllShips = key("game.pregame.clear_all_ships")
     val chooseFleetNameTitle = key("game.modal.choose_fleet_name_title")
+    val editGameBonusTitle = key("game.modal.edit_game_bonus_title")
+    val newBonusButton = key("game.pregame.new_bonus_button")
+    val saveChangesButton = key("game.pregame.save_changes")
 
     val fleet = key("game.pregame.fleet")
     val options = key("game.pregame.options")
@@ -49,7 +52,7 @@ object Translations {
     val eachTurn = key("game.pregame.eachTurn")
     val amountOfShots = key("game.pregame.amountOfShots")
     val enemyAcceptedRules = key("game.pregame.enemy_accepted_rules")
-    val bonuses = key("game.pregame.bonuses")
+    val turnBonuses = key("game.pregame.turn_bonuses")
     val bonusFirstBlood = key("game.pregame.bonusFirstBlood")
     val bonusDoubleKill = key("game.pregame.bonusDoubleKill")
     val bonusTripleKill = key("game.pregame.bonusTripleKill")

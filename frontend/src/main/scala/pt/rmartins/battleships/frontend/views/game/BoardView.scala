@@ -155,13 +155,12 @@ class BoardView(
       BoardSizeProperty,
       MyBoardGameOverSqSize,
       MyBoardMargin
-    )
-      .transform { case (canvasSize, boardSize, myBoardGameOverSqSize, myBoardMargin) =>
-        Coordinate(
-          canvasSize.x - myBoardGameOverSqSize * boardSize - myBoardMargin,
-          myBoardMargin
-        )
-      }
+    ).transform { case (canvasSize, boardSize, myBoardGameOverSqSize, myBoardMargin) =>
+      Coordinate(
+        canvasSize.x - myBoardGameOverSqSize * boardSize - myBoardMargin,
+        myBoardMargin
+      )
+    }
   private val EnemyBoardPos: ReadableProperty[Coordinate] =
     EnemyBoardMargin.transform(size => Coordinate.square(size))
 
@@ -174,23 +173,22 @@ class BoardView(
       EnemyBoardSqSize,
       BoardMarksSelectorSize,
       BoardMarksSelectorMargin
-    )
-      .transform {
-        case (
-              boardSize,
-              enemyBoardPos,
-              enemyBoardSize,
-              boardMarksSelectorSize,
-              boardMarksSelectorMargin
-            ) =>
-          enemyBoardPos +
-            Coordinate(
-              (enemyBoardSize * boardSize) / 2 -
-                (MarksSelectorOrder.size * boardMarksSelectorSize +
-                  (MarksSelectorOrder.size - 1) * boardMarksSelectorMargin) / 2,
-              enemyBoardSize * boardSize + boardMarksSelectorMargin
-            )
-      }
+    ).transform {
+      case (
+            boardSize,
+            enemyBoardPos,
+            enemyBoardSize,
+            boardMarksSelectorSize,
+            boardMarksSelectorMargin
+          ) =>
+        enemyBoardPos +
+          Coordinate(
+            (enemyBoardSize * boardSize) / 2 -
+              (MarksSelectorOrder.size * boardMarksSelectorSize +
+                (MarksSelectorOrder.size - 1) * boardMarksSelectorMargin) / 2,
+            enemyBoardSize * boardSize + boardMarksSelectorMargin
+          )
+    }
   private val BoardMarksSelectorCombined: ReadableProperty[(Coordinate, Int, Int)] =
     combine(BoardMarksSelectorPos, BoardMarksSelectorSize, BoardMarksSelectorMargin)
 
@@ -1421,7 +1419,7 @@ class BoardView(
         List(s"${translationsData.amountOfShots.innerText}: ${rules.defaultTurnAttacks.size}"),
         List(""),
         Some(rules.turnBonuses.nonEmpty)
-          .map(_ => translationsData.bonuses.innerText + ":")
+          .map(_ => translationsData.turnBonuses.innerText + ":")
           .toList, {
           def rewardsToString(bonusRewardList: List[BonusReward]): String =
             bonusRewardList

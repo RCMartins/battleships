@@ -640,8 +640,8 @@ class GamePresenter(
       .subProp(_.amountOfShots)
       .set(span(translatedDynamic(Translations.PreGame.amountOfShots)(_.apply())).render)
     translationsModel
-      .subProp(_.bonuses)
-      .set(span(translatedDynamic(Translations.PreGame.bonuses)(_.apply())).render)
+      .subProp(_.turnBonuses)
+      .set(span(translatedDynamic(Translations.PreGame.turnBonuses)(_.apply())).render)
     translationsModel
       .subProp(_.bonusFirstBlood)
       .set(span(translatedDynamic(Translations.PreGame.bonusFirstBlood)(_.apply())).render)

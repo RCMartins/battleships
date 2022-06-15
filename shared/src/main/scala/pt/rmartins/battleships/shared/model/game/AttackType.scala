@@ -17,4 +17,7 @@ object AttackType extends HasGenCodec[AttackType] {
 
   case object Radar extends AttackType
 
+  val all: List[AttackType] =
+    List(Simple, Radar)
+
 }

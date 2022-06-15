@@ -5,7 +5,7 @@ import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
 
 case class TurnBonus(
     bonusType: BonusType,
-    bonusReward: List[BonusReward]
+    bonusRewardList: List[BonusReward]
 )
 
 object TurnBonus extends HasGenCodec[TurnBonus] {
