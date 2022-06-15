@@ -45,9 +45,6 @@ class PreGameView(
   private val MinBoardSize = 4
   private val MaxBoardSize = 20
 
-  private val AllBonusType: List[BonusType] =
-    List(BonusType.FirstBlood, BonusType.DoubleKill, BonusType.TripleKill)
-
   private val boardSizeProperty: Property[Coordinate] =
     gamePresenter.preGameRulesProperty.bitransform(_.boardSize)(boardSize =>
       gamePresenter.preGameRulesProperty.get.copy(boardSize = boardSize)
@@ -896,7 +893,7 @@ class PreGameView(
         preGameModel
           .subProp(_.rules)
           .set(
-            preGameModel.subProp(_.rules).get.modify(_.turnBonuses).using {
+            preGameModel.subProp(_.rules).get.modify(_.gameBonuses).using {
               _.filterNot(_.bonusType == bonusType)
             }
           )
@@ -917,7 +914,7 @@ class PreGameView(
             preGameModel
               .subProp(_.rules)
               .get
-              .turnBonuses
+              .gameBonuses
               .find(_.bonusType == bonusType)
               .map(_.bonusRewardList)
               .getOrElse(Nil)
@@ -969,7 +966,7 @@ class PreGameView(
           div(
             `class` := "col-8",
             nested(
-              produce(preGameModel.subProp(_.rules).transform(_.turnBonuses)) { rulesTurnBonuses =>
+              produce(preGameModel.subProp(_.rules).transform(_.gameBonuses)) { rulesTurnBonuses =>
                 val bonusRewardOpt: Option[List[BonusReward]] =
                   rulesTurnBonuses
                     .find(_.bonusType == bonusType)
@@ -1023,7 +1020,7 @@ class PreGameView(
               GameStyles.flexContainer,
               height := 250,
               div(
-                AllBonusType.map(createTurnBonusDiv)
+                BonusType.AllBonusType.map(createTurnBonusDiv)
               )
             )
           )

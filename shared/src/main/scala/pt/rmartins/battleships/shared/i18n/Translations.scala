@@ -56,6 +56,7 @@ object Translations {
     val bonusFirstBlood = key("game.pregame.bonusFirstBlood")
     val bonusDoubleKill = key("game.pregame.bonusDoubleKill")
     val bonusTripleKill = key("game.pregame.bonusTripleKill")
+    val bonusUltraKill = key("game.pregame.bonusUltraKill")
     val shots = key("game.pregame.shots")
   }
 

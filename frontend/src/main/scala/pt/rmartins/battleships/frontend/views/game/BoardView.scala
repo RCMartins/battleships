@@ -1418,7 +1418,7 @@ class BoardView(
         List(""),
         List(s"${translationsData.amountOfShots.innerText}: ${rules.defaultTurnAttacks.size}"),
         List(""),
-        Some(rules.turnBonuses.nonEmpty)
+        Some(rules.gameBonuses.nonEmpty)
           .map(_ => translationsData.turnBonuses.innerText + ":")
           .toList, {
           def rewardsToString(bonusRewardList: List[BonusReward]): String =
@@ -1428,13 +1428,15 @@ class BoardView(
               }
               .mkString(", ")
 
-          rules.turnBonuses.map {
-            case TurnBonus(BonusType.FirstBlood, bonusRewardList) =>
+          rules.gameBonuses.map {
+            case GameBonus(BonusType.FirstBlood, bonusRewardList) =>
               s"${translationsData.bonusFirstBlood.innerText}: ${rewardsToString(bonusRewardList)}"
-            case TurnBonus(BonusType.DoubleKill, bonusRewardList) =>
+            case GameBonus(BonusType.DoubleKill, bonusRewardList) =>
               s"${translationsData.bonusDoubleKill.innerText}: ${rewardsToString(bonusRewardList)}"
-            case TurnBonus(BonusType.TripleKill, bonusRewardList) =>
+            case GameBonus(BonusType.TripleKill, bonusRewardList) =>
               s"${translationsData.bonusTripleKill.innerText}: ${rewardsToString(bonusRewardList)}"
+            case GameBonus(BonusType.UltraKill, bonusRewardList) =>
+              s"${translationsData.bonusUltraKill.innerText}: ${rewardsToString(bonusRewardList)}"
           }
         }
       ).flatten

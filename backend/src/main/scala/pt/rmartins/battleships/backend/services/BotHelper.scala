@@ -28,7 +28,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
   def getBotBoardMarks: BotBoardMarks = cachedBotBoardMarks
 
   private val standardTripleKill: Boolean =
-    rules.turnBonuses.exists(turnBonus =>
+    rules.gameBonuses.exists(turnBonus =>
       turnBonus.bonusType == BonusType.TripleKill &&
         turnBonus.bonusRewardList.contains(BonusReward.ExtraTurn(List.fill(3)(AttackType.Simple)))
     )

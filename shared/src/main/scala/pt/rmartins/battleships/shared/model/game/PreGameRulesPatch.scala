@@ -6,7 +6,7 @@ case class PreGameRulesPatch(
     boardSizePatch: Option[Coordinate] = None,
     gameFleetPatch: Option[(ShipId, Int)] = None,
     defaultTurnAttacksPatch: Option[List[AttackType]] = None,
-    turnBonusesPatch: Option[List[TurnBonus]] = None,
+    gameBonusesPatch: Option[List[GameBonus]] = None,
     timeLimitPatch: Option[RuleTimeLimit] = None
 ) {
   def containsPatch: Boolean =
@@ -14,7 +14,7 @@ case class PreGameRulesPatch(
       boardSizePatch,
       gameFleetPatch,
       defaultTurnAttacksPatch,
-      turnBonusesPatch,
+      gameBonusesPatch,
       timeLimitPatch
     ).exists(_.nonEmpty)
 

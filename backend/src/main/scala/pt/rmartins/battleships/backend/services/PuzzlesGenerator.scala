@@ -136,7 +136,7 @@ object PuzzlesGenerator {
         boardSize = board.boardSize,
         gameFleet = Fleet.fromShipsList(board.getSimpleShipsList),
         defaultTurnAttacks = List.fill(defaultTurnAttacks)(AttackType.Simple),
-        turnBonuses = Nil,
+        gameBonuses = Nil,
         timeLimit = WithoutRuleTimeLimit
       )
 

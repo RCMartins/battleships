@@ -567,7 +567,7 @@ class GameService(rpcClientsService: RpcClientsService) {
             case PreGameRulesPatch(_, _, _, Some(turnBonusesPatch), _) =>
               check(
                 preGame.receiveRulesPatchTurnBonuses(turnBonusesPatch),
-                PreGameRulesPatch(turnBonusesPatch = Some(turnBonusesPatch))
+                PreGameRulesPatch(gameBonusesPatch = Some(turnBonusesPatch))
               )
             case PreGameRulesPatch(_, _, _, _, Some(timeLimitPatch)) =>
               check(
@@ -1278,13 +1278,13 @@ object GameService {
       }
 
     def receiveRulesPatchTurnBonuses(
-        turnBonusesPatch: List[TurnBonus]
+        turnBonusesPatch: List[GameBonus]
     ): (PreGame, Boolean) =
-      rules.turnBonuses match {
+      rules.gameBonuses match {
         case currentTurnBonuses if currentTurnBonuses == turnBonusesPatch =>
           (this, false)
         case _ =>
-          (this.modify(_.rules.turnBonuses).setTo(turnBonusesPatch), true)
+          (this.modify(_.rules.gameBonuses).setTo(turnBonusesPatch), true)
       }
 
     def receiveRulesPatchTimeLimit(
@@ -1564,7 +1564,7 @@ object GameService {
   private def rewardExtraTurns(gameBeforeHits: Game, turnPlay: TurnPlay): List[BonusReward] = {
     val killsThisTurn = turnPlay.hitHints.count(_.isDestroyed)
 
-    gameBeforeHits.rules.turnBonuses.flatMap { case TurnBonus(bonusType, bonusReward) =>
+    gameBeforeHits.rules.gameBonuses.flatMap { case GameBonus(bonusType, bonusReward) =>
       bonusType match {
         case BonusType.FirstBlood
             if killsThisTurn > 0 && gameBeforeHits.bothPlayers.forall(_.kills == 0) =>
@@ -1572,6 +1572,8 @@ object GameService {
         case BonusType.DoubleKill if killsThisTurn == 2 =>
           bonusReward
         case BonusType.TripleKill if killsThisTurn == 3 =>
+          bonusReward
+        case BonusType.UltraKill if killsThisTurn == 4 =>
           bonusReward
         case _ =>
           Nil

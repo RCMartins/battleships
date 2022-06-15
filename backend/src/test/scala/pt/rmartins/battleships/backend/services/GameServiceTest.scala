@@ -677,10 +677,10 @@ class GameServiceTest extends AsyncWordSpec with Matchers with AsyncMockFactory 
         ),
         (
           "turnBonusesPatch",
-          PreGameRulesPatch(turnBonusesPatch =
+          PreGameRulesPatch(gameBonusesPatch =
             Some(
               List(
-                TurnBonus(
+                GameBonus(
                   BonusType.FirstBlood,
                   List(BonusReward.ExtraTurn(List(AttackType.Simple)))
                 )
