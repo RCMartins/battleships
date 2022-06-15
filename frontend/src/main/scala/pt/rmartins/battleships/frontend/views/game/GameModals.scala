@@ -335,7 +335,7 @@ class GameModals(
       rules.turnBonuses
         .find(_.bonusType == editGameBonusType)
         .map(_.bonusRewardList)
-        .getOrElse(Nil) == editGameBonusRewards
+        .getOrElse(Nil) == PreGameModel.validateEditGameBonusRewards(editGameBonusRewards)
     }
   )(nested =>
     Seq[Modifier](
@@ -352,7 +352,7 @@ class GameModals(
         preGame.rules
           .modify(_.turnBonuses)
           .using { currentTurnBonuses =>
-            (preGame.editGameBonusRewards match {
+            (preGame.validatedEditGameBonusRewards match {
               case Nil  => Nil
               case list => List(TurnBonus(preGame.editGameBonusType, list))
             }) ++

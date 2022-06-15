@@ -25,9 +25,20 @@ case class PreGameModel(
     editGameBonusType: BonusType,
     editGameBonusRewards: List[BonusReward],
     editGameBonusDiv: Div
-)
+) {
+
+  def validatedEditGameBonusRewards: List[BonusReward] =
+    PreGameModel.validateEditGameBonusRewards(editGameBonusRewards)
+
+}
 
 object PreGameModel extends HasModelPropertyCreator[PreGameModel] {
+
+  def validateEditGameBonusRewards(editGameBonusRewards: List[BonusReward]): List[BonusReward] =
+    editGameBonusRewards.filter {
+      case BonusReward.ExtraTurn(Nil) => false
+      case _                          => true
+    }
 
   val MaxPreviewTries: Int = 100
   val MinPreviewTriesPerc: Double = 0.15
