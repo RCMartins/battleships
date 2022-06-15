@@ -15,6 +15,7 @@ object TranslationUtils {
         case BonusType.FirstBlood => Translations.PreGame.bonusFirstBlood
         case BonusType.DoubleKill => Translations.PreGame.bonusDoubleKill
         case BonusType.TripleKill => Translations.PreGame.bonusTripleKill
+        case BonusType.UltraKill  => Translations.PreGame.bonusUltraKill
       }
     )(_.apply())
 

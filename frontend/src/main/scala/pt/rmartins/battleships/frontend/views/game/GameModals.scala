@@ -332,7 +332,7 @@ class GameModals(
       preGameModel.subProp(_.editGameBonusType),
       preGameModel.subProp(_.editGameBonusRewards)
     ).transform { case (rules, editGameBonusType, editGameBonusRewards) =>
-      rules.turnBonuses
+      rules.gameBonuses
         .find(_.bonusType == editGameBonusType)
         .map(_.bonusRewardList)
         .getOrElse(Nil) == PreGameModel.validateEditGameBonusRewards(editGameBonusRewards)
@@ -350,11 +350,11 @@ class GameModals(
       .subProp(_.rules)
       .set(
         preGame.rules
-          .modify(_.turnBonuses)
+          .modify(_.gameBonuses)
           .using { currentTurnBonuses =>
             (preGame.validatedEditGameBonusRewards match {
               case Nil  => Nil
-              case list => List(TurnBonus(preGame.editGameBonusType, list))
+              case list => List(GameBonus(preGame.editGameBonusType, list))
             }) ++
               currentTurnBonuses.filterNot(_.bonusType == preGame.editGameBonusType)
           }

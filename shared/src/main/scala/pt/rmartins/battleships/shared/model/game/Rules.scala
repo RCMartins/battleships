@@ -7,7 +7,7 @@ case class Rules(
     boardSize: Coordinate,
     gameFleet: Fleet,
     defaultTurnAttacks: List[AttackType],
-    turnBonuses: List[TurnBonus],
+    gameBonuses: List[GameBonus],
     timeLimit: RuleTimeLimit
 )
 

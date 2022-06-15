@@ -98,10 +98,10 @@ object PreGameModel extends HasModelPropertyCreator[PreGameModel] {
             boardSize = boardSize,
             gameFleet = gameFleet,
             defaultTurnAttacks = List.fill(3)(AttackType.Simple),
-            turnBonuses = List(
-              TurnBonus(BonusType.FirstBlood, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
-              TurnBonus(BonusType.DoubleKill, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
-              TurnBonus(BonusType.TripleKill, List(ExtraTurn(List.fill(3)(AttackType.Simple))))
+            gameBonuses = List(
+              GameBonus(BonusType.FirstBlood, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
+              GameBonus(BonusType.DoubleKill, List(ExtraTurn(List.fill(1)(AttackType.Simple)))),
+              GameBonus(BonusType.TripleKill, List(ExtraTurn(List.fill(3)(AttackType.Simple))))
             ),
             timeLimit = RuleTimeLimit.WithoutRuleTimeLimit
           )

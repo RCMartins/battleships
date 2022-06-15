@@ -19,4 +19,9 @@ object BonusType extends HasGenCodec[BonusType] {
 
   case object TripleKill extends BonusType
 
+  case object UltraKill extends BonusType
+
+  val AllBonusType: List[BonusType] =
+    List(FirstBlood, DoubleKill, TripleKill, UltraKill)
+
 }

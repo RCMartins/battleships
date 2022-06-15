@@ -223,7 +223,7 @@ class GamePresenter(
         preGameRulesProperty.get.copy(defaultTurnAttacks = defaultTurnAttacksPatch)
       )
     case PreGameRulesPatch(_, _, _, Some(turnBonusesPatch), _) =>
-      preGameRulesProperty.set(preGameRulesProperty.get.copy(turnBonuses = turnBonusesPatch))
+      preGameRulesProperty.set(preGameRulesProperty.get.copy(gameBonuses = turnBonusesPatch))
     case PreGameRulesPatch(_, _, _, _, Some(timeLimitPatch)) =>
       preGameRulesProperty.set(preGameRulesProperty.get.copy(timeLimit = timeLimitPatch))
     case _ =>
@@ -652,6 +652,9 @@ class GamePresenter(
       .subProp(_.bonusTripleKill)
       .set(span(translatedDynamic(Translations.PreGame.bonusTripleKill)(_.apply())).render)
     translationsModel
+      .subProp(_.bonusUltraKill)
+      .set(span(translatedDynamic(Translations.PreGame.bonusUltraKill)(_.apply())).render)
+    translationsModel
       .subProp(_.shots)
       .set(span(translatedDynamic(Translations.PreGame.shots)(_.apply())).render)
     translationsModel
@@ -739,11 +742,11 @@ class GamePresenter(
       }
     }
 
-    preGameRulesProperty.transform(_.turnBonuses).listen { updatedTurnBonuses =>
+    preGameRulesProperty.transform(_.gameBonuses).listen { updatedTurnBonuses =>
       gameIdOpt.get.foreach { gameId =>
         gameRpc.sendRulesPatch(
           gameId,
-          PreGameRulesPatch(turnBonusesPatch = Some(updatedTurnBonuses))
+          PreGameRulesPatch(gameBonusesPatch = Some(updatedTurnBonuses))
         )
       }
     }
