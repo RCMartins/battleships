@@ -38,7 +38,7 @@ class RootView(translationsService: TranslationsService) extends ContainerView w
     // loads Bootstrap and FontAwesome styles from CDN
     UdashBootstrap.loadBootstrapStyles(),
     UdashBootstrap.loadFontAwesome(),
-    BootstrapStyles.container,
+    BootstrapStyles.containerFluid,
     div(
       GlobalStyles.floatRight,
       span(`class` := "small text-black-50 mr-5", s"v${BuildInfo.version}"),
