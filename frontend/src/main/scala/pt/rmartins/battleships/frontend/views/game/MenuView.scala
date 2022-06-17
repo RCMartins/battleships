@@ -31,7 +31,7 @@ import scalatags.JsDom.all._
 
 import scala.util.chaining.scalaUtilChainingOps
 
-class NewGameView(
+class MenuView(
     preGameModel: ModelProperty[PreGameModel],
     gameModel: ModelProperty[GameModel],
     gameStateModel: ModelProperty[GameStateModel],
