@@ -44,7 +44,7 @@ class RootView(translationsService: TranslationsService) extends ContainerView w
       span(`class` := "small text-black-50 mr-5", s"v${BuildInfo.version}"),
       Translations.langs.map(v => langChangeButton(Lang(v)))
     ),
-    h2("battleships"), //, BootstrapStyles.Spacing.margin()),
+    h2(`class` := "text-center", "battleships"),
     childViewContainer
   )
 }

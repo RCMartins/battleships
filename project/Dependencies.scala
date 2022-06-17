@@ -19,7 +19,6 @@ object Dependencies {
 
   // JS dependencies
   val bootstrapVersion = "5.1.3"
-  val highchartsVersion = "9.2.2"
 
   // Testing
   val scalatestVersion = "3.2.3"
@@ -62,21 +61,7 @@ object Dependencies {
     Seq(
       // "jquery.js" is provided by "udash-jquery" dependency
       "org.webjars" % "bootstrap" % bootstrapVersion / "js/bootstrap.bundle.js"
-        minified "js/bootstrap.bundle.min.js" dependsOn "jquery.js",
-
-      // Highcharts JS files
-      "org.webjars" % "highcharts" % highchartsVersion /
-        s"$highchartsVersion/highcharts.src.js" minified s"$highchartsVersion/highcharts.js" dependsOn "jquery.js",
-      "org.webjars" % "highcharts" % highchartsVersion /
-        s"$highchartsVersion/highcharts-3d.src.js" minified s"$highchartsVersion/highcharts-3d.js" dependsOn s"$highchartsVersion/highcharts.src.js",
-      "org.webjars" % "highcharts" % highchartsVersion /
-        s"$highchartsVersion/highcharts-more.src.js" minified s"$highchartsVersion/highcharts-more.js" dependsOn s"$highchartsVersion/highcharts.src.js",
-      "org.webjars" % "highcharts" % highchartsVersion /
-        s"$highchartsVersion/modules/exporting.src.js" minified s"$highchartsVersion/modules/exporting.js" dependsOn s"$highchartsVersion/highcharts.src.js",
-      "org.webjars" % "highcharts" % highchartsVersion /
-        s"$highchartsVersion/modules/drilldown.src.js" minified s"$highchartsVersion/modules/drilldown.js" dependsOn s"$highchartsVersion/highcharts.src.js",
-      "org.webjars" % "highcharts" % highchartsVersion /
-        s"$highchartsVersion/modules/heatmap.src.js" minified s"$highchartsVersion/modules/heatmap.js" dependsOn s"$highchartsVersion/highcharts.src.js"
+        minified "js/bootstrap.bundle.min.js" dependsOn "jquery.js"
     )
   )
 
