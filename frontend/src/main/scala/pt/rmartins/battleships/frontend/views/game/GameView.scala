@@ -14,14 +14,16 @@ import io.udash.component.ComponentId
 import io.udash.css._
 import io.udash.i18n._
 import org.scalajs.dom
-import org.scalajs.dom._
+import org.scalajs.dom.{html, _}
 import org.scalajs.dom.html.{Canvas, Div, Input, LI, Span}
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
-import pt.rmartins.battleships.frontend.views.model.AttacksQueuedStatus
+import pt.rmartins.battleships.frontend.views.menu.{PlayerVsBotsView, PlayerVsPlayerView}
+import pt.rmartins.battleships.frontend.views.model.{AttacksQueuedStatus, MenuState}
 import pt.rmartins.battleships.frontend.views.model.JoinedPreGame.PlayingAgainstPlayer
 import pt.rmartins.battleships.frontend.views.model.ModeType._
-import pt.rmartins.battleships.shared.css.ChatStyles
+import pt.rmartins.battleships.shared.css.ChatStyles.dsl
+import pt.rmartins.battleships.shared.css.{ChatStyles, GameStyles}
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game._
@@ -41,7 +43,8 @@ class GameView(
     presenter: GamePresenter,
     translationsService: TranslationsService,
     boardView: BoardView,
-    preGameView: PreGameView,
+    playerVsBotsView: PlayerVsBotsView,
+    playerVsPlayerView: PlayerVsPlayerView,
     gameModals: GameModals,
     viewUtils: ViewUtils
 ) extends View
@@ -81,14 +84,6 @@ class GameView(
   gameModel.subProp(_.selectedAction).listen(_ => reloadBoardView())
   gameModel.subProp(_.lineDashOffset).listen(_ => reloadBoardView())
 
-  private val startGameVsBotButton = UdashButton(
-    buttonStyle = Color.Primary.toProperty,
-    block = true.toProperty,
-    componentId = ComponentId("start-game-bot-button")
-  )(nested =>
-    Seq[Modifier](span(nested(translatedDynamic(Translations.Game.startGameVsBot)(_.apply()))))
-  )
-
   private val invitePlayerButton = UdashButton(
     buttonStyle = Color.Primary.toProperty,
     block = true.toProperty,
@@ -107,31 +102,12 @@ class GameView(
     )
   )
 
-  private val confirmRulesButton = {
-    val isConfirmedProperty: ReadableProperty[Boolean] =
-      preGameModel.subProp(_.inJoinedPreGame).transform {
-        case Some(PlayingAgainstPlayer(_, true, _, _)) => true
-        case _                                         => false
-      }
-
-    UdashButton(
-      buttonStyle = Color.Primary.toProperty,
-      block = true.toProperty,
-      componentId = ComponentId("confirm-rules-button"),
-      disabled = isConfirmedProperty
-    )(nested =>
-      Seq[Modifier](
-        span(nested(translatedDynamic(Translations.Game.confirmRulesButton)(_.apply())))
-      )
-    )
-  }
-
-  private val cancelRulesButton =
+  private val cancelRulesButton: html.Element =
     UdashButton(
       buttonStyle = Color.Danger.toProperty,
       block = true.toProperty,
       componentId = ComponentId("cancel-rules-button")
-    )(_ => Seq[Modifier](`class` := "invisible", span(FontAwesome.Solid.times).render))
+    )(_ => Seq[Modifier](`class` := "invisible", span(FontAwesome.Solid.times).render)).render
 
   preGameModel
     .subProp(_.inJoinedPreGame)
@@ -139,21 +115,20 @@ class GameView(
       confirmed
     })
     .listen(
-      { confirmedOpt =>
-        val cancelButtonOpt: Option[Element] =
-          Option(document.getElementById(cancelRulesButton.componentId.value))
-        cancelButtonOpt.foreach { cancelButton =>
-          if (confirmedOpt.contains(true)) {
-            cancelButton.classList.remove("invisible")
-            cancelButton.classList.add("visible")
-          } else {
-            cancelButton.classList.remove("visible")
-            cancelButton.classList.add("invisible")
-          }
-        }
+      {
+        case Some(true) =>
+          cancelRulesButton.classList.remove("invisible")
+          cancelRulesButton.classList.add("visible")
+        case _ =>
+          cancelRulesButton.classList.remove("visible")
+          cancelRulesButton.classList.add("invisible")
       },
       initUpdate = true
     )
+
+  cancelRulesButton.onclick = _ => {
+    presenter.cancelRules()
+  }
 
   private def usernameInput(factory: FormElementsFactory): Element =
     factory.input
@@ -251,32 +226,30 @@ class GameView(
       componentId = ComponentId("edit-rules-button")
     )(nested => Seq(nested(translatedDynamic(Translations.Game.editRulesButton)(_.apply()))))
 
-  private val cancelQueuedAttacksButton =
+  private val cancelQueuedAttacksButton: html.Element =
     UdashButton(
       buttonStyle = Color.Danger.toProperty,
       block = true.toProperty,
       componentId = ComponentId("cancel-queued-attacks-button")
-    )(_ => Seq[Modifier](`class` := "invisible", span(FontAwesome.Solid.times).render))
+    )(_ => Seq[Modifier](span(FontAwesome.Solid.times).render)).render
 
   gameModel
     .subProp(_.turnAttacksQueuedStatus)
     .listen(
-      { attacksQueuedStatus =>
-        val cancelButtonOpt: Option[Element] =
-          Option(document.getElementById(cancelQueuedAttacksButton.componentId.value))
-        cancelButtonOpt.foreach { cancelButton =>
-          attacksQueuedStatus match {
-            case AttacksQueuedStatus.Queued =>
-              cancelButton.classList.remove("invisible")
-              cancelButton.classList.add("visible")
-            case _ =>
-              cancelButton.classList.remove("visible")
-              cancelButton.classList.add("invisible")
-          }
-        }
+      {
+        case AttacksQueuedStatus.Queued =>
+          cancelQueuedAttacksButton.classList.remove("invisible")
+          cancelQueuedAttacksButton.classList.add("visible")
+        case _ =>
+          cancelQueuedAttacksButton.classList.remove("visible")
+          cancelQueuedAttacksButton.classList.add("invisible")
       },
       initUpdate = true
     )
+
+  cancelQueuedAttacksButton.onclick = _ => {
+    presenter.cancelQueuedAttacks()
+  }
 
   private val launchAttackButton = {
     val launchAttackIsDisabledProperty =
@@ -284,7 +257,7 @@ class GameView(
         .subProp(_.turnAttacksQueuedStatus)
         .combine(gameModel.subProp(_.turnAttacks)) { case (turnAttacksQueuedStatus, turnAttacks) =>
           turnAttacksQueuedStatus != AttacksQueuedStatus.NotSet ||
-            !turnAttacks.forall(_.isPlaced)
+          !turnAttacks.forall(_.isPlaced)
         }
 
     UdashButton(
@@ -401,7 +374,7 @@ class GameView(
             div(
               `class` := "row mx-0",
               div(`class` := "ml-2", cancelRulesButton),
-              div(`class` := "mx-2", confirmRulesButton),
+//              div(`class` := "mx-2", confirmRulesButton),
               // TODO why using produceWithNested here if we already have inJoinedPreGame value?
               nested(produceWithNested(preGameModel.subProp(_.inJoinedPreGame)) {
                 case (Some(PlayingAgainstPlayer(_, _, true, _)), nested) =>
@@ -432,7 +405,7 @@ class GameView(
               `class` := "row justify-content-between mx-0",
               div(
                 `class` := "row mx-0",
-                div(`class` := "mx-2", startGameVsBotButton),
+//                div(`class` := "mx-2", startGameVsBotButton),
                 div(`class` := "ml-2", invitePlayerButton),
                 usernameInput(factory)
               ),
@@ -479,10 +452,6 @@ class GameView(
     )
   )
 
-  startGameVsBotButton.listen { _ =>
-    presenter.startGameWithBots()
-  }
-
   invitePlayerButton.listen { _ =>
     presenter.invitePlayer(preGameModel.subProp(_.enemyUsernameText).get)
   }
@@ -503,14 +472,6 @@ class GameView(
     presenter.startNewPuzzle()
   }
 
-  confirmRulesButton.listen { _ =>
-    presenter.confirmRules()
-  }
-
-  cancelRulesButton.listen { _ =>
-    presenter.cancelRules()
-  }
-
   confirmShipsButton.listen { _ =>
     presenter.confirmShipPlacement()
   }
@@ -529,10 +490,6 @@ class GameView(
 
   editRulesButton.listen { _ =>
     presenter.requestEditRules()
-  }
-
-  cancelQueuedAttacksButton.listen { _ =>
-    presenter.cancelQueuedAttacks()
   }
 
   launchAttackButton.listen { _ =>
@@ -637,13 +594,15 @@ class GameView(
   presenter.selectedTabProperty.listen { selectedTab =>
     def updateClass(id: String): Unit =
       if (selectedTab == id) {
-        document.getElementById(selectedTabToButtonId(id)).classList.add("active")
+        Option(document.getElementById(selectedTabToButtonId(id)))
+          .foreach(_.classList.add("active"))
         Option(document.getElementById(id)).foreach { elem =>
           elem.classList.add("show")
           elem.classList.add("active")
         }
       } else {
-        document.getElementById(selectedTabToButtonId(id)).classList.remove("active")
+        Option(document.getElementById(selectedTabToButtonId(id)))
+          .foreach(_.classList.remove("active"))
         Option(document.getElementById(id)).foreach { elem =>
           elem.classList.remove("show")
           elem.classList.remove("active")
@@ -985,10 +944,10 @@ class GameView(
 
   msgForm.listen { case FormEvent(_, FormEvent.EventType.Submit) =>
     presenter.sendMsg()
-    presenter.setSelectedTab(ScreenModel.chatTab)
-    document.getElementById(chatTabButton.componentId.value).classList.add("active")
-    document.getElementById(myMovesTabButton.componentId.value).classList.remove("active")
-    document.getElementById(enemyMovesTabButton.componentId.value).classList.remove("active")
+//    presenter.setSelectedTab(ScreenModel.chatTab)
+//    document.getElementById(chatTabButton.componentId.value).classList.add("active")
+//    document.getElementById(myMovesTabButton.componentId.value).classList.remove("active")
+//    document.getElementById(enemyMovesTabButton.componentId.value).classList.remove("active")
   }
 
   private val quitGameButton = UdashButton(
@@ -1055,260 +1014,265 @@ class GameView(
       Globals.modalToggle(gameModals.acceptPlayerInviteModalId)
   }
 
+  def fullNavBar(nested: NestedInterceptor): Modifier = {
+    div.render
+  }
+
+  def mainDiv(nested: NestedInterceptor): Modifier = {
+    div(
+      nested(
+        produceWithNested(
+          combine(
+            presenter.gameStateProperty.transform(_.nonEmpty),
+            presenter.gamePuzzleStateProperty.transform(_.nonEmpty)
+          )
+        ) {
+          case ((true, _), nested) =>
+            div.render
+          case ((_, true), nested) =>
+            div.render
+          case ((false, false), _) =>
+            div(
+              nested(
+                produceWithNested(preGameModel.subProp(_.menuState)) {
+                  case (MenuState.PlayingVsBots, nested) =>
+                    playerVsBotsView.mainEditorDiv(nested)
+                  case (MenuState.PlayingVsPlayer, nested) =>
+                    playerVsPlayerView.mainEditorDiv(nested)
+                }
+              )
+            ).render
+        }
+      )
+    ).render
+  }
+
   override def getTemplate: Modifier = div(
     UdashCard(componentId = ComponentId("game-panel"))(factory =>
-      Seq(
-        factory.header(nested =>
-          div(
-            `class` := "row justify-content-between",
-            gameModals.generalGameErrorModal(nested).tap {
-              _.addEventListener(
-                "hidden.bs.modal",
-                (_: Event) => {
-                  screenModel.subProp(_.errorModalType).set(None)
-                }
-              )
-            },
-            gameModals
-              .fleetNameModal(nested)
-              .tap {
-                _.addEventListener(
-                  "shown.bs.modal",
-                  (_: Event) => {
-                    gameModals.fleetNameInput.focus()
-                  }
-                )
-              }
-              .tap {
-                _.addEventListener(
-                  "hidden.bs.modal",
-                  (_: Event) => {
-                    presenter.saveNewNamedRules()
-                  }
-                )
-              },
-            gameModals.quitGameModal(nested),
-            gameModals.acceptPlayerInviteModal(nested).tap {
-              _.addEventListener(
-                "hidden.bs.modal",
-                (_: Event) => {
-                  presenter.answerInvitePlayerRequest(false)
-                }
-              )
-            },
-            gameModals.acceptEditRulesModal(nested).tap {
-              _.addEventListener(
-                "hidden.bs.modal",
-                (_: Event) => {
-                  screenModel.subProp(_.receiveEditRequest).set(None)
-                  presenter.answerEditRulesRequest(false)
-                }
-              )
-            },
-            gameModals.editGameBonusModal(nested),
-            div(
-              `class` := "col-6",
-              span(
-                nested(translatedDynamic(Translations.Game.loggedInAs)(_.apply())),
-                " ",
-                b(bind(chatModel.subProp(_.username)))
-              ),
-              nested(produceWithNested(presenter.enemyUsernameProperty) {
-                case (Some(Username(enemyUsername)), nested) =>
-                  span(
-                    " - ",
-                    nested(translatedDynamic(Translations.Game.playingAgainst)(_.apply())),
-                    " ",
-                    b(enemyUsername)
-                  ).render
-                case _ =>
-                  span.render
-              }),
-              br,
-              nested(produceWithNested(presenter.gameModeProperty) {
-                case (Some(PlacingShipsMode(iPlacedShips, enemyPlacedShips)), nested) =>
-                  val placeShipsBinding =
-                    nested(
-                      translatedDynamic(
-                        if (iPlacedShips)
-                          Translations.Game.placeShipsWaitEnemy
-                        else if (enemyPlacedShips)
-                          Translations.Game.placeShipsEnemyReady
-                        else
-                          Translations.Game.placeShips
-                      )(_.apply())
-                    )
-                  span(color := "#FF0000", b(placeShipsBinding)).render
-                case (Some(PlayingMode(isMyTurn, turn, _, _, _)), nested) =>
-                  val turnStrBinding: Binding =
-                    nested(
-                      translatedDynamic(
-                        if (isMyTurn)
-                          Translations.Game.yourTurn
-                        else
-                          Translations.Game.enemyTurn
-                      )(_.apply())
-                    )
-
-                  span(
-                    nested(translatedDynamic(Translations.Game.turn)(_.apply())),
-                    " ",
-                    turn.toTurnString,
-                    ": ",
-                    span(color := "#FF0000", b(turnStrBinding))
-                  ).render
-                case (Some(GameOverMode(turn, youWon, _, _, _)), nested) =>
-                  val turnStrBinding: Binding =
-                    nested(
-                      translatedDynamic(
-                        if (youWon)
-                          Translations.Game.youWon
-                        else
-                          Translations.Game.enemyWon
-                      )(_.apply())
-                    )
-
-                  span(
-                    nested(translatedDynamic(Translations.Game.turn)(_.apply())),
-                    " ",
-                    turn.toTurnString,
-                    ": ",
-                    span(color := "#FF0000", b(turnStrBinding))
-                  ).render
-                case _ =>
-                  span.render
-              })
-            ), {
-              def toTimeStr(seconds: Int): String =
-                "%02d:%02d".format(seconds / 60, seconds % 60)
-
-              def toShortTimeStr(secondsOpt: Option[Int]): String =
-                secondsOpt
-                  .map { seconds =>
-                    if (seconds >= 60)
-                      " + %02d:%02d".format(seconds / 60, seconds % 60)
-                    else
-                      " + %02d".format(seconds)
-                  }
-                  .getOrElse("")
-
-              def showTimeStr(nested: NestedInterceptor, key: TranslationKey0): Binding =
-                nested(
-                  produceWithNested(presenter.modeTypeProperty) {
-                    case (Some(PlayingModeType | GameOverModeType), nested) =>
-                      span(nested(translatedDynamic(key)(_.apply()))).render
-                    case _ =>
-                      div.render
-                  }
-                )
-
-              def showTime(timeRemaining: TimeRemaining): Span =
-                span(
-                  `class` := "px-0",
-                  span(b(toTimeStr(timeRemaining.totalTimeRemainingMillis / 1000))),
-                  span(b(toShortTimeStr(timeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000))))
-                ).render
-
-              div(
-                `class` := "col-4 row p-0 m-0",
-                div(
-                  `class` := "col px-0",
-                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.nonEmpty)) {
-                    case true =>
-                      span(showTimeStr(nested, Translations.Game.myTime)).render
-                    case false =>
-                      span.render
-                  }),
-                  br,
-                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.map(_._1))) {
-                    case Some(myTimeRemaining) =>
-                      showTime(myTimeRemaining)
-                    case None =>
-                      span.render
-                  })
-                ),
-                div(
-                  `class` := "col px-0",
-                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.nonEmpty)) {
-                    case true =>
-                      span(showTimeStr(nested, Translations.Game.enemyTime)).render
-                    case false =>
-                      span.render
-                  }),
-                  br,
-                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.nonEmpty)) {
-                    case true =>
-                      div(
-                        `class` := "row m-0",
-                        nested(produce(gameModel.subProp(_.timeRemaining).transform(_.map(_._2))) {
-                          case Some(enemyTimeRemaining) =>
-                            div(
-                              `class` := "m-0",
-                              showTime(enemyTimeRemaining)
-                            ).render
-                          case None =>
-                            span.render
-                        }),
-                        addEnemyTimeButton
-                      ).render
-                    case false =>
-                      span.render
-                  })
-                )
-              )
-            },
-            div(
-              `class` := "col-2 container",
-              div(
-                `class` := "row justify-content-end",
-                span(quitGameButton).render
-              )
-            )
-          ).render
-        ),
-        factory.body(nested =>
+      Seq[Modifier](
+//        factory.body(nested => fullNavBar(nested)),
+        factory.body { nested =>
           Seq[Modifier](
-            `class` := "p-0",
-            nested(
-              produceWithNested(
-                gameStateModel.transform(gameStateModel =>
-                  (gameStateModel.gameState.isEmpty, gameStateModel.gamePuzzleState.isEmpty)
-                )
-              ) {
-                case ((true, false), _) =>
-                  boardView.canvasDiv
-                case ((true, true), nested) =>
-                  val basePreGameDiv = div.render
-
-                  var handle: Int = 0
-
-                  handle = window.setInterval(
-                    () => {
-                      if (basePreGameDiv.clientWidth != 0) {
-                        val innerDiv = preGameView.createComponents(basePreGameDiv, nested)
-                        basePreGameDiv.appendChild(innerDiv)
-                        window.clearTimeout(handle)
-                      }
-                    },
-                    timeout = 20
-                  )
-
-                  basePreGameDiv
-                case (_, _) =>
-                  boardView.canvasDiv
-              }
+            `class` := "px-0 py-0 overflow-auto",
+            div(
+              GameStyles.flexContainer,
+              GameStyles.mainCardHeight,
+              gameModals.initialize(nested),
+              mainDiv(nested),
             )
           )
-        ),
-        factory.footer(nested => nested(mainGameForm)),
-        factory.body(nested =>
-          Seq[Modifier](
-            `class` := "py-1",
-            messagesTab(nested)
-          )
-        )
+        },
+        factory.footer { nested =>
+          playerVsBotsView.footer(nested)
+        }
       )
     )
   )
+//          div(
+//            `class` := "row justify-content-between",
+//            div(
+//              `class` := "col-6",
+//              span(
+//                nested(translatedDynamic(Translations.Game.loggedInAs)(_.apply())),
+//                " ",
+//                b(bind(chatModel.subProp(_.username)))
+//              ),
+//              nested(produceWithNested(presenter.enemyUsernameProperty) {
+//                case (Some(Username(enemyUsername)), nested) =>
+//                  span(
+//                    " - ",
+//                    nested(translatedDynamic(Translations.Game.playingAgainst)(_.apply())),
+//                    " ",
+//                    b(enemyUsername)
+//                  ).render
+//                case _ =>
+//                  span.render
+//              }),
+//              br,
+//              nested(produceWithNested(presenter.gameModeProperty) {
+//                case (Some(PlacingShipsMode(iPlacedShips, enemyPlacedShips)), nested) =>
+//                  val placeShipsBinding =
+//                    nested(
+//                      translatedDynamic(
+//                        if (iPlacedShips)
+//                          Translations.Game.placeShipsWaitEnemy
+//                        else if (enemyPlacedShips)
+//                          Translations.Game.placeShipsEnemyReady
+//                        else
+//                          Translations.Game.placeShips
+//                      )(_.apply())
+//                    )
+//                  span(color := "#FF0000", b(placeShipsBinding)).render
+//                case (Some(PlayingMode(isMyTurn, turn, _, _, _)), nested) =>
+//                  val turnStrBinding: Binding =
+//                    nested(
+//                      translatedDynamic(
+//                        if (isMyTurn)
+//                          Translations.Game.yourTurn
+//                        else
+//                          Translations.Game.enemyTurn
+//                      )(_.apply())
+//                    )
+//
+//                  span(
+//                    nested(translatedDynamic(Translations.Game.turn)(_.apply())),
+//                    " ",
+//                    turn.toTurnString,
+//                    ": ",
+//                    span(color := "#FF0000", b(turnStrBinding))
+//                  ).render
+//                case (Some(GameOverMode(turn, youWon, _, _, _)), nested) =>
+//                  val turnStrBinding: Binding =
+//                    nested(
+//                      translatedDynamic(
+//                        if (youWon)
+//                          Translations.Game.youWon
+//                        else
+//                          Translations.Game.enemyWon
+//                      )(_.apply())
+//                    )
+//
+//                  span(
+//                    nested(translatedDynamic(Translations.Game.turn)(_.apply())),
+//                    " ",
+//                    turn.toTurnString,
+//                    ": ",
+//                    span(color := "#FF0000", b(turnStrBinding))
+//                  ).render
+//                case _ =>
+//                  span.render
+//              })
+//            ), {
+//              def toTimeStr(seconds: Int): String =
+//                "%02d:%02d".format(seconds / 60, seconds % 60)
+//
+//              def toShortTimeStr(secondsOpt: Option[Int]): String =
+//                secondsOpt
+//                  .map { seconds =>
+//                    if (seconds >= 60)
+//                      " + %02d:%02d".format(seconds / 60, seconds % 60)
+//                    else
+//                      " + %02d".format(seconds)
+//                  }
+//                  .getOrElse("")
+//
+//              def showTimeStr(nested: NestedInterceptor, key: TranslationKey0): Binding =
+//                nested(
+//                  produceWithNested(presenter.modeTypeProperty) {
+//                    case (Some(PlayingModeType | GameOverModeType), nested) =>
+//                      span(nested(translatedDynamic(key)(_.apply()))).render
+//                    case _ =>
+//                      div.render
+//                  }
+//                )
+//
+//              def showTime(timeRemaining: TimeRemaining): Span =
+//                span(
+//                  `class` := "px-0",
+//                  span(b(toTimeStr(timeRemaining.totalTimeRemainingMillis / 1000))),
+//                  span(b(toShortTimeStr(timeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000))))
+//                ).render
+//
+//              div(
+//                `class` := "col-4 row p-0 m-0",
+//                div(
+//                  `class` := "col px-0",
+//                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.nonEmpty)) {
+//                    case true =>
+//                      span(showTimeStr(nested, Translations.Game.myTime)).render
+//                    case false =>
+//                      span.render
+//                  }),
+//                  br,
+//                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.map(_._1))) {
+//                    case Some(myTimeRemaining) =>
+//                      showTime(myTimeRemaining)
+//                    case None =>
+//                      span.render
+//                  })
+//                ),
+//                div(
+//                  `class` := "col px-0",
+//                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.nonEmpty)) {
+//                    case true =>
+//                      span(showTimeStr(nested, Translations.Game.enemyTime)).render
+//                    case false =>
+//                      span.render
+//                  }),
+//                  br,
+//                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.nonEmpty)) {
+//                    case true =>
+//                      div(
+//                        `class` := "row m-0",
+//                        nested(produce(gameModel.subProp(_.timeRemaining).transform(_.map(_._2))) {
+//                          case Some(enemyTimeRemaining) =>
+//                            div(
+//                              `class` := "m-0",
+//                              showTime(enemyTimeRemaining)
+//                            ).render
+//                          case None =>
+//                            span.render
+//                        }),
+//                        addEnemyTimeButton
+//                      ).render
+//                    case false =>
+//                      span.render
+//                  })
+//                )
+//              )
+//            },
+//            div(
+//              `class` := "col-2 container",
+//              div(
+//                `class` := "row justify-content-end",
+//                span(quitGameButton).render
+//              )
+//            )
+//          ).render
+//        ),
+//        factory.body(nested =>
+//          Seq[Modifier](
+//            `class` := "p-0",
+//            nested(
+//              produceWithNested(
+//                gameStateModel.transform(gameStateModel =>
+//                  (gameStateModel.gameState.isEmpty, gameStateModel.gamePuzzleState.isEmpty)
+//                )
+//              ) {
+//                case ((true, false), _) =>
+//                  boardView.canvasDiv
+//                case ((true, true), nested) =>
+//                  val basePreGameDiv = div.render
+//
+//                  var handle: Int = 0
+//
+//                  handle = window.setInterval(
+//                    () => {
+//                      if (basePreGameDiv.clientWidth != 0) {
+//                        val innerDiv = preGameView.createComponents(basePreGameDiv, nested)
+//                        basePreGameDiv.appendChild(innerDiv)
+//                        window.clearTimeout(handle)
+//                      }
+//                    },
+//                    timeout = 20
+//                  )
+//
+//                  basePreGameDiv
+//                case (_, _) =>
+//                  boardView.canvasDiv
+//              }
+//            )
+//          )
+//        ),
+//        factory.footer(nested => nested(mainGameForm)),
+//        factory.body(nested =>
+//          Seq[Modifier](
+//            `class` := "py-1",
+//            messagesTab(nested)
+//          )
+//        )
+//      )
+//    )
+//  )
 
 }

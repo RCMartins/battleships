@@ -9,6 +9,7 @@ import io.udash.bootstrap.utils.UdashIcons.FontAwesome
 import io.udash.component.ComponentId
 import io.udash.css.CssView
 import io.udash.i18n._
+import org.scalajs.dom.Event
 import org.scalajs.dom.html.{Div, Input}
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.Utils._
@@ -16,6 +17,7 @@ import pt.rmartins.battleships.frontend.views.model.ErrorModalType._
 import pt.rmartins.battleships.frontend.views.model.NamedRules
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game._
+import scalatags.JsDom
 import scalatags.JsDom.all._
 
 import scala.util.chaining.scalaUtilChainingOps
@@ -469,5 +471,54 @@ class GameModals(
         )
       )
     ).render
+
+  def initialize(nested: NestedInterceptor): Modifier = {
+    Seq[Modifier](
+      generalGameErrorModal(nested).tap {
+        _.addEventListener(
+          "hidden.bs.modal",
+          (_: Event) => {
+            screenModel.subProp(_.errorModalType).set(None)
+          }
+        )
+      },
+      fleetNameModal(nested)
+        .tap {
+          _.addEventListener(
+            "shown.bs.modal",
+            (_: Event) => {
+              fleetNameInput.focus()
+            }
+          )
+        }
+        .tap {
+          _.addEventListener(
+            "hidden.bs.modal",
+            (_: Event) => {
+              presenter.saveNewNamedRules()
+            }
+          )
+        },
+      quitGameModal(nested),
+      acceptPlayerInviteModal(nested).tap {
+        _.addEventListener(
+          "hidden.bs.modal",
+          (_: Event) => {
+            presenter.answerInvitePlayerRequest(false)
+          }
+        )
+      },
+      acceptEditRulesModal(nested).tap {
+        _.addEventListener(
+          "hidden.bs.modal",
+          (_: Event) => {
+            screenModel.subProp(_.receiveEditRequest).set(None)
+            presenter.answerEditRulesRequest(false)
+          }
+        )
+      },
+      editGameBonusModal(nested)
+    )
+  }
 
 }

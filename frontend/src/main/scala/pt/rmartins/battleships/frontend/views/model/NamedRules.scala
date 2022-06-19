@@ -7,7 +7,7 @@ case class NamedRules(name: String, rules: Rules)
 
 object NamedRules {
 
-  val MaxNamedRulesLength = 20
+  val MaxNamedRulesLength = 30
 
   implicit val namedRulesEncoder: JsonEncoder[NamedRules] =
     DeriveJsonEncoder.gen[NamedRules]

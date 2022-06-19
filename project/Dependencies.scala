@@ -16,6 +16,7 @@ object Dependencies {
   val quicklensVersion = "1.7.4"
   val betterFilesVersion = "3.9.1"
   val zioJsonVersion = "0.1.5"
+  val macwireVersion = "2.5.7"
 
   // JS dependencies
   val bootstrapVersion = "5.1.3"
@@ -51,7 +52,10 @@ object Dependencies {
       // type-safe wrapper for Twitter Bootstrap
       "io.udash" %%% "udash-bootstrap4" % udashVersion,
       // type-safe wrapper for jQuery
-      "io.udash" %%% "udash-jquery" % udashJQueryVersion
+      "io.udash" %%% "udash-jquery" % udashJQueryVersion,
+
+      // other dependencies
+      "com.softwaremill.macwire" %%% "macros" % macwireVersion % "provided"
     )
   )
 
@@ -89,4 +93,5 @@ object Dependencies {
       "org.scalamock" %%% "scalamock" % scalamockVersion
     ).map(_ % Test)
   )
+
 }

@@ -24,4 +24,22 @@ object GameStyles extends CssBase {
     overflowX.hidden
   )
 
+  val hideScrolls: CssStyle = style(
+    overflowX.hidden,
+    overflowY.hidden
+  )
+
+  val mainCardHeight: CssStyle = style(
+//    height :=! "calc(100vh - 85px)",
+    height :=! "calc(100vh - 140px)",
+  )
+
+  val playerVsCardHeight: CssStyle = style(
+    height :=! "calc(100vh - 300px)",
+  )
+
+  val noWarp: CssStyle = style(
+    whiteSpace.nowrap.important
+  )
+
 }

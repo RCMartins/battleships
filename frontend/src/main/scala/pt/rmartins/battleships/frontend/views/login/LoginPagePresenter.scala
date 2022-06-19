@@ -9,7 +9,7 @@ import pt.rmartins.battleships.shared.model.auth.UserContext
 import pt.rmartins.battleships.shared.model.game.{AuthError, Username}
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Success
+import scala.util.{Random, Success}
 
 /** Contains the business logic of this view. */
 class LoginPagePresenter(
@@ -20,8 +20,13 @@ class LoginPagePresenter(
     extends Presenter[RoutingLoginPageState.type] {
 
   override def handleState(state: RoutingLoginPageState.type): Unit = {
-    Cookies.getLoginCookieData().foreach { case (userToken, username) =>
-      loggingIn(username, userService.loginToken(userToken, username))
+    Cookies.getLoginCookieData() match {
+      case Some((userToken, username)) =>
+        loggingIn(username, userService.loginToken(userToken, username))
+      case None =>
+        val randomUsername = f"player${Random.nextInt(100000)}%05d"
+        model.subProp(_.username).set(Username(randomUsername))
+        login()
     }
   }
 

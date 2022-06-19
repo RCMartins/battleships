@@ -69,7 +69,7 @@ class GamePresenter(
     combine(
       preGameModel.subProp(_.inviter),
       preGameModel.subProp(_.inJoinedPreGame).transform(_.flatMap(_.enemyUsernameOpt)),
-      gameStateModel.transform(_.gameState.map(_.enemy.username))
+      gameStateProperty.transform(_.map(_.enemy.username))
     ).transform { case (inviter, preGameEnemy, inGameEnemy) =>
       inviter.map(_._1).orElse(preGameEnemy.orElse(inGameEnemy))
     }
@@ -77,9 +77,9 @@ class GamePresenter(
   val gameModeProperty: Property[Option[GameMode]] =
     gameStateProperty.bitransform[Option[GameMode]](_.map(_.gameMode)) {
       case None =>
-        gameStateModel.get.gameState
+        gameStateProperty.get
       case Some(gameMode) =>
-        gameStateModel.get.gameState.map(_.copy(gameMode = gameMode))
+        gameStateProperty.get.map(_.copy(gameMode = gameMode))
     }
 
   val modeTypeProperty: ReadableProperty[Option[ModeType]] =
@@ -97,7 +97,7 @@ class GamePresenter(
 
   val mainBoardSizeProperty: ReadableProperty[Option[Coordinate]] =
     combine(
-      enemyProperty.transform(_.map(_.boardSize)),
+      gameStateProperty.transform(_.map(_.enemy.boardSize)),
       gamePuzzleStateProperty.transform(_.map(_.playerPuzzle.boardSize))
     ).transform { case (boardSizeOpt1, boardSizeOpt2) =>
       boardSizeOpt1.orElse(boardSizeOpt2)

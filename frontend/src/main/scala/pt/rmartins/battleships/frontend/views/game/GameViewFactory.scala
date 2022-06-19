@@ -1,9 +1,11 @@
 package pt.rmartins.battleships.frontend.views.game
 
+import com.softwaremill.macwire.wire
 import io.udash._
 import pt.rmartins.battleships.frontend.routing.RoutingInGameState
 import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
 import pt.rmartins.battleships.frontend.services.{TranslationsService, UserContextService}
+import pt.rmartins.battleships.frontend.views.menu._
 import pt.rmartins.battleships.shared.model.SharedExceptions
 import pt.rmartins.battleships.shared.rpc.server.secure.SecureRPC
 
@@ -27,72 +29,19 @@ class GameViewFactory(
     if (rpcOpt.isEmpty) throw SharedExceptions.UnauthorizedException()
     val gameRpc = rpcOpt.get.game()
 
-    val gamePresenter: GamePresenter =
-      new GamePresenter(
-        preGameModel,
-        gameModel,
-        gameStateModel,
-        chatModel,
-        screenModel,
-        translationsModel,
-        gameRpc,
-        userService,
-        translationsService,
-        notificationsCenter
-      )
-    val mousePresenter: MousePresenter =
-      new MousePresenter(
-        gameModel,
-        gamePresenter,
-        gameRpc
-      )
-    val canvasUtils: CanvasUtils =
-      new CanvasUtils(gamePresenter)
-    val viewUtils: ViewUtils =
-      new ViewUtils(canvasUtils)
-    val gameModals: GameModals =
-      new GameModals(
-        preGameModel,
-        screenModel,
-        gamePresenter,
-        translationsService
-      )
-    val preGameView =
-      new PreGameView(
-        preGameModel,
-        screenModel,
-        translationsModel,
-        gamePresenter,
-        canvasUtils,
-        viewUtils,
-        gameModals,
-        translationsService
-      )
-    val boardView: BoardView =
-      new BoardView(
-        gameModel,
-        screenModel,
-        translationsModel,
-        gamePresenter,
-        mousePresenter,
-        canvasUtils
-      )
-    val gameView: GameView =
-      new GameView(
-        preGameModel,
-        gameModel,
-        gameStateModel,
-        chatModel,
-        screenModel,
-        translationsModel,
-        gamePresenter,
-        translationsService,
-        boardView,
-        preGameView,
-        gameModals,
-        viewUtils
-      )
+    val gamePresenter: GamePresenter = wire[GamePresenter]
+    val mousePresenter: MousePresenter = wire[MousePresenter]
+    val canvasUtils: CanvasUtils = wire[CanvasUtils]
+    val viewUtils: ViewUtils = wire[ViewUtils]
+    val gameModals: GameModals = wire[GameModals]
+    val preGameView: PreGameView = wire[PreGameView]
+    val boardView: BoardView = wire[BoardView]
+    val playesVsUtils: PlayesVsUtils = wire[PlayesVsUtils]
+    val playerVsBotsView: PlayerVsBotsView = wire[PlayerVsBotsView]
+    val playerVsPlayerView: PlayerVsPlayerView = wire[PlayerVsPlayerView]
+    val gameView: GameView = wire[GameView]
 
     (gameView, gamePresenter)
   }
+
 }
