@@ -70,7 +70,7 @@ object PuzzlesGenerator {
 
   @tailrec
   def generatePuzzleAndSave(maxMilliseconds: Long): Option[PuzzleWithId] =
-    if (maxMilliseconds > 0 && puzzlesVector.size < PuzzlesMaximumAmount) {
+    if (maxMilliseconds > 0 && morePuzzlesNeeded) {
       val initialTime = System.currentTimeMillis()
       createNewPuzzle(CorrectShipBoardMarks) match {
         case Some(puzzle) =>
@@ -98,21 +98,7 @@ object PuzzlesGenerator {
   def getPuzzle(puzzleId: PuzzleId): Option[PuzzleWithId] =
     puzzlesMap.get(puzzleId)
 
-  @tailrec
-  def createNewPuzzle(puzzleObjective: PuzzleObjective, amountOfTries: Int): Option[Puzzle] = {
-    assume(amountOfTries >= 0)
-    if (amountOfTries == 0)
-      None
-    else
-      createNewPuzzle(puzzleObjective) match {
-        case Some(value) =>
-          Some(value)
-        case None =>
-          createNewPuzzle(puzzleObjective, amountOfTries - 1)
-      }
-  }
-
-  def createNewPuzzle(puzzleObjective: PuzzleObjective): Option[Puzzle] = {
+  private def createNewPuzzle(puzzleObjective: PuzzleObjective): Option[Puzzle] = {
     puzzleObjective match {
       case CorrectShipBoardMarks =>
         val boardSize: Coordinate = Coordinate.square(nextInt(6, 8))
@@ -130,7 +116,7 @@ object PuzzlesGenerator {
     }
   }
 
-  def simpleGame(board: Board, defaultTurnAttacks: Int): (Game, BotHelper) = {
+  private def simpleGame(board: Board, defaultTurnAttacks: Int): (Game, BotHelper) = {
     val rules: Rules =
       Rules(
         boardSize = board.boardSize,
@@ -203,7 +189,7 @@ object PuzzlesGenerator {
         currentTurnPlayer = None,
         lastUpdateTimeOpt = None,
         requestInProgress = None,
-        isRealGame = true
+        isRealGame = false
       ),
       botHelper
     )
