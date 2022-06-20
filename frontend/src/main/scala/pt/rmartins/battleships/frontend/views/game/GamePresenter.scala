@@ -4,6 +4,7 @@ import com.softwaremill.quicklens.ModifyPimp
 import io.udash._
 import io.udash.auth.AuthRequires
 import io.udash.i18n.translatedDynamic
+import org.scalajs.dom.html.{Canvas, Div}
 import org.scalajs.dom.window
 import pt.rmartins.battleships.frontend.ApplicationContext.application
 import pt.rmartins.battleships.frontend.routing.{RoutingInGameState, RoutingLoginPageState}
@@ -287,7 +288,7 @@ class GamePresenter(
     else {
       val updatedGameState = None
       updateGameState(gameStateProperty.get.map(_.gameMode), updatedGameState)
-      gameModel.set(GameModel.default)
+      gameModel.set(GameModel.Default)
       gameStateProperty.set(updatedGameState)
       screenModel.set(ScreenModel.resetScreenModel(screenModel.get))
     }
@@ -302,8 +303,10 @@ class GamePresenter(
 
   val chatMessagesProperty: ReadableSeqProperty[ChatMessage] =
     chatModel.subSeq(_.msgs)
+
   val chatMessagesSizeProperty: ReadableProperty[Int] =
     chatMessagesProperty.transform(_.size)
+
   val chatMessagesShowNotification: ReadableProperty[Option[Int]] =
     combine(
       chatMessagesSizeProperty,
@@ -332,8 +335,10 @@ class GamePresenter(
           })
           .getOrElse(Seq.empty)
     }
+
   val myMovesHistorySizeProperty: ReadableProperty[Int] =
     myMovesHistoryProperty.transform(_.size)
+
   val myMovesHistoryShowNotification: ReadableProperty[Option[Int]] =
     combine(
       myMovesHistorySizeProperty,
@@ -346,8 +351,10 @@ class GamePresenter(
 
   val enemyMovesHistoryProperty: ReadableSeqProperty[TurnPlay] =
     gameStateProperty.transformToSeq(_.map(_.enemy.turnPlayHistory).getOrElse(Seq.empty))
+
   val enemyMovesHistorySizeProperty: ReadableProperty[Int] =
     enemyMovesHistoryProperty.transform(_.size)
+
   val enemyMovesHistoryShowNotification: ReadableProperty[Option[Int]] =
     combine(
       enemyMovesHistorySizeProperty,
@@ -676,6 +683,9 @@ class GamePresenter(
       .subProp(_.puzzleIncorrect)
       .set(span(translatedDynamic(Translations.Puzzles.puzzleIncorrect)(_.apply())).render)
 
+//     TODO force puzzle state:
+//    startNewPuzzle()
+
     initializePreGameModel()
   }
 
@@ -868,18 +878,25 @@ class GamePresenter(
     )
   }
 
-  def onCanvasResize(boardView: BoardView): Boolean = {
-    screenModel.subProp(_.screenResized).set((), force = true)
+  def onCanvasResize(div: Div, canvas: Canvas): Unit = {
+    println((div.clientHeight, div.parentNode.asInstanceOf[Div].clientHeight))
+    println(
+      (
+        div.style.marginTop,
+        div.style.marginBottom,
+        div.style.paddingTop,
+        div.style.paddingBottom,
+      )
+    )
 
-    val width = Math.max(500, boardView.canvasDiv.clientWidth)
-    val height = BoardView.CanvasSize.y
-    screenModel.subProp(_.canvasSize).set(Coordinate(width, height))
-    if (width != boardView.myBoardCanvas.width || height != boardView.myBoardCanvas.height) {
-      boardView.myBoardCanvas.setAttribute("width", width.toString)
-      boardView.myBoardCanvas.setAttribute("height", height.toString)
-      true
-    } else
-      false
+    val newSizeInt = div.clientHeight - 20 // - div.style.marginTop.toInt
+    val newSize = Coordinate.square(newSizeInt)
+    if (newSizeInt != canvas.width || newSizeInt != canvas.height) {
+      canvas.setAttribute("width", newSizeInt.toString)
+      canvas.setAttribute("height", newSizeInt.toString)
+//      screenModel.subProp(_.screenResized).set((), force = true)
+    }
+    screenModel.subProp(_.canvasSize).set(newSize)
   }
 
   override def onClose(): Unit = {

@@ -20,7 +20,7 @@ case class GameModel(
 
 object GameModel extends HasModelPropertyCreator[GameModel] {
 
-  val default: GameModel =
+  val Default: GameModel =
     GameModel(
       shipsLeftToPlace = Nil,
       mousePosition = None,

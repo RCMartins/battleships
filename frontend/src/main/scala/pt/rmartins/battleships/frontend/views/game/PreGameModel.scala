@@ -110,7 +110,7 @@ object PreGameModel extends HasModelPropertyCreator[PreGameModel] {
       )
     }
 
-  val default: PreGameModel =
+  val Default: PreGameModel =
     PreGameModel(
       menuState = MenuState.PlayingVsBots,
       enemyUsernameText = Username(""),

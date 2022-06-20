@@ -38,7 +38,7 @@ class PreGameView(
   private val MaxCustomNamedRules = 5
 
 //  private val defaultHeight = 360
-  private val PreviewBoardHeight = 320
+//  private val PreviewBoardHeight = 320
 //  private val BonusEditorCardHeight = 285
   private val fleetMaxSize: Coordinate = Ship.allShipsFleetMaxX.maxSize
   private val sqSize: Int = Math.min(100 / fleetMaxSize.x, 50 / fleetMaxSize.y)
@@ -407,16 +407,17 @@ class PreGameView(
           preGameModel.subProp(_.rules).transform(_.boardSize),
           preGameModel.subProp(_.previewBoardOpt),
           translationsModel.subProp(_.previewBoardTitle),
-          screenModel.subProp(_.screenResized)
+          screenModel.subProp(_.screenResized),
+          screenModel.subProp(_.canvasSize)
         )
       ) {
-        case (boardSize, previewBoardOpt, previewBoardTitle, _) =>
-          val usableWidth = PreviewBoardHeight
+        case (boardSize, previewBoardOpt, previewBoardTitle, _, defaultCanvasSize) =>
+//          val usableWidth = PreviewBoardHeight
 
-          val boardPos = Coordinate(0, 20)
-          val maxWidthPixels = usableWidth
+          val boardMargin = Coordinate(1, 1)
+          val maxWidthPixels = defaultCanvasSize.x
           val sqSize = maxWidthPixels / boardSize.max
-          val canvasSize = Coordinate.square(maxWidthPixels) + boardPos
+          val canvasSize = Coordinate.square(maxWidthPixels) + boardMargin * 2
           val previewCanvas: Canvas = canvas.render
           previewCanvas.setAttribute("width", canvasSize.x.toString)
           previewCanvas.setAttribute("height", canvasSize.y.toString)
@@ -436,9 +437,9 @@ class PreGameView(
 
           canvasUtils.drawBoardLimits(
             renderingCtx,
-            boardTitle,
+//            boardTitle,
             boardSize,
-            boardPos,
+            boardMargin,
             sqSize,
             backgroundColor = backgroundColor,
             None
@@ -449,7 +450,7 @@ class PreGameView(
               ship.shipActualPieces.foreach { shipPiece =>
                 canvasUtils.drawBoardSquare(
                   renderingCtx,
-                  boardPos,
+                  boardMargin,
                   shipPiece,
                   sqSize,
                   CanvasColor.Ship()
@@ -526,55 +527,60 @@ class PreGameView(
     )
   }
 
-  private def createFleetPreview(nested: NestedInterceptor): Binding = {
-    nested(produce(preGameModel.subProp(_.rules).transform(_.gameFleet)) { gameFleet =>
-      val fleetSorted: List[(Ship, Int)] =
-        gameFleet.shipCounterList
-          .filter(_._2._1 > 0)
-          .map { case (shipId, (amount, rotation)) => (Ship.getShip(shipId, rotation), amount) }
-          .sortBy { case (ship, _) => (ship.piecesSize, ship.shipId.id) }
-
-      val previewSqSize: Int = Math.min(80 / fleetMaxSize.x, 40 / fleetMaxSize.y)
-
-      def createShipCanvas(ship: Ship): Canvas = {
-        val canvasSize: Coordinate = ship.size * previewSqSize + Coordinate.square(4)
-        viewUtils.createShipCanvas(
-          canvasSize,
-          previewSqSize,
-          ship,
-          destroyed = false,
-          centerXCanvas = true,
-          centerYCanvas = true,
-          drawRadar = false
+  def createFleetPreview(nested: NestedInterceptor): Binding = {
+    nested(
+      produce(
+        combine(
+          preGameModel.subProp(_.rules).transform(_.gameFleet),
+          screenModel.subProp(_.canvasSize)
         )
-      }
+      ) { case (gameFleet, canvasSize) =>
+        val fleetSorted: List[(Ship, Int)] =
+          gameFleet.shipCounterList
+            .filter(_._2._1 > 0)
+            .map { case (shipId, (amount, rotation)) => (Ship.getShip(shipId, rotation), amount) }
+            .sortBy { case (ship, _) => (ship.piecesSize, ship.shipId.id) }
 
-      val maxTotalHeight1column = 44
+        val maxTotalHeight1column = 40
+        val totalFleetYSize = Math.max(10, fleetSorted.map(_._1.size.y).sum + fleetSorted.size)
+        val (previewSqSize, twoColumns) =
+          if (totalFleetYSize <= maxTotalHeight1column)
+            (Math.max(7, canvasSize.y / totalFleetYSize - 2), false)
+          else
+            (Math.max(7, canvasSize.y / (totalFleetYSize / 2) - 2), true)
 
-      val classList =
-        if (fleetSorted.map(_._1.size.y).sum + fleetSorted.size <= maxTotalHeight1column)
-          "col-12"
-        else
-          "col-6"
-
-      val fleetDivs: List[JsDom.TypedTag[Div]] =
-        fleetSorted.map { case (ship, amount) =>
-          div(
-            `class` := classList,
-            div(
-              (1 to amount).map(_ => createShipCanvas(ship))
-            )
+        def createShipCanvas(ship: Ship): Canvas = {
+          val canvasSize: Coordinate = ship.size * previewSqSize + Coordinate.square(4)
+          viewUtils.createShipCanvas(
+            canvasSize,
+            previewSqSize,
+            ship,
+            destroyed = false,
+            centerXCanvas = true,
+            centerYCanvas = true,
+            drawRadar = false
           )
         }
 
-      div(
-        `class` := "d-flex align-items-start",
+        val fleetDivs: List[JsDom.TypedTag[Div]] =
+          fleetSorted.map { case (ship, amount) =>
+            div(
+              `class` := (if (twoColumns) "col-6" else "col-12"),
+              div(
+                (1 to amount).map(_ => createShipCanvas(ship))
+              )
+            )
+          }
+
         div(
-          `class` := "row mx-0 my-3",
-          fleetDivs
-        )
-      ).render
-    })
+          `class` := "d-flex align-items-start",
+          div(
+            `class` := "row mx-0 my-3",
+            fleetDivs
+          )
+        ).render
+      }
+    )
   }
 
   private def createFirstColumnOptions(nested: NestedInterceptor): Modifier =

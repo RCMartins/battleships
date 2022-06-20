@@ -5,7 +5,7 @@ import io.udash._
 import pt.rmartins.battleships.frontend.routing.RoutingInGameState
 import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
 import pt.rmartins.battleships.frontend.services.{TranslationsService, UserContextService}
-import pt.rmartins.battleships.frontend.views.menu._
+import pt.rmartins.battleships.frontend.views.menu.{PuzzlesView, _}
 import pt.rmartins.battleships.shared.model.SharedExceptions
 import pt.rmartins.battleships.shared.rpc.server.secure.SecureRPC
 
@@ -18,12 +18,12 @@ class GameViewFactory(
 ) extends ViewFactory[RoutingInGameState.type] {
 
   override def create(): (View, Presenter[RoutingInGameState.type]) = {
-    val preGameModel = ModelProperty[PreGameModel](PreGameModel.default)
-    val gameModel = ModelProperty[GameModel](GameModel.default)
-    val gameStateModel = ModelProperty[GameStateModel](GameStateModel(None, None))
-    val chatModel = ModelProperty[ChatModel](ChatModel.default)
-    val screenModel = ModelProperty[ScreenModel](ScreenModel.default)
-    val translationsModel = ModelProperty[TranslationsModel](TranslationsModel.default)
+    val preGameModel = ModelProperty[PreGameModel](PreGameModel.Default)
+    val gameModel = ModelProperty[GameModel](GameModel.Default)
+    val gameStateModel = ModelProperty[GameStateModel](GameStateModel.Default)
+    val chatModel = ModelProperty[ChatModel](ChatModel.Default)
+    val screenModel = ModelProperty[ScreenModel](ScreenModel.Default)
+    val translationsModel = ModelProperty[TranslationsModel](TranslationsModel.Default)
 
     val rpcOpt: Option[SecureRPC] = userService.secureRpc()
     if (rpcOpt.isEmpty) throw SharedExceptions.UnauthorizedException()
@@ -36,9 +36,11 @@ class GameViewFactory(
     val gameModals: GameModals = wire[GameModals]
     val preGameView: PreGameView = wire[PreGameView]
     val boardView: BoardView = wire[BoardView]
-    val playesVsUtils: PlayesVsUtils = wire[PlayesVsUtils]
+    val chatUtils: ChatUtils = wire[ChatUtils]
+    val playesVsUtils: PlayerVsUtils = wire[PlayerVsUtils]
     val playerVsBotsView: PlayerVsBotsView = wire[PlayerVsBotsView]
     val playerVsPlayerView: PlayerVsPlayerView = wire[PlayerVsPlayerView]
+    val puzzlesView: PuzzlesView = wire[PuzzlesView]
     val gameView: GameView = wire[GameView]
 
     (gameView, gamePresenter)

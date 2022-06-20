@@ -1,5 +1,6 @@
 package pt.rmartins.battleships.frontend.views.game
 
+import io.udash.bindings.modifiers.Binding.NestedInterceptor
 import io.udash.css.CssView
 import io.udash.{ModelProperty, ReadableProperty, any2Property}
 import org.scalajs.dom._
@@ -15,7 +16,11 @@ import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit
 import pt.rmartins.battleships.shared.model.game.RuleTimeLimit._
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.BoardUtils.canPlaceInBoard
+import scalatags.JsDom
 import scalatags.JsDom.all._
+import io.udash._
+import io.udash.bindings.modifiers.Binding
+import io.udash.bindings.modifiers.Binding.NestedInterceptor
 
 import scala.util.chaining.scalaUtilChainingOps
 
@@ -33,7 +38,6 @@ class BoardView(
   val myBoardCanvas: Canvas =
     canvas(
       GameStyles.canvasWithoutBorder,
-      id := "mainGameCanvas"
     ).render
 
   screenModel.get.canvasSize.pipe { canvasSize =>
@@ -116,11 +120,13 @@ class BoardView(
       case (canvasSize, sizes) =>
         checkSize(sizes, canvasSize.x, 3)
     }
+
   private val SquareSizeMedium: ReadableProperty[Int] =
     combine(screenModel.subProp(_.canvasSize), squareSizesProperty).transform {
       case (canvasSize, sizes) =>
         checkSize(sizes, canvasSize.x, 2)
     }
+
   private val SquareSizeSmall: ReadableProperty[Int] =
     combine(screenModel.subProp(_.canvasSize), squareSizesProperty).transform {
       case (canvasSize, sizes) =>
@@ -137,6 +143,7 @@ class BoardView(
 
   private val MyBoardPreGamePos: ReadableProperty[Coordinate] =
     MyBoardMargin.transform(size => Coordinate(size, size))
+
   private val MyBoardInGamePos: ReadableProperty[Coordinate] =
     combine(
       screenModel.subProp(_.canvasSize),
@@ -149,6 +156,7 @@ class BoardView(
         myBoardMargin
       )
     }
+
   private val MyBoardGameOverPos: ReadableProperty[Coordinate] =
     combine(
       screenModel.subProp(_.canvasSize),
@@ -161,6 +169,7 @@ class BoardView(
         myBoardMargin
       )
     }
+
   private val EnemyBoardPos: ReadableProperty[Coordinate] =
     EnemyBoardMargin.transform(size => Coordinate.square(size))
 
@@ -189,6 +198,7 @@ class BoardView(
             enemyBoardSize * boardSize + boardMarksSelectorMargin
           )
     }
+
   private val BoardMarksSelectorCombined: ReadableProperty[(Coordinate, Int, Int)] =
     combine(BoardMarksSelectorPos, BoardMarksSelectorSize, BoardMarksSelectorMargin)
 
@@ -197,6 +207,7 @@ class BoardView(
       case (boardSize, enemyBoardPos, squareSizeBig, sizeBig) =>
         enemyBoardPos + Coordinate(squareSizeBig * boardSize + sizeBig / 2, 0)
     }
+
   private val MissilesSqSize: ReadableProperty[Int] =
     SizeBig.transform(sizeBig => sizeBig * 2)
 
@@ -578,7 +589,7 @@ class BoardView(
         boardMarksSelectorAllPositions
           .find { case (_, position) =>
             mousePosition >= position &&
-              mousePosition <= position + Coordinate.square(boardMarksSelectorSize)
+            mousePosition <= position + Coordinate.square(boardMarksSelectorSize)
           }
           .map(_._1)
       case _ =>
@@ -613,206 +624,254 @@ class BoardView(
       case _ =>
         Nil
     }
+//
+//  def paint(): Unit = {
+//    val GameModel(
+//      _,
+//      mousePositionOpt,
+//      _,
+//      selectedShipOpt,
+//      turnAttacks,
+//      turnAttacksQueuedStatus,
+//      selectedAction,
+//      _,
+//      _,
+//      _
+//    ) = gameModel.get
+//
+//    val screenModelData = screenModel.get
+//    val translationsData = translationsModel.get
+//
+//    val renderingCtx = myBoardCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+//
+//    renderingCtx.clearRect(0, 0, myBoardCanvas.width, myBoardCanvas.height)
+//
+//    gamePresenter.gameStateProperty.get match {
+//      case Some(GameState(_, rules, me, enemy, _: PlacingShipsMode)) =>
+//        drawMyBoard(
+//          renderingCtx,
+//          translationsData.myBoardTitle.innerText,
+//          me.myBoard,
+//          enemy.turnPlayHistory,
+//          mousePositionOpt,
+//          selectedShipOpt,
+//          MyBoardPreGamePos.get,
+//          SquareSizeBig.get,
+//          fillEmptySquares = false,
+//          hideMyBoard = false,
+//          isMyTurn = false,
+//          tick = screenModelData.tick
+//        )
+//        drawRulesSummary(
+//          renderingCtx,
+//          rules,
+//          translationsData
+//        )
+//      case Some(GameState(_, _, me, enemy, PlayingMode(isMyTurn, _, _, _, _))) =>
+//        drawMissiles(renderingCtx, turnAttacks, screenModelData.missilesPopupMillisOpt)
+//        drawDestructionSummary(renderingCtx, selectedShipOpt)
+//
+//        drawMyBoard(
+//          renderingCtx,
+//          translationsData.myBoardTitle.innerText,
+//          me.myBoard,
+//          enemy.turnPlayHistory,
+//          None,
+//          None,
+//          MyBoardInGamePos.get,
+//          SquareSizeMedium.get,
+//          fillEmptySquares = true,
+//          hideMyBoard = screenModelData.hideMyBoard,
+//          isMyTurn = !isMyTurn,
+//          tick = screenModelData.tick
+//        )
+//
+//        drawEnemyBoard(
+//          renderingCtx,
+//          translationsData.enemyBoardTitle.innerText,
+//          me,
+//          turnAttacks,
+//          EnemyBoardPos.get,
+//          selectedAction,
+//          selectedShipOpt,
+//          screenModelData.hoverMove,
+//          attacksQueuedStatus = turnAttacksQueuedStatus,
+//          isMyTurn = isMyTurn,
+//          tick = screenModelData.tick
+//        )
+//
+//        drawBoardMarksSelector(renderingCtx, selectedAction, showShootSelector = true)
+//        drawExtraTurnPopup(
+//          renderingCtx,
+//          turnAttacks,
+//          screenModelData.extraTurnPopup,
+//          translationsData.extraTurnText.innerText
+//        )
+//      case Some(GameState(_, _, me, enemy, GameOverMode(_, _, _, _, enemyRealBoard))) =>
+//        drawDestructionSummary(renderingCtx, selectedShipOpt)
+//
+//        if (screenModelData.revealEnemyBoard)
+//          drawGameOverEnemyBoard(
+//            renderingCtx,
+//            translationsData.realEnemyBoardTitle.innerText,
+//            me,
+//            enemyRealBoard,
+//            MyBoardGameOverPos.get,
+//            SquareSizeBig.get,
+//            selectedShipOpt,
+//            screenModelData.hoverMove
+//          )
+//        else
+//          drawMyBoard(
+//            renderingCtx,
+//            translationsData.myBoardTitle.innerText,
+//            me.myBoard,
+//            enemy.turnPlayHistory,
+//            None,
+//            None,
+//            MyBoardGameOverPos.get,
+//            SquareSizeBig.get,
+//            fillEmptySquares = true,
+//            hideMyBoard = false,
+//            isMyTurn = false,
+//            tick = screenModelData.tick
+//          )
+//
+//        drawEnemyBoard(
+//          renderingCtx,
+//          translationsData.enemyBoardTitle.innerText,
+//          me,
+//          Nil,
+//          EnemyBoardPos.get,
+//          selectedAction,
+//          selectedShipOpt,
+//          screenModelData.hoverMove,
+//          attacksQueuedStatus = AttacksQueuedStatus.NotSet,
+//          isMyTurn = false,
+//          tick = screenModelData.tick
+//        )
+//
+//        drawBoardMarksSelector(renderingCtx, selectedAction, showShootSelector = false)
+//      case None =>
+//        gamePresenter.gamePuzzleStateProperty.get match {
+//          case Some(
+//                GamePuzzleState(
+//                  puzzleSolvedCounter,
+//                  _,
+//                  enemyBoardMarks,
+//                  playerPuzzle,
+//                  puzzleSolutionOpt
+//                )
+//              ) =>
+//            drawDestructionSummary(renderingCtx, selectedShipOpt)
+//
+//            drawEnemyBoard(
+//              renderingCtx,
+//              "",
+//              Player(
+//                Board(playerPuzzle.boardSize, Nil),
+//                enemyBoardMarks,
+//                playerPuzzle.turnPlayHistory
+//              ),
+//              Nil,
+//              EnemyBoardPos.get,
+//              selectedAction,
+//              selectedShipOpt,
+//              screenModelData.hoverMove,
+//              attacksQueuedStatus = AttacksQueuedStatus.NotSet,
+//              isMyTurn = false,
+//              tick = screenModelData.tick
+//            )
+//
+//            drawBoardMarksSelector(renderingCtx, selectedAction, showShootSelector = false)
+//
+//            puzzleSolutionOpt match {
+//              case None =>
+//                drawPlayerPuzzleObjective(renderingCtx, playerPuzzle, translationsData)
+//              case Some((PuzzleSolution.CorrectShipBoardMarksSolution(board), correctState)) =>
+//                drawMyBoard(
+//                  renderingCtx,
+//                  "Solution",
+//                  board,
+//                  Nil,
+//                  None,
+//                  None,
+//                  MyBoardGameOverPos.get,
+//                  SquareSizeBig.get,
+//                  fillEmptySquares = true,
+//                  hideMyBoard = false,
+//                  isMyTurn = false,
+//                  tick = screenModelData.tick
+//                )
+//
+//                drawPuzzleCorrectSolution(renderingCtx, correctState, translationsData)
+//              case _ =>
+//            }
+//
+//            drawPuzzleCounter(renderingCtx, puzzleSolvedCounter, translationsData)
+//
+//          case None =>
+//        }
+//    }
+//  }
 
-  def paint(): Unit = {
-    val GameModel(
-      _,
-      mousePositionOpt,
-      _,
-      selectedShipOpt,
-      turnAttacks,
-      turnAttacksQueuedStatus,
-      selectedAction,
-      _,
-      _,
-      _
-    ) = gameModel.get
+  def clearCanvas(canvas: Canvas): Unit = {
+    val renderingCtx = canvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+    renderingCtx.clearRect(0, 0, canvas.width, canvas.height)
+  }
 
-    val screenModelData = screenModel.get
-    val translationsData = translationsModel.get
+  def drawPuzzleBoardDiv(nested: NestedInterceptor): Div = {
+    drawMyBoardDiv(nested)
+  }
 
-    val renderingCtx = myBoardCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+  def drawMyBoardDiv(nested: NestedInterceptor): Div = {
+//    val myBoardCanvas: Canvas =
+//      canvas(
+//        GameStyles.canvasWithoutBorder,
+//      ).render
 
-    renderingCtx.clearRect(0, 0, myBoardCanvas.width, myBoardCanvas.height)
-
-    gamePresenter.gameStateProperty.get match {
-      case Some(GameState(_, rules, me, enemy, _: PlacingShipsMode)) =>
+    combine(
+      gamePresenter.gameStateProperty,
+      screenModel.subProp(_.tick),
+      screenModel.subProp(_.canvasSize),
+      gameModel.subProp(_.mousePosition),
+      gameModel.subProp(_.selectedShip),
+    ).listen {
+      case (
+            Some(GameState(_, _, me, enemy, _: PlacingShipsMode)),
+            screenModelDataTick,
+            _,
+            mousePositionOpt,
+            selectedShipOpt,
+          ) =>
+        clearCanvas(myBoardCanvas)
         drawMyBoard(
-          renderingCtx,
-          translationsData.myBoardTitle.innerText,
+          myBoardCanvas,
           me.myBoard,
           enemy.turnPlayHistory,
           mousePositionOpt,
           selectedShipOpt,
-          MyBoardPreGamePos.get,
-          SquareSizeBig.get,
           fillEmptySquares = false,
           hideMyBoard = false,
           isMyTurn = false,
-          tick = screenModelData.tick
+          tick = screenModelDataTick
         )
-        drawRulesSummary(
-          renderingCtx,
-          rules,
-          translationsData
-        )
-      case Some(GameState(_, _, me, enemy, PlayingMode(isMyTurn, _, _, _, _))) =>
-        drawMissiles(renderingCtx, turnAttacks, screenModelData.missilesPopupMillisOpt)
-        drawDestructionSummary(renderingCtx, selectedShipOpt)
-
-        drawMyBoard(
-          renderingCtx,
-          translationsData.myBoardTitle.innerText,
-          me.myBoard,
-          enemy.turnPlayHistory,
-          None,
-          None,
-          MyBoardInGamePos.get,
-          SquareSizeMedium.get,
-          fillEmptySquares = true,
-          hideMyBoard = screenModelData.hideMyBoard,
-          isMyTurn = !isMyTurn,
-          tick = screenModelData.tick
-        )
-
-        drawEnemyBoard(
-          renderingCtx,
-          translationsData.enemyBoardTitle.innerText,
-          me,
-          turnAttacks,
-          EnemyBoardPos.get,
-          selectedAction,
-          selectedShipOpt,
-          screenModelData.hoverMove,
-          attacksQueuedStatus = turnAttacksQueuedStatus,
-          isMyTurn = isMyTurn,
-          tick = screenModelData.tick
-        )
-
-        drawBoardMarksSelector(renderingCtx, selectedAction, showShootSelector = true)
-        drawExtraTurnPopup(
-          renderingCtx,
-          turnAttacks,
-          screenModelData.extraTurnPopup,
-          translationsData.extraTurnText.innerText
-        )
-      case Some(GameState(_, _, me, enemy, GameOverMode(_, _, _, _, enemyRealBoard))) =>
-        drawDestructionSummary(renderingCtx, selectedShipOpt)
-
-        if (screenModelData.revealEnemyBoard)
-          drawGameOverEnemyBoard(
-            renderingCtx,
-            translationsData.realEnemyBoardTitle.innerText,
-            me,
-            enemyRealBoard,
-            MyBoardGameOverPos.get,
-            SquareSizeBig.get,
-            selectedShipOpt,
-            screenModelData.hoverMove
-          )
-        else
-          drawMyBoard(
-            renderingCtx,
-            translationsData.myBoardTitle.innerText,
-            me.myBoard,
-            enemy.turnPlayHistory,
-            None,
-            None,
-            MyBoardGameOverPos.get,
-            SquareSizeBig.get,
-            fillEmptySquares = true,
-            hideMyBoard = false,
-            isMyTurn = false,
-            tick = screenModelData.tick
-          )
-
-        drawEnemyBoard(
-          renderingCtx,
-          translationsData.enemyBoardTitle.innerText,
-          me,
-          Nil,
-          EnemyBoardPos.get,
-          selectedAction,
-          selectedShipOpt,
-          screenModelData.hoverMove,
-          attacksQueuedStatus = AttacksQueuedStatus.NotSet,
-          isMyTurn = false,
-          tick = screenModelData.tick
-        )
-
-        drawBoardMarksSelector(renderingCtx, selectedAction, showShootSelector = false)
-      case None =>
-        gamePresenter.gamePuzzleStateProperty.get match {
-          case Some(
-                GamePuzzleState(
-                  puzzleSolvedCounter,
-                  _,
-                  enemyBoardMarks,
-                  playerPuzzle,
-                  puzzleSolutionOpt
-                )
-              ) =>
-            drawDestructionSummary(renderingCtx, selectedShipOpt)
-
-            drawEnemyBoard(
-              renderingCtx,
-              "",
-              Player(
-                Board(playerPuzzle.boardSize, Nil),
-                enemyBoardMarks,
-                playerPuzzle.turnPlayHistory
-              ),
-              Nil,
-              EnemyBoardPos.get,
-              selectedAction,
-              selectedShipOpt,
-              screenModelData.hoverMove,
-              attacksQueuedStatus = AttacksQueuedStatus.NotSet,
-              isMyTurn = false,
-              tick = screenModelData.tick
-            )
-
-            drawBoardMarksSelector(renderingCtx, selectedAction, showShootSelector = false)
-
-            puzzleSolutionOpt match {
-              case None =>
-                drawPlayerPuzzleObjective(renderingCtx, playerPuzzle, translationsData)
-              case Some((PuzzleSolution.CorrectShipBoardMarksSolution(board), correctState)) =>
-                drawMyBoard(
-                  renderingCtx,
-                  "Solution",
-                  board,
-                  Nil,
-                  None,
-                  None,
-                  MyBoardGameOverPos.get,
-                  SquareSizeBig.get,
-                  fillEmptySquares = true,
-                  hideMyBoard = false,
-                  isMyTurn = false,
-                  tick = screenModelData.tick
-                )
-
-                drawPuzzleCorrectSolution(renderingCtx, correctState, translationsData)
-              case _ =>
-            }
-
-            drawPuzzleCounter(renderingCtx, puzzleSolvedCounter, translationsData)
-
-          case None =>
-        }
+      case _ =>
     }
+
+    div(
+      myBoardCanvas
+    ).render
   }
 
   def drawMyBoard(
-      renderingCtx: CanvasRenderingContext2D,
-      boardTitle: String,
+      canvas: Canvas,
       myBoard: Board,
       turnPlayHistory: List[TurnPlay],
       mousePositionOpt: Option[Coordinate],
       selectedShipOpt: Option[Ship],
-      boardPosition: Coordinate,
-      squareSize: Int,
+//      boardPosition: Coordinate,
+//      squareSize: Int,
       fillEmptySquares: Boolean,
       hideMyBoard: Boolean,
       isMyTurn: Boolean,
@@ -820,9 +879,13 @@ class BoardView(
   ): Unit = {
     val boardSize = myBoard.boardSize
 
+    val renderingCtx = canvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+
+    val boardPosition: Coordinate = Coordinate.square(8)
+    val squareSize = (canvas.width - boardPosition.x) / boardSize.x
+
     drawBoardLimits(
       renderingCtx,
-      boardTitle,
       boardSize,
       boardPosition,
       squareSize,
@@ -830,42 +893,42 @@ class BoardView(
       Some(tick).filter(_ => isMyTurn)
     )
 
-    val shipToPlaceHoverOpt: Option[ToPlaceShip] = shipToPlaceHover.get
-    val placeShipsSqSize = SummaryShipsSqSize.get
-    allShipsToPlaceCoordinates.get.foreach { case ToPlaceShip(ship, pieces, alreadyPlaced) =>
-      if (alreadyPlaced)
-        pieces.foreach(
-          drawSquareAbs(
-            renderingCtx,
-            _,
-            placeShipsSqSize,
-            CanvasColor.Ship(CanvasBorder.Standard(alpha = 0.4), alpha = 0.4)
-          )
-        )
-      else
-        (selectedShipOpt, shipToPlaceHoverOpt) match {
-          case (Some(selectedShip), _) if selectedShip.shipId == ship.shipId =>
-            pieces.foreach(
-              drawSquareAbs(
-                renderingCtx,
-                _,
-                placeShipsSqSize,
-                CanvasColor.Ship(CanvasBorder.RedBold())
-              )
-            )
-          case (_, Some(ToPlaceShip(hoverShip, _, _))) if hoverShip.shipId == ship.shipId =>
-            pieces.foreach(
-              drawSquareAbs(
-                renderingCtx,
-                _,
-                placeShipsSqSize,
-                CanvasColor.Ship(CanvasBorder.RedBold())
-              )
-            )
-          case _ =>
-            pieces.foreach(drawSquareAbs(renderingCtx, _, placeShipsSqSize, CanvasColor.Ship()))
-        }
-    }
+//    val shipToPlaceHoverOpt: Option[ToPlaceShip] = shipToPlaceHover.get
+//    val placeShipsSqSize = SummaryShipsSqSize.get
+//    allShipsToPlaceCoordinates.get.foreach { case ToPlaceShip(ship, pieces, alreadyPlaced) =>
+//      if (alreadyPlaced)
+//        pieces.foreach(
+//          drawSquareAbs(
+//            renderingCtx,
+//            _,
+//            placeShipsSqSize,
+//            CanvasColor.Ship(CanvasBorder.Standard(alpha = 0.4), alpha = 0.4)
+//          )
+//        )
+//      else
+//        (selectedShipOpt, shipToPlaceHoverOpt) match {
+//          case (Some(selectedShip), _) if selectedShip.shipId == ship.shipId =>
+//            pieces.foreach(
+//              drawSquareAbs(
+//                renderingCtx,
+//                _,
+//                placeShipsSqSize,
+//                CanvasColor.Ship(CanvasBorder.RedBold())
+//              )
+//            )
+//          case (_, Some(ToPlaceShip(hoverShip, _, _))) if hoverShip.shipId == ship.shipId =>
+//            pieces.foreach(
+//              drawSquareAbs(
+//                renderingCtx,
+//                _,
+//                placeShipsSqSize,
+//                CanvasColor.Ship(CanvasBorder.RedBold())
+//              )
+//            )
+//          case _ =>
+//            pieces.foreach(drawSquareAbs(renderingCtx, _, placeShipsSqSize, CanvasColor.Ship()))
+//        }
+//    }
 
     if (!hideMyBoard) {
       if (!fillEmptySquares)
@@ -977,7 +1040,6 @@ class BoardView(
 
     drawBoardLimits(
       renderingCtx,
-      boardTitle,
       me.myBoard.boardSize,
       boardPosition,
       squareSize,
@@ -1118,7 +1180,6 @@ class BoardView(
 
     drawBoardLimits(
       renderingCtx,
-      boardTitle,
       boardSize,
       boardPosition,
       squareSize,
@@ -1548,8 +1609,8 @@ object BoardView {
   val MinTextSize = 15
   val BoardMarkSize = 30
   val BoardMarkMargin = 20
-  val CanvasSize: Coordinate =
-    Coordinate(1000, 20 + 300 + BoardMarkMargin * 2 + BoardMarkSize)
+//  val CanvasSize: Coordinate =
+//    Coordinate(1000, 20 + 300 + BoardMarkMargin * 2 + BoardMarkSize)
 
   sealed trait GameAction
 
@@ -1585,6 +1646,7 @@ object BoardView {
   val ExtraTurnPopupTime: Int = 7600
   def ExtraTurnAppear(timeRemaining: Int): Boolean =
     timeRemaining < 4000 || ((timeRemaining / 400) % 2 == 0)
+
   val ExtraTurnPopupTimeFade: Int = 2000
 
 }

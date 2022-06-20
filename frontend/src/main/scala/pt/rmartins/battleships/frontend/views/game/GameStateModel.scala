@@ -8,4 +8,12 @@ case class GameStateModel(
     gamePuzzleState: Option[GamePuzzleState]
 )
 
-object GameStateModel extends HasModelPropertyCreator[GameStateModel]
+object GameStateModel extends HasModelPropertyCreator[GameStateModel] {
+
+  val Default: GameStateModel =
+    GameStateModel(
+      gameState = None,
+      gamePuzzleState = None
+    )
+
+}

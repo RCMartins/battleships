@@ -36,7 +36,7 @@ class CanvasUtils(gamePresenter: GamePresenter) {
 
   def drawBoardLimits(
       renderingCtx: CanvasRenderingContext2D,
-      boardTitle: String,
+//      boardTitle: String,
       boardSize: Coordinate,
       boardPosition: Coordinate,
       squareSize: Int,
@@ -96,12 +96,12 @@ class CanvasUtils(gamePresenter: GamePresenter) {
       renderingCtx.stroke()
     }
 
-    val fontSize = MinTextSize
-    renderingCtx.fillStyle = s"rgb(0, 0, 0)"
-    renderingCtx.font = s"${fontSize}px serif"
-    renderingCtx.textBaseline = "bottom"
-    renderingCtx.textAlign = "left"
-    renderingCtx.fillText(boardTitle, boardPosition.x, boardPosition.y - 2)
+//    val fontSize = MinTextSize
+//    renderingCtx.fillStyle = s"rgb(0, 0, 0)"
+//    renderingCtx.font = s"${fontSize}px serif"
+//    renderingCtx.textBaseline = "bottom"
+//    renderingCtx.textAlign = "left"
+//    renderingCtx.fillText(boardTitle, boardPosition.x, boardPosition.y - 2)
   }
 
 }
@@ -286,6 +286,7 @@ object CanvasUtils {
   class CanvasImage(src: String) {
     val element: HTMLImageElement =
       dom.document.createElement("img").asInstanceOf[HTMLImageElement]
+
     element.src = src
   }
 

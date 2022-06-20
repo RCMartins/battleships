@@ -33,32 +33,35 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
   val myMovesTab: String = "my-moves"
   val enemyMovesTab: String = "enemy-moves"
 
-  val default: ScreenModel =
-    ScreenModel(
-      canvasSize = BoardView.CanvasSize,
-      selectedTab = chatTab,
-      lastSeenMessagesChat = 0,
-      lastSeenMessagesMyMoves = 0,
-      lastSeenMessagesEnemyMoves = 0,
-      missilesPopupMillisOpt = None,
-      extraTurnPopup = None,
-      hideMyBoard = false,
-      revealEnemyBoard = false,
-      errorModalType = None,
-      screenResized = (),
-      newTurn = (),
-      showMissesMoves = true,
-      showDisabledMoves = true,
-      disabledMovesSet = Set.empty,
-      hoverMove = None,
-      tick = 0,
-      receiveEditRequest = None,
-      namedRuleNameBefore = None,
-      namedRuleName = ""
+  val Default: ScreenModel =
+    resetScreenModel(
+      ScreenModel(
+        canvasSize = Coordinate.square(1),
+        selectedTab = chatTab,
+        lastSeenMessagesChat = 0,
+        lastSeenMessagesMyMoves = 0,
+        lastSeenMessagesEnemyMoves = 0,
+        missilesPopupMillisOpt = None,
+        extraTurnPopup = None,
+        hideMyBoard = false,
+        revealEnemyBoard = false,
+        errorModalType = None,
+        screenResized = (),
+        newTurn = (),
+        showMissesMoves = true,
+        showDisabledMoves = true,
+        disabledMovesSet = Set.empty,
+        hoverMove = None,
+        tick = 0,
+        receiveEditRequest = None,
+        namedRuleNameBefore = None,
+        namedRuleName = ""
+      )
     )
 
   def resetScreenModel(model: ScreenModel): ScreenModel = {
     model.copy(
+      canvasSize = Coordinate.square(320),
       selectedTab = chatTab,
       lastSeenMessagesChat = 0,
       lastSeenMessagesMyMoves = 0,
