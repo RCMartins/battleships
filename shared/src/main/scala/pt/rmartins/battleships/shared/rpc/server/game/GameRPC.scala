@@ -61,6 +61,8 @@ trait GameRPC {
 
   def setPuzzleSolved(playerUsername: Username, puzzleId: PuzzleId): Future[Unit]
 
+  def getPuzzlesSolvedCount(playerUsername: Username): Future[Int]
+
 }
 
 object GameRPC extends DefaultServerRpcCompanion[GameRPC]

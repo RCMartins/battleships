@@ -106,4 +106,7 @@ class GameEndpoint(implicit
   override def setPuzzleSolved(playerUsername: Username, puzzleId: PuzzleId): Future[Unit] =
     gameService.setPuzzleSolved(playerUsername, puzzleId)
 
+  override def getPuzzlesSolvedCount(playerUsername: Username): Future[Int] =
+    gameService.getPuzzlesSolvedCount(playerUsername)
+
 }

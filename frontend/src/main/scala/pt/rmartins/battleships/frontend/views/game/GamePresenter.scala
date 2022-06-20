@@ -25,7 +25,7 @@ import scalatags.JsDom.all.span
 
 import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Random, Success}
 
 class GamePresenter(
@@ -1250,29 +1250,32 @@ class GamePresenter(
     }
 
   def startNewPuzzle(): Unit =
-    gameRpc.getRandomPuzzle(chatModel.get.username).map {
+    gameRpc.getRandomPuzzle(chatModel.get.username).foreach {
       case None =>
       case Some((puzzleId, playerPuzzle)) =>
-        val currentPuzzlesSolvedCounter: Int =
-          gamePuzzleStateProperty.get.map(_.puzzleSolvedCounter).getOrElse(0)
-
-        gamePuzzleStateProperty.set(
-          Some(
-            GamePuzzleState(
-              currentPuzzlesSolvedCounter,
-              puzzleId,
-              playerPuzzle.initialBoardMarks,
-              playerPuzzle,
-              None
+        gamePuzzleStateProperty.get
+          .map(_.puzzleSolvedCounter)
+          .map(Future.successful)
+          .getOrElse(gameRpc.getPuzzlesSolvedCount(chatModel.get.username))
+          .foreach { currentPuzzlesSolvedCounter =>
+            gamePuzzleStateProperty.set(
+              Some(
+                GamePuzzleState(
+                  currentPuzzlesSolvedCounter,
+                  puzzleId,
+                  playerPuzzle.initialBoardMarks,
+                  playerPuzzle,
+                  None
+                )
+              )
             )
-          )
-        )
-        setSelectedTab(ScreenModel.myMovesTab)
-        gameModel.set(
-          gameModel.get.copy(
-            selectedAction = GameAction.ManualShipSelector
-          )
-        )
+            setSelectedTab(ScreenModel.myMovesTab)
+            gameModel.set(
+              gameModel.get.copy(
+                selectedAction = GameAction.ManualShipSelector
+              )
+            )
+          }
     }
 
   def getPuzzleSolution(): Unit =
