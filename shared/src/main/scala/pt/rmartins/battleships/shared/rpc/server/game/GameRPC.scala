@@ -55,9 +55,11 @@ trait GameRPC {
 
   def addToEnemyTimeSeconds(gameId: GameId, secondsToAdd: Int): Future[Unit]
 
-  def getRandomPuzzle(): Future[Option[(PuzzleId, PlayerPuzzle)]]
+  def getRandomPuzzle(playerUsername: Username): Future[Option[(PuzzleId, PlayerPuzzle)]]
 
   def getPuzzleSolution(puzzleId: PuzzleId): Future[Option[PuzzleSolution]]
+
+  def setPuzzleSolved(playerUsername: Username, puzzleId: PuzzleId): Future[Unit]
 
 }
 

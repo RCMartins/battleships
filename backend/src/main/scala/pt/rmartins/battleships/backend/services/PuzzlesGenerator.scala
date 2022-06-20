@@ -87,12 +87,16 @@ object PuzzlesGenerator {
     } else
       None
 
-  def getRandomPuzzle: Option[PuzzleWithId] =
+  def getRandomPuzzle(puzzlesSolvedSet: Set[PuzzleId]): Option[PuzzleWithId] =
     puzzlesVector.synchronized {
-      if (puzzlesVector.isEmpty)
+      val puzzlesNotSolved: Vector[PuzzleWithId] =
+        puzzlesVector.filterNot(puzzle => puzzlesSolvedSet(puzzle.puzzleId))
+
+      if (puzzlesNotSolved.isEmpty)
         None
-      else
-        Some(puzzlesVector(Random.nextInt(puzzlesVector.size)))
+      else {
+        Some(puzzlesNotSolved(Random.nextInt(puzzlesNotSolved.size)))
+      }
     }
 
   def getPuzzle(puzzleId: PuzzleId): Option[PuzzleWithId] =

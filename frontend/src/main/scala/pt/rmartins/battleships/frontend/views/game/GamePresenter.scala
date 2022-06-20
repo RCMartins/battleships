@@ -1250,7 +1250,7 @@ class GamePresenter(
     }
 
   def startNewPuzzle(): Unit =
-    gameRpc.getRandomPuzzle().map {
+    gameRpc.getRandomPuzzle(chatModel.get.username).map {
       case None =>
       case Some((puzzleId, playerPuzzle)) =>
         val currentPuzzlesSolvedCounter: Int =
@@ -1286,7 +1286,7 @@ class GamePresenter(
               None
             )
           ) =>
-        gameRpc.getPuzzleSolution(puzzleId).map {
+        gameRpc.getPuzzleSolution(puzzleId).foreach {
           case None =>
           case Some(puzzleSolution) =>
             val correctState: Boolean =
@@ -1306,6 +1306,9 @@ class GamePresenter(
 
             val updatedPuzzleSolvedCounter: Int =
               (if (correctState) 1 else 0) + puzzleSolvedCounter
+
+            if (correctState)
+              gameRpc.setPuzzleSolved(chatModel.get.username, puzzleId)
 
             gamePuzzleStateProperty.set(
               Some(
