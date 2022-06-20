@@ -29,6 +29,8 @@ class GameService(rpcClientsService: RpcClientsService) {
   private val activePreGames: mutable.Map[GameId, PreGame] = mutable.Map.empty
   private val acceptedInviteRequests: mutable.Map[ClientId, (ClientId, PlayerInviteType)] =
     mutable.Map.empty
+  private val puzzlesSolvedCache: mutable.Map[Username, Set[PuzzleId]] =
+    mutable.Map.empty
 
   PuzzlesGenerator.initialize()
 
@@ -924,13 +926,17 @@ class GameService(rpcClientsService: RpcClientsService) {
       }
     }
 
-  def getRandomPuzzle(): Future[Option[(PuzzleId, PlayerPuzzle)]] =
-    Future.successful(
-      PuzzlesGenerator.getRandomPuzzle.map { case PuzzleWithId(puzzleId, puzzle) =>
-        println(puzzleId)
-        (puzzleId, puzzle.playerPuzzle)
+  def getRandomPuzzle(playerUsername: Username): Future[Option[(PuzzleId, PlayerPuzzle)]] =
+    Future.successful {
+      val puzzlesSolvedSet: Set[PuzzleId] =
+        puzzlesSolvedCache.getOrElse(playerUsername, Set.empty)
+
+      PuzzlesGenerator.getRandomPuzzle(puzzlesSolvedSet).map {
+        case PuzzleWithId(puzzleId, puzzle) =>
+          println((puzzle.value, puzzleId))
+          (puzzleId, puzzle.playerPuzzle)
       }
-    )
+    }
 
   def getPuzzleSolution(puzzleId: PuzzleId): Future[Option[PuzzleSolution]] =
     Future.successful(
@@ -938,6 +944,21 @@ class GameService(rpcClientsService: RpcClientsService) {
         puzzle.puzzleSolution
       }
     )
+
+  def setPuzzleSolved(
+      playerUsername: Username,
+      puzzleId: PuzzleId
+  ): Future[Unit] =
+    Future.successful {
+      puzzlesSolvedCache.updateWith(playerUsername)(
+        (_: Option[Set[PuzzleId]]).map(_ + puzzleId).orElse(Some(Set(puzzleId)))
+      )
+    }
+
+  def getPuzzlesSolvedCount(playerUsername: Username): Future[Int] =
+    Future.successful {
+      puzzlesSolvedCache.get(playerUsername).map(_.size).getOrElse(0)
+    }
 
   private def sendSystemMessage(username: Username, message: String): Unit = {
     if (username != BotUsername)
