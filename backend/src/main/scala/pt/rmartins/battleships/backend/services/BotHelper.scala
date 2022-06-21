@@ -22,6 +22,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
 
   private var cachedTurnPlays: List[TurnPlay] =
     Nil
+
   private var cachedBotBoardMarks: BotBoardMarks =
     createEmptyBotBoardMarks(boardSize)
 
@@ -178,6 +179,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
 
     private val shipsCounter: Int =
       rules.gameFleet.shipCounterList.find(_._1 == shipId).map(_._2._1).getOrElse(0)
+
     private val uniqueRotations = Ship.allShipsUniqueRotations(shipId)
 
     private var turnsWithShip: List[TurnPlay] = Nil
@@ -773,7 +775,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
           case (turn, list) => (turn, list.size)
         }
 
-      //TODO create fullTurnHistoryMap to make this more efficient
+      // TODO create fullTurnHistoryMap to make this more efficient
       fullTurnHistory.forall { case TurnPlay(turn, _, hitHints) =>
         val hitShipIds = hitHints.flatMap(_.shipIdOpt)
         val thisTurnShipCounter = hitShipIds.count(_ == shipId)
@@ -892,7 +894,7 @@ object BotHelper {
       boardSize: Coordinate,
       shipsToPlace: List[Ship],
       randomSeed: Option[Long] = None
-  ): Either[Unit, List[ShipInBoard]] = {
+  ): Option[List[ShipInBoard]] = {
     def canPlaceInBoard(
         shipsPlacedSoFar: List[ShipInBoard],
         shipToPlace: Ship,
@@ -918,14 +920,14 @@ object BotHelper {
     def loopPlaceAllShips(
         ships: List[Ship],
         shipsPlacedSoFar: List[ShipInBoard]
-    ): Either[Unit, List[ShipInBoard]] = {
+    ): Option[List[ShipInBoard]] = {
       ships match {
         case Nil =>
-          Right(shipsPlacedSoFar)
+          Some(shipsPlacedSoFar)
         case headShip :: nextShips =>
           val result: Option[ShipInBoard] =
-            random
-              .shuffle(possibleCoorList)
+            LazyList
+              .from(random.shuffle(possibleCoorList))
               .map { case (coor, rotation) => (coor, headShip.rotateTo(rotation)) }
               .find { case (coor, shipWithRotation) =>
                 canPlaceInBoard(shipsPlacedSoFar, shipWithRotation, coor)
@@ -934,14 +936,14 @@ object BotHelper {
 
           result match {
             case None =>
-              Left(())
+              None
             case Some(placedShip) =>
               loopPlaceAllShips(nextShips, placedShip :: shipsPlacedSoFar)
           }
       }
     }
 
-    loopPlaceAllShips(shipsToPlace, Nil)
+    loopPlaceAllShips(shipsToPlace.sortBy(_.shipBiggestToSmallestOrder), Nil)
   }
 
 }

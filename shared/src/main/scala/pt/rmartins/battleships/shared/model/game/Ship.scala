@@ -13,6 +13,8 @@ case class Ship(shipId: ShipId, pieces: List[Coordinate], rotation: Rotation) {
 
   val size: Coordinate = Coordinate(pieces.maxBy(_.x).x + 1, pieces.maxBy(_.y).y + 1)
 
+  def area: Int = size.x * size.y
+
   @inline
   def rotateBy(delta: Int): Ship =
     rotateTo(rotation.rotateBy(delta))
@@ -23,8 +25,8 @@ case class Ship(shipId: ShipId, pieces: List[Coordinate], rotation: Rotation) {
   private[Ship] def mapPieces(f: Coordinate => Coordinate): Ship =
     Ship(shipId, pieces.map(f), rotation)
 
-  def shipBiggestToSmallestOrder: (Int, Int) =
-    (-piecesSize, shipId.id)
+  def shipBiggestToSmallestOrder: (Int, Int, Int) =
+    (-piecesSize, -area, shipId.id)
 
   def name: String =
     Ship.shipsNamesMap(shipId)
@@ -62,48 +64,69 @@ object Ship extends HasGenCodec[Ship] {
   val MiniCruiser: Ship = List((0, 0), (1, 1)).pipe(toShip)
   val Epoch: Ship =
     List((0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1), (1, 2)).pipe(toShip)
+
   val Battleship: Ship =
     List((0, 0), (1, 0), (2, 0), (1, 1), (0, 2), (1, 2), (2, 2), (1, 3), (1, 4)).pipe(toShip)
+
   val MotherShip: Ship =
     List(l(y = 0, 0, 1, 3, 5, 6), l(y = 1, 1, 2, 3, 4, 5), l(y = 2, 0, 1, 3, 5, 6)).flatten
       .map(_.swap)
       .pipe(toShip)
+
   val Atoll: Ship =
     List((2, 0), (1, 1), (3, 1), (0, 2), (4, 2), (1, 3), (3, 3)).pipe(toShip)
+
   val HoleStar: Ship =
     List((0, 1), (1, 0), (1, 2), (2, 1)).pipe(toShip)
+
   val SmallStar: Ship =
     List((0, 1), (1, 0), (1, 1), (1, 2), (2, 1)).pipe(toShip)
+
   val StarShip: Ship =
     List((2, 0), (2, 1), (0, 2), (1, 2), (2, 2), (3, 2), (4, 2), (2, 3), (2, 4)).pipe(toShip)
+
   val LShip: Ship =
     List((0, 0), (0, 1), (0, 2), (1, 2)).pipe(toShip)
+
   val MissileShip: Ship =
     List((0, 1), (1, 0), (1, 1), (1, 2), (2, 1), (2, 2), (2, 3), (3, 2), (3, 3)).pipe(toShip)
+
   val WShip: Ship =
     List((0, 2), (1, 1), (1, 2), (2, 0), (2, 1)).pipe(toShip)
+
   val ArrowShip: Ship =
     List((0, 2), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2)).pipe(toShip)
+
   val LongShip: Ship =
     List((0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5)).pipe(toShip)
+
   val SmallSnake: Ship =
     List((0, 2), (1, 0), (1, 1), (1, 2), (2, 0)).pipe(toShip)
+
   val LongArrow: Ship =
     List((0, 0), (1, 1), (2, 2), (2, 4), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)).pipe(toShip)
+
   val Plane: Ship =
     List((0, 2), (1, 0), (1, 1), (1, 2), (1, 3), (1, 4), (2, 1), (2, 3)).pipe(toShip)
+
   val HoledMissile: Ship =
     List((0, 1), (1, 0), (1, 2), (2, 1), (2, 3), (3, 2), (3, 3)).pipe(toShip)
+
   val StaffShip: Ship =
     List((0, 1), (1, 0), (1, 2), (1, 3), (1, 4), (2, 1)).pipe(toShip)
+
   val Butterfly: Ship =
     List((0, 1), (1, 0), (1, 1), (2, 2), (2, 3), (3, 2)).pipe(toShip)
+
   val HammerHead: Ship =
     List((0, 0), (0, 2), (1, 1), (2, 0), (2, 1), (2, 2)).pipe(toShip)
+
   val CornerShip: Ship =
     List((0, 0), (0, 1), (0, 2), (1, 0), (2, 0)).pipe(toShip)
+
   val MiniCorner: Ship =
     List((0, 0), (0, 1), (1, 0)).pipe(toShip)
+
   val SmallC: Ship =
     List((0, 0), (0, 1), (0, 2), (1, 0), (1, 2)).pipe(toShip)
 
