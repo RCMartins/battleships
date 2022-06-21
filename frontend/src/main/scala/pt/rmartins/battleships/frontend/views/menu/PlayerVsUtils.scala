@@ -4,24 +4,33 @@ import io.udash._
 import io.udash.bindings.modifiers.Binding.NestedInterceptor
 import io.udash.bootstrap.button.UdashButton
 import io.udash.bootstrap.utils.BootstrapStyles.Color
+import io.udash.bootstrap.utils.UdashIcons.FontAwesome
 import io.udash.component.ComponentId
 import io.udash.css.CssView
 import io.udash.i18n._
 import io.udash.properties.single.Property
 import org.scalajs.dom.html.Div
-import org.scalajs.dom.{UIEvent, window}
+import org.scalajs.dom.{UIEvent, html, window}
 import pt.rmartins.battleships.frontend.services.TranslationsService
+import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasImage
+import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.frontend.views.game._
+import pt.rmartins.battleships.frontend.views.model.AttacksQueuedStatus
 import pt.rmartins.battleships.frontend.views.model.JoinedPreGame.PlayingAgainstPlayer
 import pt.rmartins.battleships.frontend.views.model.ModeType._
 import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game.GameMode._
-import scalatags.JsDom.all._
+import pt.rmartins.battleships.shared.model.game.{AttackType, Coordinate, Turn}
+import scalatags.JsDom
+import scalatags.JsDom.all.{span, _}
+
+import scala.util.chaining.scalaUtilChainingOps
 
 class PlayerVsUtils(
     preGameModel: ModelProperty[PreGameModel],
     gameModel: ModelProperty[GameModel],
+    screenModel: ModelProperty[ScreenModel],
     presenter: GamePresenter,
     boardView: BoardView,
     preGameView: PreGameView,
@@ -127,6 +136,101 @@ class PlayerVsUtils(
     presenter.requestEditRules()
   }
 
+  private val cancelQueuedAttacksButton: html.Element =
+    UdashButton(
+      buttonStyle = Color.Danger.toProperty,
+      block = true.toProperty,
+      componentId = ComponentId("cancel-queued-attacks-button")
+    )(_ => Seq[Modifier](span(FontAwesome.Solid.times).render)).render
+
+  gameModel
+    .subProp(_.turnAttacksQueuedStatus)
+    .listen(
+      {
+        case AttacksQueuedStatus.Queued =>
+          cancelQueuedAttacksButton.classList.remove("invisible")
+          cancelQueuedAttacksButton.classList.add("visible")
+        case _ =>
+          cancelQueuedAttacksButton.classList.remove("visible")
+          cancelQueuedAttacksButton.classList.add("invisible")
+      },
+      initUpdate = true
+    )
+
+  cancelQueuedAttacksButton.onclick = _ => {
+    presenter.cancelQueuedAttacks()
+  }
+
+  private val launchAttackButton = {
+    val launchAttackIsDisabledProperty =
+      gameModel
+        .subProp(_.turnAttacksQueuedStatus)
+        .combine(gameModel.subProp(_.turnAttacks)) { case (turnAttacksQueuedStatus, turnAttacks) =>
+          turnAttacksQueuedStatus != AttacksQueuedStatus.NotSet ||
+          !turnAttacks.forall(_.isPlaced)
+        }
+
+    UdashButton(
+      buttonStyle = Color.Primary.toProperty,
+      block = true.toProperty,
+      componentId = ComponentId("launch-attack-button"),
+      disabled = launchAttackIsDisabledProperty
+    )(nested =>
+      Seq(
+        nested(
+          produceWithNested(
+            combine(
+              gameModel.subProp(_.turnAttacksQueuedStatus),
+              presenter.isMyTurnProperty,
+              gameModel.subProp(_.turnAttacks).transform(_.count(_.isPlaced)),
+              gameModel.subProp(_.turnAttacks).transform(_.size)
+            )
+          ) {
+            case ((AttacksQueuedStatus.NotSet, true, placed, size), nested) =>
+              span(
+                nested(translatedDynamic(Translations.Game.launchAttackButton)(_.apply())),
+                s" $placed/$size"
+              ).render
+            case ((AttacksQueuedStatus.NotSet, false, placed, size), nested) =>
+              span(
+                nested(translatedDynamic(Translations.Game.queueAttackButton)(_.apply())),
+                s" $placed/$size"
+              ).render
+            case ((_, _, _, _), nested) =>
+              span(
+                nested(translatedDynamic(Translations.Game.waitForTurnButton)(_.apply()))
+              ).render
+          }
+        )
+      )
+    )
+  }
+
+  launchAttackButton.listen { _ =>
+    presenter.launchAttack()
+  }
+
+  private val hideMyBoardButton =
+    UdashButton(
+      buttonStyle = screenModel.subProp(_.hideMyBoard).transform {
+        case true  => Color.Danger
+        case false => Color.Secondary
+      },
+      block = true.toProperty,
+      componentId = ComponentId("hide-my-board-button")
+    )(nested =>
+      Seq(nested(produceWithNested(screenModel.subProp(_.hideMyBoard)) {
+        case (true, nested) =>
+          span(nested(translatedDynamic(Translations.Game.showMyBoardButton)(_.apply()))).render
+        case (false, nested) =>
+          span(nested(translatedDynamic(Translations.Game.hideMyBoardButton)(_.apply()))).render
+      }))
+    )
+
+  hideMyBoardButton.listen { _ =>
+    screenModel.subProp(_.hideMyBoard).set(!screenModel.get.hideMyBoard)
+  }
+
   def mainDiv(nested: NestedInterceptor): Div = {
     div(
       nested(produceWithNested(presenter.modeTypeProperty) {
@@ -213,7 +317,11 @@ class PlayerVsUtils(
       div(
         `class` := "d-flex justify-content-center",
         GameStyles.mainCardHeight,
-        preGameView.createFleetPreview(nested),
+        div(
+          `class` := "row",
+          currentTurnDiv(nested),
+          preGameView.createFleetPreview(nested),
+        ),
         boardView.drawMyBoardDiv(nested),
         chatUtils.chatAndMovesDiv(nested)
       ).render
@@ -241,7 +349,7 @@ class PlayerVsUtils(
           gameDiv
         )
       ),
-      placingShipsFooter(nested)
+      gameFooter(nested)
     ).render
   }
 
@@ -249,7 +357,7 @@ class PlayerVsUtils(
     div(
       `class` := "card-footer",
       nested(
-        produce(presenter.placingShipsModeProperty) {
+        produce(presenter.gameModeProperty) {
           case Some(PlacingShipsMode(false, _)) =>
             div(
               `class` := "row justify-content-between mx-0",
@@ -268,11 +376,93 @@ class PlayerVsUtils(
               div(`class` := "mx-2", undoButton),
               div(`class` := "mx-2", resetButton)
             ).render
+          case Some(PlayingMode(_, _, _, _, _)) =>
+            div(
+              `class` := "row justify-content-between mx-0",
+              div(
+                `class` := "row mx-0",
+                div(`class` := "ml-2", cancelQueuedAttacksButton),
+                div(`class` := "mx-1", launchAttackButton)
+              ),
+              div(`class` := "mx-2", hideMyBoardButton)
+            ).render
           case _ =>
             div.render
         }
       )
     ).render
+  }
+
+  private def currentTurnDiv(nested: NestedInterceptor): Div = {
+    div(
+      nested(
+        produceWithNested(presenter.gameModeProperty) {
+          case (
+                Some(PlayingMode(true, Turn(currentTurn, extraTurn), turnAttackTypes, _, _)),
+                nested
+              ) =>
+            val extraTurnDiv =
+              extraTurn match {
+                case Some(value) =>
+                  div(
+                    b(value)
+                  )
+                case None =>
+                  div()
+              }
+
+            val turnNumberDiv =
+              div(
+                `class` := "d-flex align-items-center",
+                span(
+                  `class` := "m-2",
+                  FontAwesome.Modifiers.Sizing.x2,
+                  FontAwesome.Solid.infoCircle
+                ),
+                nested(translatedDynamic(Translations.Game.turn)(_.apply())),
+                currentTurn,
+                ":"
+              )
+
+            val turnAttacksDiv =
+              createExtraTurnDiv(nested, turnAttackTypes)
+
+            div(
+              `class` := "row m-1",
+              div(`class` := "col-12", turnNumberDiv),
+              div(`class` := "col-12", extraTurnDiv),
+              div(`class` := "col-12", turnAttacksDiv)
+            ).render
+          case _ =>
+            ???
+        }
+      )
+    ).render
+  }
+
+  private def createExtraTurnDiv(
+      nested: NestedInterceptor,
+      attackTypes: List[AttackType]
+  ): JsDom.TypedTag[Div] = {
+    val imageSize = Coordinate.square(50)
+
+    def createAttackTypeDiv(attackType: AttackType, amount: Int): JsDom.TypedTag[Div] =
+      div(
+        `class` := "mr-4 d-flex align-items-center",
+        (1 to amount).map { _ =>
+          CanvasUtils
+            .createCanvasImage(CanvasImage.fromAttackType(attackType), imageSize)
+            .tap { canvas =>
+              canvas.classList.add("border")
+              canvas.classList.add("border-dark")
+            }
+        }
+      )
+
+    div(
+      `class` := "d-flex align-items-center",
+      attackTypes.map { attackType => createAttackTypeDiv(attackType, 1) }
+    )
   }
 
 }

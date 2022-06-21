@@ -162,93 +162,6 @@ class GameView(
     Seq[Modifier](span(nested(translatedDynamic(Translations.Game.solvePuzzleButton)(_.apply()))))
   )
 
-  private val cancelQueuedAttacksButton: html.Element =
-    UdashButton(
-      buttonStyle = Color.Danger.toProperty,
-      block = true.toProperty,
-      componentId = ComponentId("cancel-queued-attacks-button")
-    )(_ => Seq[Modifier](span(FontAwesome.Solid.times).render)).render
-
-  gameModel
-    .subProp(_.turnAttacksQueuedStatus)
-    .listen(
-      {
-        case AttacksQueuedStatus.Queued =>
-          cancelQueuedAttacksButton.classList.remove("invisible")
-          cancelQueuedAttacksButton.classList.add("visible")
-        case _ =>
-          cancelQueuedAttacksButton.classList.remove("visible")
-          cancelQueuedAttacksButton.classList.add("invisible")
-      },
-      initUpdate = true
-    )
-
-  cancelQueuedAttacksButton.onclick = _ => {
-    presenter.cancelQueuedAttacks()
-  }
-
-  private val launchAttackButton = {
-    val launchAttackIsDisabledProperty =
-      gameModel
-        .subProp(_.turnAttacksQueuedStatus)
-        .combine(gameModel.subProp(_.turnAttacks)) { case (turnAttacksQueuedStatus, turnAttacks) =>
-          turnAttacksQueuedStatus != AttacksQueuedStatus.NotSet ||
-          !turnAttacks.forall(_.isPlaced)
-        }
-
-    UdashButton(
-      buttonStyle = Color.Primary.toProperty,
-      block = true.toProperty,
-      componentId = ComponentId("launch-attack-button"),
-      disabled = launchAttackIsDisabledProperty
-    )(nested =>
-      Seq(
-        nested(
-          produceWithNested(
-            combine(
-              gameModel.subProp(_.turnAttacksQueuedStatus),
-              presenter.isMyTurnProperty,
-              gameModel.subProp(_.turnAttacks).transform(_.count(_.isPlaced)),
-              gameModel.subProp(_.turnAttacks).transform(_.size)
-            )
-          ) {
-            case ((AttacksQueuedStatus.NotSet, true, placed, size), nested) =>
-              span(
-                nested(translatedDynamic(Translations.Game.launchAttackButton)(_.apply())),
-                s" $placed/$size"
-              ).render
-            case ((AttacksQueuedStatus.NotSet, false, placed, size), nested) =>
-              span(
-                nested(translatedDynamic(Translations.Game.queueAttackButton)(_.apply())),
-                s" $placed/$size"
-              ).render
-            case ((_, _, _, _), nested) =>
-              span(
-                nested(translatedDynamic(Translations.Game.waitForTurnButton)(_.apply()))
-              ).render
-          }
-        )
-      )
-    )
-  }
-
-  private val hideMyBoardButton =
-    UdashButton(
-      buttonStyle = screenModel.subProp(_.hideMyBoard).transform {
-        case true  => Color.Danger
-        case false => Color.Secondary
-      },
-      block = true.toProperty,
-      componentId = ComponentId("hide-my-board-button")
-    )(nested =>
-      Seq(nested(produceWithNested(screenModel.subProp(_.hideMyBoard)) {
-        case (true, nested) =>
-          span(nested(translatedDynamic(Translations.Game.showMyBoardButton)(_.apply()))).render
-        case (false, nested) =>
-          span(nested(translatedDynamic(Translations.Game.hideMyBoardButton)(_.apply()))).render
-      }))
-    )
-
   private val addEnemyTimeButton =
     UdashButton(
       buttonStyle = Color.Primary.toProperty,
@@ -370,10 +283,10 @@ class GameView(
               `class` := "row justify-content-between mx-0",
               div(
                 `class` := "row mx-0",
-                div(`class` := "ml-2", cancelQueuedAttacksButton),
-                div(`class` := "mx-1", launchAttackButton)
+//                div(`class` := "ml-2", cancelQueuedAttacksButton),
+//                div(`class` := "mx-1", launchAttackButton)
               ),
-              div(`class` := "mx-2", hideMyBoardButton)
+//              div(`class` := "mx-2", hideMyBoardButton)
             ).render
           case ((_, _, Some(GameOverModeType), _, _), _) =>
             div(
@@ -398,14 +311,6 @@ class GameView(
 
   solvePuzzleButton.listen { _ =>
     presenter.startNewPuzzle()
-  }
-
-  launchAttackButton.listen { _ =>
-    presenter.launchAttack()
-  }
-
-  hideMyBoardButton.listen { _ =>
-    screenModel.subProp(_.hideMyBoard).set(!screenModel.get.hideMyBoard)
   }
 
   rematchButton.listen { _ =>
