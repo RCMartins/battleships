@@ -110,9 +110,9 @@ object PuzzlesGenerator {
           boardSize,
           Random.shuffle(smallShips).take(3)
         ) match {
-          case Left(_) =>
+          case None =>
             None
-          case Right(shipsInPlace) =>
+          case Some(shipsInPlace) =>
             makeSomePlays(Board(boardSize, shipsInPlace))
         }
       case WinInXTurns(maximumTurns) =>

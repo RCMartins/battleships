@@ -29,6 +29,7 @@ class GameService(rpcClientsService: RpcClientsService) {
   private val activePreGames: mutable.Map[GameId, PreGame] = mutable.Map.empty
   private val acceptedInviteRequests: mutable.Map[ClientId, (ClientId, PlayerInviteType)] =
     mutable.Map.empty
+
   private val puzzlesSolvedCache: mutable.Map[Username, Set[PuzzleId]] =
     mutable.Map.empty
 
@@ -87,10 +88,10 @@ class GameService(rpcClientsService: RpcClientsService) {
                   player.myBoard.boardSize,
                   game.rules.gameFleet.shipsList
                 ) match {
-                  case Left(_) =>
+                  case None =>
                     // Try placing ships in the next botUpdater loop ...
                     println("Failed placing ships... Waiting for next loop...")
-                  case Right(placedShips) =>
+                  case Some(placedShips) =>
                     confirmShips(game.gameId, player.username, placedShips)
                 }
               }
@@ -1330,6 +1331,7 @@ object GameService {
           PreGamePlayer(game.player1.clientId, game.player1.username, acceptedRules = false),
         player2 = PreGamePlayer(game.player2.clientId, game.player2.username, acceptedRules = false)
       )
+
   }
 
   case class Game(
@@ -1483,7 +1485,7 @@ object GameService {
             val shipIsDestroyed =
               shipInGame.shipActualPieces.forall { case pieceCoor @ Coordinate(x, y) =>
                 listOfHits.exists(_._1 == pieceCoor) ||
-                  player.enemyBoard.boardMarks(x)(y)._1.nonEmpty
+                player.enemyBoard.boardMarks(x)(y)._1.nonEmpty
               }
             if (shipIsDestroyed)
               hitsOnTheShip.head.copy(destroyed = true) :: hitsOnTheShip.tail
