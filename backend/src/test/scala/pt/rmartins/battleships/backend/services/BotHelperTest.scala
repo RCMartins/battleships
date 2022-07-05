@@ -432,6 +432,34 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
       )
     }
 
+    "find correct position of both Ranger ships #1" in {
+      val rules = Rules(
+        boardSize = Coordinate(4, 4),
+        gameFleet = Fleet.fromShips(List(Ranger -> 2)),
+        defaultTurnAttacks = turnAttackTypes4,
+        gameBonuses = Nil,
+        timeLimit = WithoutRuleTimeLimit
+      )
+      val botHelper = createBotHelper(rules)
+
+      val turnHistory =
+        List(
+          totalMiss(1, (1, 0), (0, 1), (1, 2), (3, 2)),
+          hitTurn(2, hits = List((Ranger, 3, 1), (Ranger, 2, 3)), water = List((0, 3)))
+        )
+
+      val result = placeAttacks(botHelper, turnHistory)
+
+      val expectedCoordinates: Set[Coordinate] =
+        Set((1, 1), (2, 1), (1, 3), (3, 3)).map { case (x, y) => Coordinate(x, y) }
+
+      containsCoordinates(
+        result,
+        rules.defaultTurnAttacks.size,
+        expectedCoordinates
+      )
+    }
+
   }
 
   private def containsCoordinates(
@@ -530,7 +558,7 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
     new BotHelper(
       gameId = GameId(UUID.randomUUID().toString),
       rules = rules,
-      logger = BotHelperLogger.EmptyLogger
+      logger = BotHelperLogger.DefaultLogger
     )
 
 }
