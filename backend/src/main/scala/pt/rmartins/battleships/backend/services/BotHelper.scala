@@ -7,21 +7,22 @@ import pt.rmartins.battleships.shared.model.game._
 import scala.annotation.tailrec
 import scala.util.Random
 
-class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
+class BotHelper(gameId: GameId, val rules: Rules, val logger: BotHelperLogger) {
 
   import logger._
-
-  private val MaxShipSamples = 1000
 
   private val boardSize: Coordinate = rules.boardSize
 
   private val allShipGuessers: Map[ShipId, ShipGuesser] = {
     val allShipIds: List[ShipId] = rules.gameFleet.shipCounterList.map(_._1)
-    allShipIds.map(shipId => shipId -> new ShipGuesser(shipId)).toMap
+    allShipIds.map(shipId => shipId -> new ShipGuesser(rules, shipId, this)).toMap
   }
 
   private var cachedTurnPlays: List[TurnPlay] =
     Nil
+
+  def getCachedTurnPlays: List[TurnPlay] =
+    cachedTurnPlays
 
   private var cachedBotBoardMarks: BotBoardMarks =
     createEmptyBotBoardMarks(boardSize)
@@ -33,22 +34,6 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
       turnBonus.bonusType == BonusType.TripleKill &&
         turnBonus.bonusRewardList.contains(BonusReward.ExtraTurn(List.fill(3)(AttackType.Simple)))
     )
-
-  private def forceSetBoardMarkUpdated(
-      botBoardMarks: BotBoardMarks,
-      coordinate: Coordinate,
-      botBoardMark: BotBoardMark
-  ): (BotBoardMarks, Boolean) = {
-    val vectorX: Vector[(Option[Turn], BotBoardMark)] = botBoardMarks(coordinate.x)
-    val (turnOpt, currentMark) = vectorX(coordinate.y)
-    if (currentMark == botBoardMark)
-      (botBoardMarks, false)
-    else
-      (
-        botBoardMarks.updated(coordinate.x, vectorX.updated(coordinate.y, (turnOpt, botBoardMark))),
-        true
-      )
-  }
 
   def updateBotBoardMarks(turnPlay: TurnPlay): Unit = {
     cachedTurnPlays = turnPlay :: cachedTurnPlays
@@ -63,6 +48,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
     val allSubmarineHits =
       allShipHit && hitHints.forall(_.shipIdDestroyedOpt.contains(Ship.Submarine.shipId))
 
+    // Update board marks with direct turnPlay data
     val updatedBotBoardMarks: BotBoardMarks =
       coordinates.foldLeft(cachedBotBoardMarks) { case (botBoardMarks, coor) =>
         if (allWater)
@@ -97,6 +83,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
           )
       }
 
+    // Update board marks with all submarineHits or allShipHit
     val updatedBotBoardMarks2: BotBoardMarks =
       if (allSubmarineHits)
         turnAttacks
@@ -127,6 +114,7 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
       } else
         updatedBotBoardMarks
 
+    // Update board marks with destroyed ships positions (with only 1 possibility)
     val updatedBotBoardMarks3: BotBoardMarks =
       hitHints.flatMap(_.shipIdDestroyedOpt).foldLeft(updatedBotBoardMarks2) {
         case (botBoardMarks, destroyedShipId) =>
@@ -173,384 +161,6 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
     logBotBoardMarks(boardSize, updatedBotBoardMarks3)
 
     cachedBotBoardMarks = updatedBotBoardMarks3
-  }
-
-  private class ShipGuesser(val shipId: ShipId) {
-
-    private val shipsCounter: Int =
-      rules.gameFleet.shipCounterList.find(_._1 == shipId).map(_._2._1).getOrElse(0)
-
-    private val uniqueRotations = Ship.allShipsUniqueRotations(shipId)
-
-    private var turnsWithShip: List[TurnPlay] = Nil
-
-    def getTurnsWithShip: List[TurnPlay] = turnsWithShip
-
-    def updateTurnPlay(turnPlay: TurnPlay): Unit =
-      if (turnPlay.hitHints.exists(_.shipIdOpt.contains(shipId)))
-        turnsWithShip = turnPlay :: turnsWithShip
-
-    def checkPossiblePositions(boardMarks: BotBoardMarks): Option[List[ShipGuess]] = {
-      val possiblePositionsList: List[(List[HitHint], List[Coordinate])] =
-        turnsWithShip
-          .map { case TurnPlay(_, turnAttacks, hitHints) =>
-            (
-              hitHints,
-              turnAttacks
-                .filter(_.attackType == AttackType.Simple)
-                .flatMap(_.coordinateOpt)
-                .filter { coor =>
-                  getMark(boardMarks, coor) match {
-                    case Empty                  => true
-                    case Water                  => false
-                    case ShipOrWater(shipIds)   => shipIds.contains(shipId)
-                    case ShipExclusive(shipIds) => shipIds.contains(shipId)
-                  }
-                }
-            )
-          }
-          .filter(_._2.nonEmpty)
-
-      Some(
-        if (shipsCounter == 1) {
-          @tailrec
-          def filterLoop(
-              remainingPositionsList: List[(List[HitHint], List[Coordinate])],
-              currentPossibilitiesOpt: Option[List[List[Coordinate]]]
-          ): List[List[Coordinate]] =
-            remainingPositionsList match {
-              case Nil =>
-                currentPossibilitiesOpt.getOrElse(Nil)
-              case (hitHints, coordinates) :: next =>
-                val amount = hitHints.flatMap(_.shipIdOpt).count(_ == shipId)
-                val comb = Utils.combinations(coordinates, amount = amount)
-                currentPossibilitiesOpt match {
-                  case None =>
-                    filterLoop(next, Some(comb))
-                  case Some(currentPossibilities) =>
-                    filterLoop(
-                      next,
-                      Some(
-                        currentPossibilities.flatMap { list =>
-                          comb.map(list ++ _)
-                        }
-                      )
-                    )
-                }
-            }
-
-          if (possiblePositionsList.nonEmpty) {
-            logLine(s"possiblePositionsList: ${possiblePositionsList.size}")
-            logLine(possiblePositionsList.mkString("\n"))
-          }
-
-          filterLoop(possiblePositionsList, None).map(ShipGuess)
-        } else
-          possiblePositionsList.flatMap(_._2).map(coor => ShipGuess(List(coor)))
-      )
-    }
-
-    def baseShipsHit(boardMarks: BotBoardMarks): Option[List[ShipGuess]] = {
-      val destroyedCount: Int =
-        turnsWithShip.map { case TurnPlay(_, _, hitHints) =>
-          hitHints.count(_.shipIdDestroyedOpt.contains(shipId))
-        }.sum
-      val aliveShips = shipsCounter - destroyedCount
-
-      if (aliveShips == 0)
-        None
-      else
-        checkPossiblePositions(boardMarks)
-    }
-
-    private val getBlindShipPositions: (BotBoardMarks, Int) => LazyList[(Ship, Coordinate)] = {
-      var cachePositions: LazyList[(Ship, Coordinate)] =
-        LazyList.from(
-          Random.shuffle(
-            for {
-              rotation <- Rotation.all
-              ship = Ship.getShip(shipId, rotation)
-              x <- 0 to boardSize.x - ship.size.x
-              y <- 0 to boardSize.y - ship.size.y
-            } yield (ship, Coordinate(x, y))
-          )
-        )
-
-      (boardMarks: BotBoardMarks, amount: Int) => {
-        cachePositions
-          .filter { case (ship, coordinate) =>
-            shipIsPossible(shipId, ship.pieces.map(_ + coordinate), boardMarks, turnsWithShip)
-          }
-          .take(amount)
-      }
-    }
-
-    def possibleShipPositions(
-        botBoardMarks: BotBoardMarks,
-        shipGuesses: List[ShipGuess]
-    ): Set[List[Coordinate]] = {
-      def getSimplePositions(guessCoor: Coordinate): List[List[Coordinate]] =
-        uniqueRotations.flatMap { ship =>
-          ship.pieces.flatMap { shipPiece =>
-            val diffDist = guessCoor - shipPiece
-            List(ship.pieces.map(_ + diffDist))
-              .filter(shipIsPossible(shipId, _, botBoardMarks, cachedTurnPlays))
-          }
-        }
-
-      shipGuesses.flatMap {
-        case ShipGuess(headPosition :: other) =>
-          val otherPositionsSet = other.toSet
-          getSimplePositions(headPosition).filter { shipPieces =>
-            val shipPiecesSet = shipPieces.toSet
-            otherPositionsSet.forall(shipPiecesSet)
-          }
-        case _ => // impossible...
-          Nil
-      }.toSet
-    }
-
-    /* Option[BotBoardMarks] -> Some(BotBoardMarks) or None if there was no update
-     * List[Coordinate]   -> known 100% shots
-     * List[Coordinate]   -> tentative shots
-     */
-    def getBestShots(
-        botBoardMarks: BotBoardMarks,
-        currentTurnAttackTypes: List[AttackType]
-    ): (Option[BotBoardMarks], Set[Coordinate], Set[Coordinate]) = {
-
-      def processShipGuesses(
-          shipGuesses: List[ShipGuess]
-      ): (Option[BotBoardMarks], Set[Coordinate], Set[Coordinate]) = {
-        val possibleShipPositionsSet: Set[List[Coordinate]] =
-          possibleShipPositions(botBoardMarks, shipGuesses)
-
-        if (possibleShipPositionsSet.isEmpty) {
-          logLine("Bug! possibleShipPositions is empty!")
-          logLine("shipGuesses:")
-          logLine(shipGuesses.mkString("\n"))
-          (None, Set.empty, Set.empty)
-        } else
-          processShipPositions(possibleShipPositionsSet, allShipPossiblePositions = true)
-      }
-
-      def processShipPositions(
-          possibleShipPositions: Set[List[Coordinate]],
-          allShipPossiblePositions: Boolean
-      ): (Option[BotBoardMarks], Set[Coordinate], Set[Coordinate]) = {
-        logLine(s"possibleShipPositions: ${possibleShipPositions.size}")
-        if (possibleShipPositions.size <= 15)
-          logLine(possibleShipPositions.mkString("\n"))
-
-        val allKnownWater = {
-          val waterListList: List[Set[Coordinate]] =
-            possibleShipPositions.toList
-              .map(guessPositions =>
-                guessPositions.flatMap(_.get8CoorAround).toSet -- guessPositions.toSet
-              )
-
-          val all = waterListList.flatten.distinct
-          all.filter { possibleWaterCoor =>
-            waterListList.forall(_(possibleWaterCoor)) &&
-            possibleWaterCoor.isInsideBoard(boardSize)
-          }
-        }
-
-        val newWaterFound: List[Coordinate] =
-          if (allShipPossiblePositions)
-            allKnownWater.filter(coor => getMark(botBoardMarks, coor) != Water)
-          else
-            Nil
-
-        if (newWaterFound.nonEmpty) {
-          logLine("All new known water coordinates:")
-          logLine(newWaterFound.mkString("\n"))
-        }
-
-        val updatedBoardMarks: BotBoardMarks =
-          newWaterFound.foldLeft(botBoardMarks) { case (upBoardMarks, coor) =>
-            forceSetBoardMark(upBoardMarks, coor, Water)
-          }
-
-        val maximumAttacksNecessary = currentTurnAttackTypes.size
-
-        val coordinatesInAllShipPositions: Set[Coordinate] =
-          possibleShipPositions.flatten
-            .filter(coor =>
-              getSquare(updatedBoardMarks, coor) match {
-                case (_, botBoardMark) if botBoardMark != Water => true
-                case _                                          => false
-              }
-            )
-
-        val (sureAttacks, otherAttacks) = {
-          val all: Set[Coordinate] =
-            coordinatesInAllShipPositions
-              .filter(getTurn(updatedBoardMarks, _).isEmpty)
-
-          val coordinatesInAllGuesses: Set[Coordinate] =
-            all
-              .filter(coor => possibleShipPositions.forall(_.contains(coor)))
-              .take(maximumAttacksNecessary)
-
-          (
-            coordinatesInAllGuesses,
-            (all -- coordinatesInAllGuesses).take(maximumAttacksNecessary)
-          )
-        }
-
-        val updateShipCoordinates: Set[(Coordinate, BotBoardMark)] = {
-          val sureMarks =
-            sureAttacks ++
-              (if (possibleShipPositions.sizeIs == 1) possibleShipPositions.flatten else Set.empty)
-
-          val aroundMarks =
-            (sureMarks.flatMap(_.get8CoorAround) -- sureMarks).filter(_.isInsideBoard(boardSize))
-
-          sureMarks.map(_ -> (ShipExclusive(Set(shipId)): BotBoardMark)) ++
-            aroundMarks.map(_ -> (ShipOrWater(Set(shipId)): BotBoardMark))
-        }
-
-        if (updateShipCoordinates.nonEmpty) {
-          val exclusive = updateShipCoordinates.filter(_._2.isExclusive)
-          val shipOrWater = updateShipCoordinates.filter(_._2.isShipOrWater)
-          if (exclusive.nonEmpty) {
-            logLine("updateShipCoordinates Exclusive:")
-            logLine(
-              exclusive
-                .map { case (coor, mark) =>
-                  s"  $coor-$mark  ${getTurn(updatedBoardMarks, coor).nonEmpty}"
-                }
-                .mkString("\n")
-            )
-          }
-          if (shipOrWater.nonEmpty) {
-            logLine("updateShipCoordinates ShipOrWater:")
-            logLine(
-              shipOrWater
-                .map { case (coor, mark) =>
-                  s"  $coor-$mark  ${getTurn(updatedBoardMarks, coor).nonEmpty}"
-                }
-                .mkString("\n")
-            )
-          }
-        }
-
-        val (updatedBotBoardMarks2, marksUpdated2) =
-          updateShipCoordinates
-            .filter(_._1.isInsideBoard(boardSize))
-            .foldLeft((updatedBoardMarks, false)) { case ((upBoardMarks, updated), (coor, mark)) =>
-              val markOpt: Option[BotBoardMark] =
-                (getMark(upBoardMarks, coor), mark) match {
-                  case (Empty, _) | (_, ShipExclusive(_)) =>
-                    Some(mark)
-                  case (ShipOrWater(currentShipIds), ShipOrWater(markShipIds)) =>
-                    Some(shipOrWater(currentShipIds.filter(markShipIds)))
-                  case (ShipExclusive(currentShipIds), ShipOrWater(markShipIds)) =>
-                    Some(ShipExclusive(currentShipIds.filter(markShipIds)))
-                  case (_, _) =>
-                    None
-                }
-
-              markOpt match {
-                case Some(mark) =>
-                  val (finalBoardMarks, updated2) =
-                    forceSetBoardMarkUpdated(upBoardMarks, coor, mark)
-                  (finalBoardMarks, updated || updated2)
-                case None =>
-                  (upBoardMarks, updated)
-              }
-            }
-
-        if (newWaterFound.nonEmpty || marksUpdated2) {
-          logLine("printBotBoard2")
-          logBotBoardMarks(boardSize, updatedBotBoardMarks2)
-        }
-
-        val (updatedBotBoardMarks3, marksUpdated3) =
-          if (allShipPossiblePositions)
-            turnsWithShip.foldLeft((updatedBotBoardMarks2, false)) {
-              case ((upBoardMarks, updated), TurnPlay(_, turnAttacks, hitHints)) =>
-                def findAllWater(
-                    coordinates: Set[Coordinate],
-                    shipIds: List[ShipId]
-                ): Set[Coordinate] = {
-                  shipIds match {
-                    case Nil =>
-                      coordinates
-                    case shipId :: next =>
-                      coordinates
-                        .map { coor =>
-                          getMark(upBoardMarks, coor) match {
-                            case ShipExclusive(markShipIds) if markShipIds == Set(shipId) =>
-                              findAllWater(coordinates - coor, next)
-                            case _ =>
-                              Set.empty[Coordinate]
-                          }
-                        }
-                        .find(_.nonEmpty)
-                        .getOrElse(Set.empty[Coordinate])
-                  }
-                }
-
-                if (hitHints.exists(_.isWater)) {
-                  val result =
-                    findAllWater(
-                      turnAttacks.flatMap(_.coordinateOpt).toSet,
-                      hitHints.flatMap(_.shipIdOpt)
-                    ).filter(getMark(upBoardMarks, _) match {
-                      case Water => false
-                      case _     => true
-                    })
-
-                  if (result.nonEmpty)
-                    (
-                      result.foldLeft(upBoardMarks) { case (upBoardMarks2, coor) =>
-                        forceSetBoardMark(upBoardMarks2, coor, Water)
-                      },
-                      true
-                    )
-                  else
-                    (upBoardMarks, updated)
-                } else
-                  (upBoardMarks, updated)
-            }
-          else
-            (updatedBotBoardMarks2, false)
-
-        if (marksUpdated3) {
-          logLine("printBotBoard3")
-          logBotBoardMarks(boardSize, updatedBotBoardMarks3)
-        }
-
-        val finalMarksUpdated = newWaterFound.nonEmpty || marksUpdated2 || marksUpdated3
-        (
-          Some(updatedBotBoardMarks3).filter(_ => finalMarksUpdated),
-          sureAttacks,
-          otherAttacks
-        )
-      }
-
-      baseShipsHit(botBoardMarks) match {
-        case None =>
-          (None, Set.empty, Set.empty)
-        case Some(Nil) =>
-          val possiblePositions = getBlindShipPositions(botBoardMarks, MaxShipSamples)
-
-          val possibleShipPositions: Set[List[Coordinate]] =
-            possiblePositions.map { case (ship, coor) =>
-              ship.pieces.map(_ + coor)
-            }.toSet
-
-          processShipPositions(
-            possibleShipPositions,
-            allShipPossiblePositions = possiblePositions.sizeIs < MaxShipSamples
-          )
-        case Some(shipGuesses) =>
-          processShipGuesses(shipGuesses)
-      }
-    }
-
   }
 
   def placeAttacks(
@@ -754,41 +364,6 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
     (boardMarksUpdated.getOrElse(initialBoardMarks), attacks)
   }
 
-  private def shipIsPossible(
-      shipId: ShipId,
-      shipPieces: List[Coordinate],
-      botBoardMarks: BotBoardMarks,
-      fullTurnHistory: List[TurnPlay]
-  ): Boolean =
-    shipPieces.forall { coor =>
-      coor.isInsideBoard(boardSize) && {
-        getSquare(botBoardMarks, coor) match {
-          case (_, Empty)                  => true
-          case (_, Water)                  => false
-          case (_, ShipOrWater(shipIds))   => shipIds.contains(shipId)
-          case (_, ShipExclusive(shipIds)) => shipIds.contains(shipId)
-        }
-      }
-    } && {
-      val turnsCounter: Map[Turn, Int] =
-        shipPieces.flatMap(coor => getTurn(botBoardMarks, coor)).groupBy(identity).map {
-          case (turn, list) => (turn, list.size)
-        }
-
-      // TODO create fullTurnHistoryMap to make this more efficient
-      fullTurnHistory.forall { case TurnPlay(turn, _, hitHints) =>
-        val hitShipIds = hitHints.flatMap(_.shipIdOpt)
-        val thisTurnShipCounter = hitShipIds.count(_ == shipId)
-
-        turnsCounter.get(turn) match {
-          case None =>
-            0 == thisTurnShipCounter
-          case Some(shipTurnCount) =>
-            shipTurnCount == thisTurnShipCounter
-        }
-      }
-    }
-
   private def shotAllRandom(
       boardMarks: BotBoardMarks,
       currentTurnAttackTypes: List[AttackType]
@@ -815,7 +390,11 @@ class BotHelper(gameId: GameId, val rules: Rules, logger: BotHelperLogger) {
 
 object BotHelper {
 
-  case class ShipGuess(positions: List[Coordinate])
+  sealed trait ShipGuess
+
+  case class SingleShipGuess(positions: List[Coordinate]) extends ShipGuess
+
+  case class MultipleShipGuess(positions: List[List[Coordinate]]) extends ShipGuess
 
   sealed trait BotBoardMark {
 

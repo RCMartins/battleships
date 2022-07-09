@@ -32,4 +32,35 @@ object Utils {
           combinations(tail, amount) ++ combinations(tail, amount - 1).map(head :: _)
       }
 
+  def combinationGroups[A](
+      list: List[A],
+      amountGroups: List[Int]
+  ): Set[Set[Set[A]]] = {
+    def loop(
+        list: List[A],
+        other: List[A],
+        amountGroups: List[Int]
+    ): List[List[List[A]]] =
+      amountGroups match {
+        case Nil =>
+          List(Nil)
+        case 0 :: nextAmounts =>
+          loop(list ++ other, Nil, nextAmounts).map(Nil :: _)
+        case amount :: nextAmounts =>
+          list match {
+            case Nil =>
+              Nil
+            case head :: tail =>
+              loop(tail, head :: other, amountGroups) ++
+                loop(tail, other, (amount - 1) :: nextAmounts)
+                  .map {
+                    case Nil                    => Nil
+                    case headGroup :: nextGroup => (head :: headGroup) :: nextGroup
+                  }
+          }
+      }
+
+    loop(list, Nil, amountGroups).map(_.map(_.toSet).toSet).toSet
+  }
+
 }

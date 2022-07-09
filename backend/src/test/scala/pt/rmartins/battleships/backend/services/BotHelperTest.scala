@@ -18,8 +18,9 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
   private val turnAttackTypes3: List[AttackType] = List.fill(3)(Simple)
   private val turnAttackTypes4: List[AttackType] = List.fill(4)(Simple)
   private val turnAttackTypes5: List[AttackType] = List.fill(5)(Simple)
+  private val turnAttackTypes6: List[AttackType] = List.fill(6)(Simple)
 
-  "placeAttacks" should {
+  "placeAttacks - single ships" should {
 
     "shoot only one missile and ignore the 2 radars" in {
       val rules = Rules(
@@ -424,6 +425,38 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
 
       val expectedCoordinates: Set[Coordinate] =
         Set((1, 0), (2, 0), (3, 0), (4, 0), (5, 0)).map { case (x, y) => Coordinate(x, y) }
+
+      containsCoordinates(
+        result,
+        rules.defaultTurnAttacks.size,
+        expectedCoordinates
+      )
+    }
+
+  }
+
+  "placeAttacks - multiple ships" should {
+
+    "find correct position of both Conqueror ships #1" in {
+      val rules = Rules(
+        boardSize = Coordinate(4, 4),
+        gameFleet = Fleet.fromShips(List(Conqueror -> 2)),
+        defaultTurnAttacks = turnAttackTypes6,
+        gameBonuses = Nil,
+        timeLimit = WithoutRuleTimeLimit
+      )
+      val botHelper = createBotHelper(rules)
+
+      val turnHistory =
+        List(
+          totalMiss(1, (0, 1), (2, 1), (1, 2), (3, 2)),
+          hitTurn(2, hits = List((Conqueror, 1, 3), (Conqueror, 3, 3)), water = List((3, 1)))
+        )
+
+      val result = placeAttacks(botHelper, turnHistory)
+
+      val expectedCoordinates: Set[Coordinate] =
+        Set((0, 0), (0, 1), (0, 2), (0, 3), (0, 3), (2, 3)).map { case (x, y) => Coordinate(x, y) }
 
       containsCoordinates(
         result,
