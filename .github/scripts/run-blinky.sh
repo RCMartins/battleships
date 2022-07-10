@@ -1,3 +1,3 @@
 #!/bin/bash
 
-coursier launch "com.github.rcmartins:blinky-cli_2.12:0.3.1+39-19f3193e-SNAPSHOT" -r sonatype:snapshots -- "$1"
+coursier launch "com.github.rcmartins:blinky-cli_2.13:0.4.0+4-40ff3115-SNAPSHOT" -r sonatype:snapshots -- $1

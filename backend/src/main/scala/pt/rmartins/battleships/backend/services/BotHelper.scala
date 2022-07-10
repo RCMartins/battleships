@@ -199,7 +199,7 @@ class BotHelper(gameId: GameId, val rules: Rules, val logger: BotHelperLogger) {
     cachedBotBoardMarks = updatedBotBoardMarks
     if (validAttacks.isEmpty) {
       logLine(s"smarterPlaceAttacks returned an invalid attack list: $attackList")
-      shotAllRandom(botBoardMarks, filteredCurrentTurnAttackTypes)
+      shotAllRandom(botBoardMarks, filteredCurrentTurnAttackTypes, ignorePositions = Set.empty)
     } else if (
       validAttacks.map(_.attackType).groupBy(identity) ==
         filteredCurrentTurnAttackTypes.groupBy(identity)
@@ -211,7 +211,8 @@ class BotHelper(gameId: GameId, val rules: Rules, val logger: BotHelperLogger) {
           botBoardMarks,
           filteredCurrentTurnAttackTypes.take(
             filteredCurrentTurnAttackTypes.size - validAttacks.size
-          )
+          ),
+          ignorePositions = validAttacks.flatMap(_.coordinateOpt).toSet
         )
     }
   }
@@ -366,24 +367,44 @@ class BotHelper(gameId: GameId, val rules: Rules, val logger: BotHelperLogger) {
 
   private def shotAllRandom(
       boardMarks: BotBoardMarks,
-      currentTurnAttackTypes: List[AttackType]
+      currentTurnAttackTypes: List[AttackType],
+      ignorePositions: Set[Coordinate]
   ): List[Attack] = {
-    val possibleCoorList: Seq[Coordinate] =
+    def possibleCoorList(excludeWater: Boolean): Seq[Coordinate] =
       for {
         x <- 0 until boardSize.x
         y <- 0 until boardSize.y
         if {
           val (turnOpt, botBoardMark) = boardMarks(x)(y)
-          turnOpt.isEmpty && botBoardMark != Water
+          turnOpt.isEmpty && (!excludeWater || botBoardMark != Water)
         }
       } yield Coordinate(x, y)
 
-    LazyList
-      .from(Random.shuffle(possibleCoorList))
-      .take(currentTurnAttackTypes.size)
-      .zip(currentTurnAttackTypes)
-      .map { case (coor, attackType) => Attack(attackType, Some(coor)) }
-      .toList
+    val standardRandomShots: Seq[Attack] =
+      Random
+        .shuffle(possibleCoorList(excludeWater = true))
+        .filterNot(ignorePositions)
+        .zip(currentTurnAttackTypes)
+        .map { case (coor, attackType) => Attack(attackType, Some(coor)) }
+
+    if (currentTurnAttackTypes.sizeIs == standardRandomShots.size)
+      standardRandomShots.toList
+    else {
+      val standardRandomShotsSet: Set[Coordinate] =
+        standardRandomShots.flatMap(_.coordinateOpt).toSet
+
+      val remainingTurnAttackTypes = currentTurnAttackTypes.drop(standardRandomShots.size)
+
+      standardRandomShots.toList ++
+        Random
+          .shuffle(possibleCoorList(excludeWater = false))
+          .filterNot(ignorePositions)
+          .filterNot(standardRandomShotsSet)
+          .take(remainingTurnAttackTypes.size)
+          .zip(remainingTurnAttackTypes)
+          .map { case (coor, attackType) => Attack(attackType, Some(coor)) }
+          .toList
+    }
   }
 
 }

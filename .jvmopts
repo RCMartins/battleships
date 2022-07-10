@@ -1,1 +1,1 @@
--Xmx4G
+-XX:MaxMetaspaceSize=2G
