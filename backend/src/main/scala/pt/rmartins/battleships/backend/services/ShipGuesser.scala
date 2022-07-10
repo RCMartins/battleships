@@ -177,7 +177,7 @@ case class ShipGuesser(rules: Rules, shipId: ShipId, botHelper: BotHelper) {
   def possibleShipPositions(
       botBoardMarks: BotBoardMarks,
       shipGuesses: List[ShipGuess]
-  ): Set[List[Coordinate]] = {
+  ): Set[List[List[Coordinate]]] = {
     def getSimplePositions(guessCoor: Coordinate): List[List[Coordinate]] =
       uniqueRotations.flatMap { ship =>
         ship.pieces.flatMap { shipPiece =>
@@ -190,14 +190,16 @@ case class ShipGuesser(rules: Rules, shipId: ShipId, botHelper: BotHelper) {
     shipGuesses.flatMap {
       case SingleShipGuess(headPosition :: other) =>
         val otherPositionsSet = other.toSet
-        getSimplePositions(headPosition).filter { shipPieces =>
-          val shipPiecesSet = shipPieces.toSet
-          otherPositionsSet.forall(shipPiecesSet)
-        }
+        getSimplePositions(headPosition)
+          .filter { shipPieces =>
+            val shipPiecesSet = shipPieces.toSet
+            otherPositionsSet.forall(shipPiecesSet)
+          }
+          .map(List(_))
       case SingleShipGuess(Nil) =>
         Nil
       case MultipleShipGuess(initialShips) =>
-//        def loop(shipsPositions: List[List[Coordinate]]): List[Coordinate] = {
+//        def loop(shipsPositions: List[List[Coordinate]]): List[List[Coordinate]] = {
 //          shipsPositions match {
 //            case Nil =>
 //              ???
@@ -224,7 +226,7 @@ case class ShipGuesser(rules: Rules, shipId: ShipId, botHelper: BotHelper) {
     def processShipGuesses(
         shipGuesses: List[ShipGuess]
     ): (Option[BotBoardMarks], Set[Coordinate], Set[Coordinate]) = {
-      val possibleShipPositionsSet: Set[List[Coordinate]] =
+      val possibleShipPositionsSet: Set[List[List[Coordinate]]] =
         possibleShipPositions(botBoardMarks, shipGuesses)
 
       if (possibleShipPositionsSet.isEmpty) {
@@ -237,19 +239,19 @@ case class ShipGuesser(rules: Rules, shipId: ShipId, botHelper: BotHelper) {
     }
 
     def processShipPositions(
-        possibleShipPositions: Set[List[Coordinate]],
+        possibleShipPositions: Set[List[List[Coordinate]]],
         allShipPossiblePositions: Boolean
     ): (Option[BotBoardMarks], Set[Coordinate], Set[Coordinate]) = {
       logLine(s"possibleShipPositions: ${possibleShipPositions.size}")
       if (possibleShipPositions.size <= 15)
         logLine(possibleShipPositions.mkString("\n"))
 
-      // TODO possibleShipPositions could be a Set[List[List[Coordinate]]]
-      //  - would it actually help with anything?
+      val possibleShipPositionsFlatten: Set[Coordinate] =
+        possibleShipPositions.flatten.flatten
 
       val allKnownWater = {
         val waterListList: List[Set[Coordinate]] =
-          possibleShipPositions.toList.map(guessPositions =>
+          possibleShipPositions.toList.flatten.map(guessPositions =>
             guessPositions.flatMap(_.get8CoorAround).toSet -- guessPositions.toSet
           )
 
@@ -279,13 +281,12 @@ case class ShipGuesser(rules: Rules, shipId: ShipId, botHelper: BotHelper) {
       val maximumAttacksNecessary = currentTurnAttackTypes.size
 
       val coordinatesInAllShipPositions: Set[Coordinate] =
-        possibleShipPositions.flatten
-          .filter(coor =>
-            getSquare(updatedBoardMarks, coor) match {
-              case (_, botBoardMark) if botBoardMark != Water => true
-              case _                                          => false
-            }
-          )
+        possibleShipPositionsFlatten.filter(coor =>
+          getSquare(updatedBoardMarks, coor) match {
+            case (_, botBoardMark) if botBoardMark != Water => true
+            case _                                          => false
+          }
+        )
 
       val (sureAttacks, otherAttacks) = {
         val all: Set[Coordinate] =
@@ -306,7 +307,7 @@ case class ShipGuesser(rules: Rules, shipId: ShipId, botHelper: BotHelper) {
       val updateShipCoordinates: Set[(Coordinate, BotBoardMark)] = {
         val sureMarks =
           sureAttacks ++
-            (if (possibleShipPositions.sizeIs == 1) possibleShipPositions.flatten else Set.empty)
+            (if (possibleShipPositions.sizeIs == 1) possibleShipPositionsFlatten else Set.empty)
 
         val aroundMarks =
           (sureMarks.flatMap(_.get8CoorAround) -- sureMarks).filter(_.isInsideBoard(boardSize))
@@ -441,10 +442,13 @@ case class ShipGuesser(rules: Rules, shipId: ShipId, botHelper: BotHelper) {
       case Some(Nil) =>
         val possiblePositions = getBlindShipPositions(botBoardMarks, MaxShipSamples)
 
-        val possibleShipPositions: Set[List[Coordinate]] =
-          possiblePositions.map { case (ship, coor) =>
-            ship.pieces.map(_ + coor)
-          }.toSet
+        val possibleShipPositions: Set[List[List[Coordinate]]] =
+          possiblePositions
+            .map { case (ship, coor) =>
+              ship.pieces.map(_ + coor)
+            }
+            .map(List(_))
+            .toSet
 
         processShipPositions(
           possibleShipPositions,

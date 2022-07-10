@@ -6,6 +6,7 @@ import pt.rmartins.battleships.shared.model.game._
 
 import scala.annotation.tailrec
 import scala.util.Random
+import scala.util.chaining.scalaUtilChainingOps
 
 class BotHelper(gameId: GameId, val rules: Rules, val logger: BotHelperLogger) {
 
@@ -121,12 +122,12 @@ class BotHelper(gameId: GameId, val rules: Rules, val logger: BotHelperLogger) {
           val shipGuesser = allShipGuessers(destroyedShipId)
           shipGuesser.checkPossiblePositions(botBoardMarks) match {
             case Some(shipGuesses) =>
-              val possibleShipPositionsSet: Set[List[Coordinate]] =
+              val possibleShipPositionsSet: Set[List[List[Coordinate]]] =
                 shipGuesser.possibleShipPositions(botBoardMarks, shipGuesses)
 
               if (possibleShipPositionsSet.sizeIs == 1) {
                 val shipPos: Set[Coordinate] =
-                  possibleShipPositionsSet.flatten
+                  possibleShipPositionsSet.flatten.flatten
                 val water: Set[Coordinate] =
                   (shipPos.flatMap(_.get8CoorAround) -- shipPos).filter(_.isInsideBoard(boardSize))
                 val outsideTurnCoordinates: Set[Coordinate] =

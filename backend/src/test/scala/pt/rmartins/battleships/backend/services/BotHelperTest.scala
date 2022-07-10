@@ -659,7 +659,8 @@ class BotHelperTest extends AnyWordSpec with Matchers with MockFactory with Insp
     new BotHelper(
       gameId = GameId(UUID.randomUUID().toString),
       rules = rules,
-      logger = BotHelperLogger.DefaultLogger
+//      logger = BotHelperLogger.DefaultLogger
+      logger = BotHelperLogger.EmptyLogger
     )
 
 }
