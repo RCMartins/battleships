@@ -252,7 +252,7 @@ class PlayerVsUtils(
         `class` := "d-flex justify-content-center",
         GameStyles.mainCardHeight,
         boardView.drawMyBoardDiv(nested),
-        preGameView.createFleetPreview(nested)
+        boardView.createFleetPlacePreview(nested)
       ).render
 
     window.onresize = (_: UIEvent) => {
@@ -320,7 +320,7 @@ class PlayerVsUtils(
         div(
           `class` := "row",
           currentTurnDiv(nested),
-          preGameView.createFleetPreview(nested),
+          boardView.createFleetPreview(nested)
         ),
         boardView.drawMyBoardDiv(nested),
         chatUtils.chatAndMovesDiv(nested)
@@ -398,7 +398,7 @@ class PlayerVsUtils(
       nested(
         produceWithNested(presenter.gameModeProperty) {
           case (
-                Some(PlayingMode(true, Turn(currentTurn, extraTurn), turnAttackTypes, _, _)),
+                Some(PlayingMode(isMyTurn, Turn(currentTurn, extraTurn), turnAttackTypes, _, _)),
                 nested
               ) =>
             val extraTurnDiv =

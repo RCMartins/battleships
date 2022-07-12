@@ -1,8 +1,9 @@
 package pt.rmartins.battleships.frontend.views.game
 
+import io.udash._
+import io.udash.bindings.modifiers.Binding
 import io.udash.bindings.modifiers.Binding.NestedInterceptor
 import io.udash.css.CssView
-import io.udash.{ModelProperty, ReadableProperty, any2Property}
 import org.scalajs.dom._
 import org.scalajs.dom.html.{Canvas, Div}
 import pt.rmartins.battleships.frontend.views.game.BoardView._
@@ -16,21 +17,19 @@ import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit
 import pt.rmartins.battleships.shared.model.game.RuleTimeLimit._
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.BoardUtils.canPlaceInBoard
-import scalatags.JsDom
 import scalatags.JsDom.all._
-import io.udash._
-import io.udash.bindings.modifiers.Binding
-import io.udash.bindings.modifiers.Binding.NestedInterceptor
 
 import scala.util.chaining.scalaUtilChainingOps
 
 class BoardView(
+    preGameModel: ModelProperty[PreGameModel],
     gameModel: ModelProperty[GameModel],
     screenModel: ModelProperty[ScreenModel],
     translationsModel: ModelProperty[TranslationsModel],
     gamePresenter: GamePresenter,
     mousePresenter: MousePresenter,
-    canvasUtils: CanvasUtils
+    canvasUtils: CanvasUtils,
+    viewUtils: ViewUtils,
 ) extends CssView {
 
   import canvasUtils._
@@ -110,11 +109,6 @@ class BoardView(
       checkSize(sizes, canvasSize.x, 2)
     }
 
-  private val SizeSmall: ReadableProperty[Int] =
-    screenModel.subProp(_.canvasSize).transform { canvasSize =>
-      checkSize(sizes, canvasSize.x, 1)
-    }
-
   private val SquareSizeBig: ReadableProperty[Int] =
     combine(screenModel.subProp(_.canvasSize), squareSizesProperty).transform {
       case (canvasSize, sizes) =>
@@ -134,40 +128,24 @@ class BoardView(
     }
 
   private val MyBoardPreGameSqSize = SquareSizeBig
-  private val MyBoardInGameSqSize = SquareSizeMedium
-  private val MyBoardGameOverSqSize = SquareSizeBig
-  private val MyBoardMargin = SizeMedium
 
   private val EnemyBoardSqSize = SquareSizeBig
   private val EnemyBoardMargin = SizeMedium
 
   private val MyBoardPreGamePos: ReadableProperty[Coordinate] =
-    MyBoardMargin.transform(size => Coordinate(size, size))
+    Property(Coordinate.square(8))
 
-  private val MyBoardInGamePos: ReadableProperty[Coordinate] =
+  private val PreGameSquareSize: ReadableProperty[Int] =
     combine(
+      gamePresenter.meProperty,
       screenModel.subProp(_.canvasSize),
-      BoardSizeProperty,
-      MyBoardInGameSqSize,
-      MyBoardMargin
-    ).transform { case (canvasSize, boardSize, myBoardInGameSize, myBoardMargin) =>
-      Coordinate(
-        canvasSize.x - myBoardInGameSize * boardSize - myBoardMargin,
-        myBoardMargin
-      )
-    }
-
-  private val MyBoardGameOverPos: ReadableProperty[Coordinate] =
-    combine(
-      screenModel.subProp(_.canvasSize),
-      BoardSizeProperty,
-      MyBoardGameOverSqSize,
-      MyBoardMargin
-    ).transform { case (canvasSize, boardSize, myBoardGameOverSqSize, myBoardMargin) =>
-      Coordinate(
-        canvasSize.x - myBoardGameOverSqSize * boardSize - myBoardMargin,
-        myBoardMargin
-      )
+      MyBoardPreGamePos
+    ).transform {
+      case (Some(me), canvasSize, myBoardPreGamePos) =>
+        val boardSize = me.myBoard.boardSize
+        (canvasSize.x - myBoardPreGamePos.x) / boardSize.x
+      case _ =>
+        1
     }
 
   private val EnemyBoardPos: ReadableProperty[Coordinate] =
@@ -504,23 +482,23 @@ class BoardView(
       gamePresenter.mousePositionProperty,
       gamePresenter.meProperty.transform(_.map(_.myBoard.boardSize)),
       gamePresenter.modeTypeProperty,
-      SquareSizeBig,
+      PreGameSquareSize,
       MyBoardPreGamePos
     ).transform {
       case (
             Some(mousePosition),
             Some(boardSize),
             Some(PlacingGameModeType),
-            defaultSquareSize,
+            preGameSquareSize,
             myBoardPosPreGame
           ) =>
         val relativeBoardCoor = mousePosition - myBoardPosPreGame
         Some(relativeBoardCoor)
           .filter(coor =>
             coor >= -PlaceShipBoardMargin &&
-              coor <= (boardSize * defaultSquareSize + PlaceShipBoardMargin)
+              coor <= (boardSize * preGameSquareSize + PlaceShipBoardMargin)
           )
-          .map(_ / defaultSquareSize)
+          .map(_ / preGameSquareSize)
           .map(_.roundTo(boardSize))
       case _ =>
         None
@@ -825,11 +803,6 @@ class BoardView(
   }
 
   def drawMyBoardDiv(nested: NestedInterceptor): Div = {
-//    val myBoardCanvas: Canvas =
-//      canvas(
-//        GameStyles.canvasWithoutBorder,
-//      ).render
-
     combine(
       gamePresenter.gameStateProperty,
       screenModel.subProp(_.tick),
@@ -1594,6 +1567,148 @@ class BoardView(
         translationsData.puzzleIncorrect.innerText
 
     renderingCtx.fillText(text, initialCoordinate.x, initialCoordinate.y)
+  }
+
+  def createFleetPlacePreview(nested: NestedInterceptor): Binding = {
+    nested(
+      produce(
+        combine(
+          preGameModel.subProp(_.rules).transform(_.gameFleet),
+          screenModel.subProp(_.canvasSize),
+          gameModel.subProp(_.shipsLeftToPlace),
+        )
+      ) { case (gameFleet, canvasSize, shipsLeftToPlace) =>
+        val fleetSorted: List[(Ship, Int)] =
+          gameFleet.shipCounterList
+            .filter(_._2._1 > 0)
+            .map { case (shipId, (amount, rotation)) => (Ship.getShip(shipId, rotation), amount) }
+            .sortBy { case (ship, _) => (ship.piecesSize, ship.shipId.id) }
+
+        val maxTotalHeight1column = 40
+        val totalFleetYSize = Math.max(10, fleetSorted.map(_._1.size.y).sum + fleetSorted.size)
+        val (previewSqSize, twoColumns) =
+          if (totalFleetYSize <= maxTotalHeight1column)
+            (Math.max(7, canvasSize.y / totalFleetYSize - 2), false)
+          else
+            (Math.max(7, canvasSize.y / (totalFleetYSize / 2) - 2), true)
+
+        def createShipCanvas(ship: Ship, placed: Boolean): Canvas = {
+          val canvasSize: Coordinate = ship.size * previewSqSize + Coordinate.square(4)
+          val canvasColor: CanvasColor.Ship =
+            if (placed)
+              CanvasColor.Ship(CanvasBorder.Standard(alpha = 0.4), alpha = 0.4)
+            else
+              CanvasColor.Ship()
+
+          viewUtils.createShipCanvas(
+            canvasSize,
+            previewSqSize,
+            ship,
+            destroyed = false,
+            centerXCanvas = true,
+            centerYCanvas = true,
+            drawRadar = false,
+            canvasColor = canvasColor
+          )
+        }
+
+        val shipsLeftToPlaceMap: Map[ShipId, Int] =
+          shipsLeftToPlace.groupBy(_.shipId).map { case (shipId, list) => shipId -> list.size }
+
+        val shipsPlaced: Map[ShipId, Int] =
+          shipsLeftToPlaceMap.map { case (shipId, shipLeftToPlace) =>
+            shipId ->
+              gameFleet.shipCounterMap
+                .get(shipId)
+                .map(_._1 - shipLeftToPlace)
+                .getOrElse(0)
+          }
+
+        val fleetDivs: List[Div] =
+          fleetSorted.map { case (ship, amount) =>
+            val amountPlaced: Int = shipsPlaced.getOrElse(ship.shipId, amount)
+            val amountLeftToPlace: Int = shipsLeftToPlaceMap.getOrElse(ship.shipId, 0)
+
+            div(
+              `class` := (if (twoColumns) "col-6" else "col-12"),
+              div(
+                (1 to amountPlaced).map(_ => createShipCanvas(ship, placed = true)),
+                (1 to amountLeftToPlace).map(_ => createShipCanvas(ship, placed = false))
+              )
+            ).render.tap { shipDiv =>
+              if (amountLeftToPlace > 0)
+                shipDiv.onclick = { _ =>
+                  gameModel.subProp(_.selectedShip).set(Some(ship))
+                }
+            }
+          }
+
+        div(
+          `class` := "d-flex align-items-start",
+          div(
+            `class` := "row mx-0 my-3",
+            fleetDivs
+          )
+        ).render
+      }
+    )
+  }
+
+  def createFleetPreview(nested: NestedInterceptor): Binding = {
+    nested(
+      produce(
+        combine(
+          preGameModel.subProp(_.rules).transform(_.gameFleet),
+          screenModel.subProp(_.canvasSize),
+          gameModel.subProp(_.shipsLeftToPlace),
+        )
+      ) { case (gameFleet, canvasSize, shipsLeftToPlace) =>
+        val fleetSorted: List[(Ship, Int)] =
+          gameFleet.shipCounterList
+            .filter(_._2._1 > 0)
+            .map { case (shipId, (amount, rotation)) => (Ship.getShip(shipId, rotation), amount) }
+            .sortBy { case (ship, _) => (ship.piecesSize, ship.shipId.id) }
+
+        val maxTotalHeight1column = 40
+        val totalFleetYSize = Math.max(10, fleetSorted.map(_._1.size.y).sum + fleetSorted.size)
+        val (previewSqSize, twoColumns) =
+          if (totalFleetYSize <= maxTotalHeight1column)
+            (Math.max(7, canvasSize.y / totalFleetYSize - 2), false)
+          else
+            (Math.max(7, canvasSize.y / (totalFleetYSize / 2) - 2), true)
+
+        def createShipCanvas(ship: Ship): Canvas = {
+          val canvasSize: Coordinate = ship.size * previewSqSize + Coordinate.square(4)
+          viewUtils.createShipCanvas(
+            canvasSize,
+            previewSqSize,
+            ship,
+            destroyed = false,
+            centerXCanvas = true,
+            centerYCanvas = true,
+            drawRadar = false
+          )
+        }
+
+        val fleetDivs: List[Div] =
+          fleetSorted.map { case (ship, amount) =>
+            div(
+              `class` := (if (twoColumns) "col-6" else "col-12"),
+              div(
+                (1 to amount).map(_ => createShipCanvas(ship))
+              )
+            ).render
+          }
+
+        div(
+          `class` := "d-flex align-items-start",
+          div(
+            `class` := "row mx-0 my-3",
+            fleetDivs
+          )
+        ).render
+      }
+    )
   }
 
 }
