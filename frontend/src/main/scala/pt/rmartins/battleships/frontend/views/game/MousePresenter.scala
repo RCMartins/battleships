@@ -32,8 +32,8 @@ class MousePresenter(
   }
 
   def mouseMove(boardView: BoardView, mouseX: Int, mouseY: Int): Unit = {
-    boardView.myBoardCanvas.setAttribute("tabindex", "0")
-    boardView.myBoardCanvas.focus()
+    boardView.mainBoardCanvas.setAttribute("tabindex", "0")
+    boardView.mainBoardCanvas.focus()
 
     gameModel.subProp(_.mousePosition).set(Some(Coordinate(mouseX, mouseY)))
 
@@ -118,8 +118,8 @@ class MousePresenter(
     gameModel.subProp(_.mouseDown).set(None)
 
   def mouseDown(boardView: BoardView, button: Int): Unit = {
-    boardView.myBoardCanvas.setAttribute("tabindex", "0")
-    boardView.myBoardCanvas.focus()
+    boardView.mainBoardCanvas.setAttribute("tabindex", "0")
+    boardView.mainBoardCanvas.focus()
 
     gameModel.subProp(_.mouseDown).set(Some(button))
 
@@ -402,8 +402,8 @@ class MousePresenter(
   }
 
   def mouseWheel(boardView: BoardView, wheelRotation: Int): Unit = {
-    boardView.myBoardCanvas.setAttribute("tabindex", "0")
-    boardView.myBoardCanvas.focus()
+    boardView.mainBoardCanvas.setAttribute("tabindex", "0")
+    boardView.mainBoardCanvas.focus()
 
     gamePresenter.modeTypeOrPuzzleProperty.get match {
       case (Some(PlacingGameModeType), _) =>

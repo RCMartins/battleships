@@ -52,33 +52,33 @@ class GameView(
 
   import translationsService._
 
-  private def reloadBoardView(): Unit = {
+//  private def reloadBoardView(): Unit = {
 //    if (!presenter.onCanvasResize(boardView)) {
 //      window.setTimeout(
 //        () => boardView.paint(),
 //        1
 //      )
 //    }
-  }
+//  }
 
-  gameStateModel.listen(_ => reloadBoardView())
-
-  screenModel.subProp(_.canvasSize).listen(_ => reloadBoardView())
-  screenModel.subProp(_.missilesPopupMillisOpt).listen(_ => reloadBoardView())
-  screenModel.subProp(_.extraTurnPopup).listen(_ => reloadBoardView())
-  screenModel.subProp(_.screenResized).listen(_ => reloadBoardView())
-  screenModel.subProp(_.hoverMove).listen(_ => reloadBoardView())
-  screenModel.subProp(_.tick).listen(_ => reloadBoardView())
-  translationsService.currentLangProperty.listen(_ => reloadBoardView())
-  translationsModel.listen(_ => reloadBoardView())
-
-  gameModel.subProp(_.mousePosition).listen(_ => reloadBoardView())
-  gameModel.subProp(_.mouseDown).listen(_ => reloadBoardView())
-  gameModel.subProp(_.selectedShip).listen(_ => reloadBoardView())
-  gameModel.subProp(_.turnAttacks).listen(_ => reloadBoardView())
-  gameModel.subProp(_.turnAttacksQueuedStatus).listen(_ => reloadBoardView())
-  gameModel.subProp(_.selectedAction).listen(_ => reloadBoardView())
-  gameModel.subProp(_.lineDashOffset).listen(_ => reloadBoardView())
+//  gameStateModel.listen(_ => reloadBoardView())
+//
+//  screenModel.subProp(_.canvasSize).listen(_ => reloadBoardView())
+//  screenModel.subProp(_.missilesPopupMillisOpt).listen(_ => reloadBoardView())
+//  screenModel.subProp(_.extraTurnPopup).listen(_ => reloadBoardView())
+//  screenModel.subProp(_.screenResized).listen(_ => reloadBoardView())
+//  screenModel.subProp(_.hoverMove).listen(_ => reloadBoardView())
+//  screenModel.subProp(_.tick).listen(_ => reloadBoardView())
+//  translationsService.currentLangProperty.listen(_ => reloadBoardView())
+//  translationsModel.listen(_ => reloadBoardView())
+//
+//  gameModel.subProp(_.mousePosition).listen(_ => reloadBoardView())
+//  gameModel.subProp(_.mouseDown).listen(_ => reloadBoardView())
+//  gameModel.subProp(_.selectedShip).listen(_ => reloadBoardView())
+//  gameModel.subProp(_.turnAttacks).listen(_ => reloadBoardView())
+//  gameModel.subProp(_.turnAttacksQueuedStatus).listen(_ => reloadBoardView())
+//  gameModel.subProp(_.selectedAction).listen(_ => reloadBoardView())
+//  gameModel.subProp(_.lineDashOffset).listen(_ => reloadBoardView())
 
   private val invitePlayerButton = UdashButton(
     buttonStyle = Color.Primary.toProperty,

@@ -37,7 +37,7 @@ class GameViewFactory(
     val preGameView: PreGameView = wire[PreGameView]
     val boardView: BoardView = wire[BoardView]
     val chatUtils: ChatUtils = wire[ChatUtils]
-    val playesVsUtils: PlayerVsUtils = wire[PlayerVsUtils]
+    val playerVsUtils: PlayerVsUtils = wire[PlayerVsUtils]
     val playerVsBotsView: PlayerVsBotsView = wire[PlayerVsBotsView]
     val playerVsPlayerView: PlayerVsPlayerView = wire[PlayerVsPlayerView]
     val puzzlesView: PuzzlesView = wire[PuzzlesView]

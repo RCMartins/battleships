@@ -251,19 +251,19 @@ class PlayerVsUtils(
       div(
         `class` := "d-flex justify-content-center",
         GameStyles.mainCardHeight,
-        boardView.drawMyBoardDiv(nested),
+        boardView.drawMainBoardDiv(nested),
         boardView.createFleetPlacePreview(nested)
       ).render
 
     window.onresize = (_: UIEvent) => {
-      presenter.onCanvasResize(gameDiv, boardView.myBoardCanvas)
+      presenter.onCanvasResize(gameDiv, boardView.mainBoardCanvas)
     }
 
     var handle: Int = 0
     handle = window.setInterval(
       () => {
         if (gameDiv.clientWidth != 0) {
-          presenter.onCanvasResize(gameDiv, boardView.myBoardCanvas)
+          presenter.onCanvasResize(gameDiv, boardView.mainBoardCanvas)
           window.clearTimeout(handle)
         }
       },
@@ -322,19 +322,24 @@ class PlayerVsUtils(
           currentTurnDiv(nested),
           boardView.createFleetPreview(nested)
         ),
-        boardView.drawMyBoardDiv(nested),
-        chatUtils.chatAndMovesDiv(nested)
+        boardView.drawMainBoardDiv(nested),
+        chatUtils.chatAndMovesDiv(nested),
+        div(
+          `class` := "row",
+          currentTurnDiv(nested),
+          boardView.drawSmallBoardDiv(nested),
+        ),
       ).render
 
     window.onresize = (_: UIEvent) => {
-      presenter.onCanvasResize(gameDiv, boardView.myBoardCanvas)
+      presenter.onCanvasResize(gameDiv, boardView.mainBoardCanvas)
     }
 
     var handle: Int = 0
     handle = window.setInterval(
       () => {
         if (gameDiv.clientWidth != 0) {
-          presenter.onCanvasResize(gameDiv, boardView.myBoardCanvas)
+          presenter.onCanvasResize(gameDiv, boardView.mainBoardCanvas)
           window.clearTimeout(handle)
         }
       },

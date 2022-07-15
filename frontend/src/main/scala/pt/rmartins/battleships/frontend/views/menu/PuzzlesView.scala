@@ -69,14 +69,14 @@ class PuzzlesView(
       ).render
 
     window.onresize = (_: UIEvent) => {
-      presenter.onCanvasResize(gameDiv, boardView.myBoardCanvas)
+      presenter.onCanvasResize(gameDiv, boardView.mainBoardCanvas)
     }
 
     var handle: Int = 0
     handle = window.setInterval(
       () => {
         if (gameDiv.clientWidth != 0) {
-          presenter.onCanvasResize(gameDiv, boardView.myBoardCanvas)
+          presenter.onCanvasResize(gameDiv, boardView.mainBoardCanvas)
           window.clearTimeout(handle)
         }
       },

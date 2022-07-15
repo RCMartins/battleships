@@ -891,11 +891,6 @@ class GamePresenter(
 
     val newSizeInt = div.clientHeight - 20 // - div.style.marginTop.toInt
     val newSize = Coordinate.square(newSizeInt)
-    if (newSizeInt != canvas.width || newSizeInt != canvas.height) {
-      canvas.setAttribute("width", newSizeInt.toString)
-      canvas.setAttribute("height", newSizeInt.toString)
-//      screenModel.subProp(_.screenResized).set((), force = true)
-    }
     screenModel.subProp(_.canvasSize).set(newSize)
   }
 
