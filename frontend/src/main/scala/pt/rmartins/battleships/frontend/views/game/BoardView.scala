@@ -45,11 +45,21 @@ class BoardView(
     ).render
 
   screenModel
-    .subProp(_.canvasSize)
+    .subProp(_.mainBoardCanvasSize)
     .listen(
       { canvasSize =>
         mainBoardCanvas.setAttribute("width", canvasSize.x.toString)
         mainBoardCanvas.setAttribute("height", canvasSize.y.toString)
+      },
+      initUpdate = true
+    )
+
+  screenModel
+    .subProp(_.smallBoardNewSize)
+    .listen(
+      { canvasSize =>
+        smallBoardCanvas.setAttribute("width", canvasSize.x.toString)
+        smallBoardCanvas.setAttribute("height", canvasSize.y.toString)
       },
       initUpdate = true
     )
@@ -110,46 +120,45 @@ class BoardView(
     sizes((if (screenSize < 500) 0 else if (screenSize < 680) 1 else 2) + defaultSizeIndex)
 
   private val SizeBig: ReadableProperty[Int] =
-    screenModel.subProp(_.canvasSize).transform { canvasSize =>
+    screenModel.subProp(_.mainBoardCanvasSize).transform { canvasSize =>
       checkSize(sizes, canvasSize.x, 3)
     }
 
   private val SizeMedium: ReadableProperty[Int] =
-    screenModel.subProp(_.canvasSize).transform { canvasSize =>
+    screenModel.subProp(_.mainBoardCanvasSize).transform { canvasSize =>
       checkSize(sizes, canvasSize.x, 2)
     }
 
   private val SquareSizeBig: ReadableProperty[Int] =
-    combine(screenModel.subProp(_.canvasSize), squareSizesProperty).transform {
+    combine(screenModel.subProp(_.mainBoardCanvasSize), squareSizesProperty).transform {
       case (canvasSize, sizes) =>
         checkSize(sizes, canvasSize.x, 3)
     }
 
   private val SquareSizeMedium: ReadableProperty[Int] =
-    combine(screenModel.subProp(_.canvasSize), squareSizesProperty).transform {
+    combine(screenModel.subProp(_.mainBoardCanvasSize), squareSizesProperty).transform {
       case (canvasSize, sizes) =>
         checkSize(sizes, canvasSize.x, 2)
     }
 
   private val SquareSizeSmall: ReadableProperty[Int] =
-    combine(screenModel.subProp(_.canvasSize), squareSizesProperty).transform {
+    combine(screenModel.subProp(_.mainBoardCanvasSize), squareSizesProperty).transform {
       case (canvasSize, sizes) =>
         checkSize(sizes, canvasSize.x, 1)
     }
 
-  private val MyBoardPreGameSqSize = SquareSizeBig
+//  private val MyBoardPreGameSqSize = SquareSizeBig
+//  private val EnemyBoardSqSize = SquareSizeBig
+//  private val EnemyBoardMargin = SizeMedium
 
-  private val EnemyBoardSqSize = SquareSizeBig
-  private val EnemyBoardMargin = SizeMedium
-
-  private val MyBoardPreGamePos: ReadableProperty[Coordinate] =
-    Property(Coordinate.square(8))
+  private val MainBoardPos: ReadableProperty[Coordinate] = Property(Coordinate.square(8))
+  private val PlaceShipBoardMargin: Coordinate = Coordinate.square(20)
 
   private val PreGameSquareSize: ReadableProperty[Int] =
     combine(
       gamePresenter.meProperty,
-      screenModel.subProp(_.canvasSize),
-      MyBoardPreGamePos
+      screenModel.subProp(_.mainBoardCanvasSize),
+      MainBoardPos
     ).transform {
       case (Some(me), canvasSize, myBoardPreGamePos) =>
         val boardSize = me.myBoard.boardSize
@@ -158,347 +167,346 @@ class BoardView(
         1
     }
 
-  private val EnemyBoardPos: ReadableProperty[Coordinate] =
-    EnemyBoardMargin.transform(size => Coordinate.square(size))
+//  private val EnemyBoardPos: ReadableProperty[Coordinate] =
+//    EnemyBoardMargin.transform(size => Coordinate.square(size))
+//
+//  private val BoardMarksSelectorSize = BoardView.BoardMarkSize.toProperty
+//  private val BoardMarksSelectorMargin = BoardView.BoardMarkMargin.toProperty
+//  private val BoardMarksSelectorPos: ReadableProperty[Coordinate] =
+//    combine(
+//      BoardSizeProperty,
+//      EnemyBoardPos,
+//      EnemyBoardSqSize,
+//      BoardMarksSelectorSize,
+//      BoardMarksSelectorMargin
+//    ).transform {
+//      case (
+//            boardSize,
+//            enemyBoardPos,
+//            enemyBoardSize,
+//            boardMarksSelectorSize,
+//            boardMarksSelectorMargin
+//          ) =>
+//        enemyBoardPos +
+//          Coordinate(
+//            (enemyBoardSize * boardSize) / 2 -
+//              (MarksSelectorOrder.size * boardMarksSelectorSize +
+//                (MarksSelectorOrder.size - 1) * boardMarksSelectorMargin) / 2,
+//            enemyBoardSize * boardSize + boardMarksSelectorMargin
+//          )
+//    }
+//
+//  private val BoardMarksSelectorCombined: ReadableProperty[(Coordinate, Int, Int)] =
+//    combine(BoardMarksSelectorPos, BoardMarksSelectorSize, BoardMarksSelectorMargin)
 
-  private val BoardMarksSelectorSize = BoardView.BoardMarkSize.toProperty
-  private val BoardMarksSelectorMargin = BoardView.BoardMarkMargin.toProperty
-  private val BoardMarksSelectorPos: ReadableProperty[Coordinate] =
-    combine(
-      BoardSizeProperty,
-      EnemyBoardPos,
-      EnemyBoardSqSize,
-      BoardMarksSelectorSize,
-      BoardMarksSelectorMargin
-    ).transform {
-      case (
-            boardSize,
-            enemyBoardPos,
-            enemyBoardSize,
-            boardMarksSelectorSize,
-            boardMarksSelectorMargin
-          ) =>
-        enemyBoardPos +
-          Coordinate(
-            (enemyBoardSize * boardSize) / 2 -
-              (MarksSelectorOrder.size * boardMarksSelectorSize +
-                (MarksSelectorOrder.size - 1) * boardMarksSelectorMargin) / 2,
-            enemyBoardSize * boardSize + boardMarksSelectorMargin
-          )
-    }
+//  private val MissilesInicialPos: ReadableProperty[Coordinate] =
+//    combine(BoardSizeProperty, EnemyBoardPos, SquareSizeBig, SizeBig).transform {
+//      case (boardSize, enemyBoardPos, squareSizeBig, sizeBig) =>
+//        enemyBoardPos + Coordinate(squareSizeBig * boardSize + sizeBig / 2, 0)
+//    }
 
-  private val BoardMarksSelectorCombined: ReadableProperty[(Coordinate, Int, Int)] =
-    combine(BoardMarksSelectorPos, BoardMarksSelectorSize, BoardMarksSelectorMargin)
+//  private val MissilesSqSize: ReadableProperty[Int] =
+//    SizeBig.transform(sizeBig => sizeBig * 2)
+//
+//  private val MissilesPosDiff: ReadableProperty[Coordinate] =
+//    MissilesSqSize.transform { missilesSqSize =>
+//      Coordinate(0, missilesSqSize)
+//    }
 
-  private val MissilesInicialPos: ReadableProperty[Coordinate] =
-    combine(BoardSizeProperty, EnemyBoardPos, SquareSizeBig, SizeBig).transform {
-      case (boardSize, enemyBoardPos, squareSizeBig, sizeBig) =>
-        enemyBoardPos + Coordinate(squareSizeBig * boardSize + sizeBig / 2, 0)
-    }
+//  private val PlaceShipsPos: ReadableProperty[Coordinate] =
+//    combine(BoardSizeProperty, MainBoardPos, MyBoardPreGameSqSize).transform {
+//      case (boardSize, myBoardPreGamePos, myBoardPreGameSqSize) =>
+//        myBoardPreGamePos +
+//          Coordinate(myBoardPreGameSqSize * boardSize + myBoardPreGameSqSize, 0)
+//    }
+//
+//  private val SummaryShipsSqSize: ReadableProperty[Int] = SquareSizeMedium
+//  private val DestructionSummaryHitCountSize: ReadableProperty[Int] = SquareSizeSmall
+//  private val SummaryMaxY: ReadableProperty[Int] =
+//    combine(BoardSizeProperty, EnemyBoardSqSize, SummaryShipsSqSize).transform {
+//      case (boardSize, enemyBoardSqSize, summaryShipsSqSize) =>
+//        (boardSize * enemyBoardSqSize) / summaryShipsSqSize
+//    }
+//
+//  private val shipsForSummaryProperty: ReadableProperty[Option[List[Ship]]] =
+//    combine(
+//      gamePresenter.rulesProperty.transform(_.map(_.gameFleet.shipsList)),
+//      gamePresenter.gamePuzzleStateProperty.transform(
+//        _.map(_.playerPuzzle.gameFleet.shipsList)
+//      )
+//    ).transform { case (shipsListOpt1, shipsListOpt2) =>
+//      shipsListOpt1.orElse(shipsListOpt2)
+//    }
+//
+//  private val DestructionSummaryPos: ReadableProperty[Coordinate] =
+//    combine(
+//      gamePresenter.modeTypeOrPuzzleProperty,
+//      MissilesInicialPos,
+//      MissilesSqSize,
+//      DestructionSummaryHitCountSize
+//    ).transform {
+//      case (
+//            modeType @ ((Some(PlayingModeType | GameOverModeType), _) | (_, true)),
+//            missilesPos,
+//            missilesSize,
+//            destructionSummaryHitCountSize
+//          ) =>
+//        missilesPos +
+//          Coordinate(
+//            if (modeType._1.contains(PlayingModeType))
+//              missilesSize + destructionSummaryHitCountSize * 2
+//            else
+//              destructionSummaryHitCountSize * 2,
+//            0
+//          )
+//      case _ =>
+//        Coordinate.origin
+//    }
 
-  private val MissilesSqSize: ReadableProperty[Int] =
-    SizeBig.transform(sizeBig => sizeBig * 2)
+//  private val DestructionSummaryCombined: ReadableProperty[(Coordinate, Int)] =
+//    combine(DestructionSummaryPos, SummaryShipsSqSize)
 
-  private val MissilesPosDiff: ReadableProperty[Coordinate] =
-    MissilesSqSize.transform { missilesSqSize =>
-      Coordinate(0, missilesSqSize)
-    }
+//  private val shipsSummaryRelCoordinates: ReadableProperty[List[(ShipId, List[ViewShip])]] =
+//    combine(shipsForSummaryProperty, SummaryMaxY).transform {
+//      case (Some(shipsInThisGame), summaryMaxY) =>
+//        def getShipsToPlacePos(
+//            posX: Int,
+//            posY: Int,
+//            columnX: Int,
+//            maxX: Int,
+//            ships: List[List[Ship]],
+//            currentList: List[ViewShip],
+//            shipBefore: Option[Ship]
+//        ): List[List[ViewShip]] =
+//          ships match {
+//            case (ship :: _) :: _ if posY > 0 && posY + ship.pieces.maxBy(_.y).y >= summaryMaxY =>
+//              val newColumnX = maxX + 4
+//              getShipsToPlacePos(
+//                posX = newColumnX,
+//                posY = 0,
+//                columnX = newColumnX,
+//                maxX = newColumnX,
+//                ships,
+//                currentList,
+//                shipBefore
+//              )
+//            case (ship :: next) :: nextList =>
+//              getShipsToPlacePos(
+//                posX + ship.size.x + 1,
+//                posY,
+//                columnX,
+//                Math.max(maxX, ship.pieces.map(_ + Coordinate(posX, posY)).maxBy(_.x).x),
+//                next :: nextList,
+//                ViewShip(ship, ship.pieces.map(_ + Coordinate(posX, posY))) :: currentList,
+//                Some(ship)
+//              )
+//            case Nil :: nextList =>
+//              currentList.reverse ::
+//                getShipsToPlacePos(
+//                  columnX,
+//                  posY + shipBefore.map(_.size.y + 1).getOrElse(0),
+//                  columnX,
+//                  maxX,
+//                  nextList,
+//                  Nil,
+//                  None
+//                )
+//            case Nil if currentList.nonEmpty =>
+//              currentList.reverse :: Nil
+//            case Nil =>
+//              Nil
+//          }
+//
+//        val shipsGrouped: List[(ShipId, List[Ship])] =
+//          shipsInThisGame.groupBy(_.shipId).toList
+//
+//        val minX =
+//          shipsGrouped.map { case (_, ships) =>
+//            val ship = ships.head
+//            val size = ships.size
+//            ship.size.min * size + size - 1
+//          }.max
+//
+//        val shipsListList: List[List[Ship]] =
+//          shipsGrouped
+//            .map { case (shipId, ships) =>
+//              val ship = ships.head
+//              val size = ships.size
+//              val fullSizeX = ship.size.x * size + size - 1
+//              val fullSizeY = ship.size.y * size + size - 1
+//              if (
+//                Math.max(minX, fullSizeX) * ship.size.y <= Math.max(minX, fullSizeY) * ship.size.x
+//              )
+//                (shipId, ships)
+//              else
+//                (shipId, ships.map(_.rotateBy(1)))
+//            }
+//            .sortBy(_._2.head.shipBiggestToSmallestOrder)
+//            .map(_._2)
+//
+//        getShipsToPlacePos(
+//          posX = 0,
+//          posY = 0,
+//          columnX = 0,
+//          maxX = 0,
+//          shipsListList,
+//          Nil,
+//          None
+//        ).map { viewShipList => viewShipList.head.ship.shipId -> viewShipList }
+//      case _ =>
+//        Nil
+//    }
 
-  private val PlaceShipsPos: ReadableProperty[Coordinate] =
-    combine(BoardSizeProperty, MyBoardPreGamePos, MyBoardPreGameSqSize).transform {
-      case (boardSize, myBoardPreGamePos, myBoardPreGameSqSize) =>
-        myBoardPreGamePos +
-          Coordinate(myBoardPreGameSqSize * boardSize + myBoardPreGameSqSize, 0)
-    }
+//  private val allShipsToPlaceCoordinates: ReadableProperty[List[ToPlaceShip]] =
+//    combine(
+//      shipsSummaryRelCoordinates,
+//      gameModel.subProp(_.shipsLeftToPlace),
+//      gamePresenter.modeTypeProperty,
+//      PlaceShipsPos,
+//      SummaryShipsSqSize
+//    ).transform {
+//      case (
+//            shipsSummary,
+//            shipsLeftToPlace,
+//            Some(PlacingGameModeType),
+//            placeShipsPos,
+//            placeShipsSqSize
+//          ) =>
+//        val shipsLeftToPlaceMap: Map[ShipId, Int] =
+//          shipsLeftToPlace.groupBy(_.shipId).map { case (shipId, list) => shipId -> list.size }
+//
+//        val shipsPlaced: Map[ShipId, Int] =
+//          shipsLeftToPlaceMap.map { case (shipId, shipLeftToPlace) =>
+//            shipId ->
+//              shipsSummary
+//                .find(_._1 == shipId)
+//                .map(_._2.size - shipLeftToPlace)
+//                .getOrElse(0)
+//          }
+//
+//        shipsSummary.flatMap { case (shipId, viewShipList) =>
+//          viewShipList.zipWithIndex.map { case (viewShip, index) =>
+//            ToPlaceShip(
+//              viewShip.ship,
+//              viewShip.pieces.map(relPieceCoor => placeShipsPos + relPieceCoor * placeShipsSqSize),
+//              shipsPlaced.getOrElse(shipId, Int.MaxValue) > index
+//            )
+//          }
+//        }
+//      case _ =>
+//        Nil
+//    }
 
-  private val SummaryShipsSqSize: ReadableProperty[Int] = SquareSizeMedium
-  private val DestructionSummaryHitCountSize: ReadableProperty[Int] = SquareSizeSmall
-  private val SummaryMaxY: ReadableProperty[Int] =
-    combine(BoardSizeProperty, EnemyBoardSqSize, SummaryShipsSqSize).transform {
-      case (boardSize, enemyBoardSqSize, summaryShipsSqSize) =>
-        (boardSize * enemyBoardSqSize) / summaryShipsSqSize
-    }
+//  val shipToPlaceHover: ReadableProperty[Option[ToPlaceShip]] =
+//    combine(gamePresenter.mousePositionProperty, allShipsToPlaceCoordinates, SummaryShipsSqSize)
+//      .transform {
+//        case (Some(mousePosition), shipsSummary, placeShipsSqSize) =>
+//          val sizeCoor = Coordinate.square(placeShipsSqSize)
+//          shipsSummary.find { case ToPlaceShip(_, pieces, alreadyPlaced) =>
+//            !alreadyPlaced && pieces.exists(sqCoor =>
+//              mousePosition >= sqCoor && mousePosition <= sqCoor + sizeCoor
+//            )
+//          }
+//        case _ =>
+//          None
+//      }
 
-  private val shipsForSummaryProperty: ReadableProperty[Option[List[Ship]]] =
-    combine(
-      gamePresenter.rulesProperty.transform(_.map(_.gameFleet.shipsList)),
-      gamePresenter.gamePuzzleStateProperty.transform(
-        _.map(_.playerPuzzle.gameFleet.shipsList)
-      )
-    ).transform { case (shipsListOpt1, shipsListOpt2) =>
-      shipsListOpt1.orElse(shipsListOpt2)
-    }
+//  val allShipsSummaryCoordinates
+//      : ReadableProperty[List[(ShipId, Coordinate, Int, List[SummaryShip])]] =
+//    combine(
+//      shipsSummaryRelCoordinates,
+//      gamePresenter.turnPlayHistory,
+//      gamePresenter.modeTypeOrPuzzleProperty,
+//      DestructionSummaryCombined,
+//      DestructionSummaryHitCountSize
+//    ).transform {
+//      case (
+//            shipsSummary,
+//            Some(turnPlayHistory),
+//            (Some(PlayingModeType | GameOverModeType), _) | (_, true),
+//            (destructionSummaryPos, destructionSummarySqSize),
+//            destructionSummaryHitCountSize
+//          ) =>
+//        val shipsDestroyed: Map[ShipId, Int] =
+//          turnPlayHistory
+//            .flatMap(_.hitHints.collect { case ShipHit(shipId, true) => shipId })
+//            .groupBy(identity)
+//            .map { case (shipId, list) => shipId -> list.size }
+//
+//        shipsSummary.map { case (shipId, viewShipList) =>
+//          val summaryShips: List[SummaryShip] =
+//            viewShipList.zipWithIndex.map { case (viewShip, index) =>
+//              SummaryShip(
+//                viewShip.ship,
+//                viewShip.pieces.map(relPieceCoor =>
+//                  destructionSummaryPos + relPieceCoor * destructionSummarySqSize
+//                ),
+//                shipsDestroyed.getOrElse(shipId, 0) > index
+//              )
+//            }
+//
+//          val headShip = summaryShips.head
+//          val summaryCenter: Coordinate = {
+//            val minX = headShip.pieces.minBy(_.x).x
+//            val min = headShip.pieces.minBy(_.y).y
+//            val max = headShip.pieces.maxBy(_.y).y
+//            val centerY =
+//              (max + min) / 2 + destructionSummarySqSize / 2 -
+//                destructionSummaryHitCountSize / 2 + 1
+//            Coordinate(
+//              minX,
+//              centerY
+//            )
+//          }
+//
+//          val hitCount: Int =
+//            turnPlayHistory
+//              .map(_.hitHints.count {
+//                case ShipHit(shipHitId, _) if shipHitId == shipId => true
+//                case _                                            => false
+//              })
+//              .sum - summaryShips.count(_.destroyed) * headShip.pieces.size
+//
+//          (shipId, summaryCenter, hitCount, summaryShips)
+//        }
+//      case _ =>
+//        Nil
+//    }
+//
+//  val summaryShipHover: ReadableProperty[Option[Ship]] =
+//    combine(
+//      gamePresenter.mousePositionProperty,
+//      allShipsSummaryCoordinates,
+//      SummaryShipsSqSize
+//    ).transform {
+//      case (Some(mousePosition), shipsSummary, destructionSummarySqSize) =>
+//        val sizeCoor = Coordinate.square(destructionSummarySqSize)
+//        shipsSummary
+//          .find { case (_, _, _, summaryShips) =>
+//            summaryShips.exists(
+//              _.pieces.exists(sqCoor =>
+//                mousePosition >= sqCoor && mousePosition <= sqCoor + sizeCoor
+//              )
+//            )
+//          }
+//          .map(_._4.head.ship)
+//      case _ =>
+//        None
+//    }
+//
 
-  private val DestructionSummaryPos: ReadableProperty[Coordinate] =
-    combine(
-      gamePresenter.modeTypeOrPuzzleProperty,
-      MissilesInicialPos,
-      MissilesSqSize,
-      DestructionSummaryHitCountSize
-    ).transform {
-      case (
-            modeType @ ((Some(PlayingModeType | GameOverModeType), _) | (_, true)),
-            missilesPos,
-            missilesSize,
-            destructionSummaryHitCountSize
-          ) =>
-        missilesPos +
-          Coordinate(
-            if (modeType._1.contains(PlayingModeType))
-              missilesSize + destructionSummaryHitCountSize * 2
-            else
-              destructionSummaryHitCountSize * 2,
-            0
-          )
-      case _ =>
-        Coordinate.origin
-    }
-
-  private val DestructionSummaryCombined: ReadableProperty[(Coordinate, Int)] =
-    combine(DestructionSummaryPos, SummaryShipsSqSize)
-
-  private val PlaceShipBoardMargin = Coordinate.square(20)
-
-  private val shipsSummaryRelCoordinates: ReadableProperty[List[(ShipId, List[ViewShip])]] =
-    combine(shipsForSummaryProperty, SummaryMaxY).transform {
-      case (Some(shipsInThisGame), summaryMaxY) =>
-        def getShipsToPlacePos(
-            posX: Int,
-            posY: Int,
-            columnX: Int,
-            maxX: Int,
-            ships: List[List[Ship]],
-            currentList: List[ViewShip],
-            shipBefore: Option[Ship]
-        ): List[List[ViewShip]] =
-          ships match {
-            case (ship :: _) :: _ if posY > 0 && posY + ship.pieces.maxBy(_.y).y >= summaryMaxY =>
-              val newColumnX = maxX + 4
-              getShipsToPlacePos(
-                posX = newColumnX,
-                posY = 0,
-                columnX = newColumnX,
-                maxX = newColumnX,
-                ships,
-                currentList,
-                shipBefore
-              )
-            case (ship :: next) :: nextList =>
-              getShipsToPlacePos(
-                posX + ship.size.x + 1,
-                posY,
-                columnX,
-                Math.max(maxX, ship.pieces.map(_ + Coordinate(posX, posY)).maxBy(_.x).x),
-                next :: nextList,
-                ViewShip(ship, ship.pieces.map(_ + Coordinate(posX, posY))) :: currentList,
-                Some(ship)
-              )
-            case Nil :: nextList =>
-              currentList.reverse ::
-                getShipsToPlacePos(
-                  columnX,
-                  posY + shipBefore.map(_.size.y + 1).getOrElse(0),
-                  columnX,
-                  maxX,
-                  nextList,
-                  Nil,
-                  None
-                )
-            case Nil if currentList.nonEmpty =>
-              currentList.reverse :: Nil
-            case Nil =>
-              Nil
-          }
-
-        val shipsGrouped: List[(ShipId, List[Ship])] =
-          shipsInThisGame.groupBy(_.shipId).toList
-
-        val minX =
-          shipsGrouped.map { case (_, ships) =>
-            val ship = ships.head
-            val size = ships.size
-            ship.size.min * size + size - 1
-          }.max
-
-        val shipsListList: List[List[Ship]] =
-          shipsGrouped
-            .map { case (shipId, ships) =>
-              val ship = ships.head
-              val size = ships.size
-              val fullSizeX = ship.size.x * size + size - 1
-              val fullSizeY = ship.size.y * size + size - 1
-              if (
-                Math.max(minX, fullSizeX) * ship.size.y <= Math.max(minX, fullSizeY) * ship.size.x
-              )
-                (shipId, ships)
-              else
-                (shipId, ships.map(_.rotateBy(1)))
-            }
-            .sortBy(_._2.head.shipBiggestToSmallestOrder)
-            .map(_._2)
-
-        getShipsToPlacePos(
-          posX = 0,
-          posY = 0,
-          columnX = 0,
-          maxX = 0,
-          shipsListList,
-          Nil,
-          None
-        ).map { viewShipList => viewShipList.head.ship.shipId -> viewShipList }
-      case _ =>
-        Nil
-    }
-
-  private val allShipsToPlaceCoordinates: ReadableProperty[List[ToPlaceShip]] =
-    combine(
-      shipsSummaryRelCoordinates,
-      gameModel.subProp(_.shipsLeftToPlace),
-      gamePresenter.modeTypeProperty,
-      PlaceShipsPos,
-      SummaryShipsSqSize
-    ).transform {
-      case (
-            shipsSummary,
-            shipsLeftToPlace,
-            Some(PlacingGameModeType),
-            placeShipsPos,
-            placeShipsSqSize
-          ) =>
-        val shipsLeftToPlaceMap: Map[ShipId, Int] =
-          shipsLeftToPlace.groupBy(_.shipId).map { case (shipId, list) => shipId -> list.size }
-
-        val shipsPlaced: Map[ShipId, Int] =
-          shipsLeftToPlaceMap.map { case (shipId, shipLeftToPlace) =>
-            shipId ->
-              shipsSummary
-                .find(_._1 == shipId)
-                .map(_._2.size - shipLeftToPlace)
-                .getOrElse(0)
-          }
-
-        shipsSummary.flatMap { case (shipId, viewShipList) =>
-          viewShipList.zipWithIndex.map { case (viewShip, index) =>
-            ToPlaceShip(
-              viewShip.ship,
-              viewShip.pieces.map(relPieceCoor => placeShipsPos + relPieceCoor * placeShipsSqSize),
-              shipsPlaced.getOrElse(shipId, Int.MaxValue) > index
-            )
-          }
-        }
-      case _ =>
-        Nil
-    }
-
-  val shipToPlaceHover: ReadableProperty[Option[ToPlaceShip]] =
-    combine(gamePresenter.mousePositionProperty, allShipsToPlaceCoordinates, SummaryShipsSqSize)
-      .transform {
-        case (Some(mousePosition), shipsSummary, placeShipsSqSize) =>
-          val sizeCoor = Coordinate.square(placeShipsSqSize)
-          shipsSummary.find { case ToPlaceShip(_, pieces, alreadyPlaced) =>
-            !alreadyPlaced && pieces.exists(sqCoor =>
-              mousePosition >= sqCoor && mousePosition <= sqCoor + sizeCoor
-            )
-          }
-        case _ =>
-          None
-      }
-
-  val allShipsSummaryCoordinates
-      : ReadableProperty[List[(ShipId, Coordinate, Int, List[SummaryShip])]] =
-    combine(
-      shipsSummaryRelCoordinates,
-      gamePresenter.turnPlayHistory,
-      gamePresenter.modeTypeOrPuzzleProperty,
-      DestructionSummaryCombined,
-      DestructionSummaryHitCountSize
-    ).transform {
-      case (
-            shipsSummary,
-            Some(turnPlayHistory),
-            (Some(PlayingModeType | GameOverModeType), _) | (_, true),
-            (destructionSummaryPos, destructionSummarySqSize),
-            destructionSummaryHitCountSize
-          ) =>
-        val shipsDestroyed: Map[ShipId, Int] =
-          turnPlayHistory
-            .flatMap(_.hitHints.collect { case ShipHit(shipId, true) => shipId })
-            .groupBy(identity)
-            .map { case (shipId, list) => shipId -> list.size }
-
-        shipsSummary.map { case (shipId, viewShipList) =>
-          val summaryShips: List[SummaryShip] =
-            viewShipList.zipWithIndex.map { case (viewShip, index) =>
-              SummaryShip(
-                viewShip.ship,
-                viewShip.pieces.map(relPieceCoor =>
-                  destructionSummaryPos + relPieceCoor * destructionSummarySqSize
-                ),
-                shipsDestroyed.getOrElse(shipId, 0) > index
-              )
-            }
-
-          val headShip = summaryShips.head
-          val summaryCenter: Coordinate = {
-            val minX = headShip.pieces.minBy(_.x).x
-            val min = headShip.pieces.minBy(_.y).y
-            val max = headShip.pieces.maxBy(_.y).y
-            val centerY =
-              (max + min) / 2 + destructionSummarySqSize / 2 -
-                destructionSummaryHitCountSize / 2 + 1
-            Coordinate(
-              minX,
-              centerY
-            )
-          }
-
-          val hitCount: Int =
-            turnPlayHistory
-              .map(_.hitHints.count {
-                case ShipHit(shipHitId, _) if shipHitId == shipId => true
-                case _                                            => false
-              })
-              .sum - summaryShips.count(_.destroyed) * headShip.pieces.size
-
-          (shipId, summaryCenter, hitCount, summaryShips)
-        }
-      case _ =>
-        Nil
-    }
-
-  val summaryShipHover: ReadableProperty[Option[Ship]] =
-    combine(
-      gamePresenter.mousePositionProperty,
-      allShipsSummaryCoordinates,
-      SummaryShipsSqSize
-    ).transform {
-      case (Some(mousePosition), shipsSummary, destructionSummarySqSize) =>
-        val sizeCoor = Coordinate.square(destructionSummarySqSize)
-        shipsSummary
-          .find { case (_, _, _, summaryShips) =>
-            summaryShips.exists(
-              _.pieces.exists(sqCoor =>
-                mousePosition >= sqCoor && mousePosition <= sqCoor + sizeCoor
-              )
-            )
-          }
-          .map(_._4.head.ship)
-      case _ =>
-        None
-    }
-
-  val myBoardMouseCoordinate: ReadableProperty[Option[Coordinate]] =
+  val mainBoardMouseCoordinate: ReadableProperty[Option[Coordinate]] =
     combine(
       gamePresenter.mousePositionProperty,
       gamePresenter.meProperty.transform(_.map(_.myBoard.boardSize)),
       gamePresenter.modeTypeProperty,
       PreGameSquareSize,
-      MyBoardPreGamePos
+      MainBoardPos
     ).transform {
       case (
             Some(mousePosition),
             Some(boardSize),
-            Some(PlacingGameModeType),
+            Some(_),
             preGameSquareSize,
             myBoardPosPreGame
           ) =>
@@ -514,75 +522,75 @@ class BoardView(
         None
     }
 
-  val enemyBoardMouseCoordinate: ReadableProperty[Option[Coordinate]] =
-    combine(
-      gamePresenter.mousePositionProperty,
-      gamePresenter.mainBoardSizeProperty,
-      gamePresenter.modeTypeOrPuzzleProperty,
-      EnemyBoardPos,
-      EnemyBoardSqSize
-    ).transform {
-      case (
-            Some(mousePosition),
-            Some(boardSize),
-            (Some(PlayingModeType | GameOverModeType), _) | (_, true),
-            enemyBoardPos,
-            defaultSquareSize
-          ) =>
-        val relativeBoardCoor = mousePosition - enemyBoardPos
-        Some(relativeBoardCoor)
-          .filter(coor =>
-            coor >= -PlaceShipBoardMargin &&
-              coor <= (boardSize * defaultSquareSize + PlaceShipBoardMargin)
-          )
-          .map(_ / defaultSquareSize)
-          .map(_.roundTo(boardSize))
-      case _ =>
-        None
-    }
+//  val enemyBoardMouseCoordinate: ReadableProperty[Option[Coordinate]] =
+//    combine(
+//      gamePresenter.mousePositionProperty,
+//      gamePresenter.mainBoardSizeProperty,
+//      gamePresenter.modeTypeOrPuzzleProperty,
+//      MainBoardPos,
+//      EnemyBoardSqSize
+//    ).transform {
+//      case (
+//            Some(mousePosition),
+//            Some(boardSize),
+//            (Some(PlayingModeType | GameOverModeType), _) | (_, true),
+//            enemyBoardPos,
+//            defaultSquareSize
+//          ) =>
+//        val relativeBoardCoor = mousePosition - enemyBoardPos
+//        Some(relativeBoardCoor)
+//          .filter(coor =>
+//            coor >= -PlaceShipBoardMargin &&
+//              coor <= (boardSize * defaultSquareSize + PlaceShipBoardMargin)
+//          )
+//          .map(_ / defaultSquareSize)
+//          .map(_.roundTo(boardSize))
+//      case _ =>
+//        None
+//    }
 
-  private val BoardMarksSelectorAllPositions: ReadableProperty[List[(GameAction, Coordinate)]] =
-    combine(
-      gamePresenter.modeTypeOrPuzzleProperty,
-      BoardMarksSelectorCombined
-    ).transform {
-      case (
-            (Some(PlayingModeType | GameOverModeType), _) | (_, true),
-            (boardMarksSelectorPos, boardMarksSelectorSize, boardMarksSelectorMargin)
-          ) =>
-        MarksSelectorOrder.zipWithIndex.map { case (boardMark, index) =>
-          (
-            boardMark,
-            boardMarksSelectorPos +
-              Coordinate(index * (boardMarksSelectorSize + boardMarksSelectorMargin), 0)
-          )
-        }
-      case _ =>
-        Nil
-    }
+//  private val BoardMarksSelectorAllPositions: ReadableProperty[List[(GameAction, Coordinate)]] =
+//    combine(
+//      gamePresenter.modeTypeOrPuzzleProperty,
+//      BoardMarksSelectorCombined
+//    ).transform {
+//      case (
+//            (Some(PlayingModeType | GameOverModeType), _) | (_, true),
+//            (boardMarksSelectorPos, boardMarksSelectorSize, boardMarksSelectorMargin)
+//          ) =>
+//        MarksSelectorOrder.zipWithIndex.map { case (boardMark, index) =>
+//          (
+//            boardMark,
+//            boardMarksSelectorPos +
+//              Coordinate(index * (boardMarksSelectorSize + boardMarksSelectorMargin), 0)
+//          )
+//        }
+//      case _ =>
+//        Nil
+//    }
 
-  val boardMarkHover: ReadableProperty[Option[GameAction]] =
-    combine(
-      gamePresenter.mousePositionProperty,
-      gamePresenter.modeTypeOrPuzzleProperty,
-      BoardMarksSelectorAllPositions,
-      BoardMarksSelectorSize
-    ).transform {
-      case (
-            Some(mousePosition),
-            (Some(PlayingModeType | GameOverModeType), _) | (_, true),
-            boardMarksSelectorAllPositions,
-            boardMarksSelectorSize
-          ) =>
-        boardMarksSelectorAllPositions
-          .find { case (_, position) =>
-            mousePosition >= position &&
-            mousePosition <= position + Coordinate.square(boardMarksSelectorSize)
-          }
-          .map(_._1)
-      case _ =>
-        None
-    }
+//  val boardMarkHover: ReadableProperty[Option[GameAction]] =
+//    combine(
+//      gamePresenter.mousePositionProperty,
+//      gamePresenter.modeTypeOrPuzzleProperty,
+//      BoardMarksSelectorAllPositions,
+//      BoardMarksSelectorSize
+//    ).transform {
+//      case (
+//            Some(mousePosition),
+//            (Some(PlayingModeType | GameOverModeType), _) | (_, true),
+//            boardMarksSelectorAllPositions,
+//            boardMarksSelectorSize
+//          ) =>
+//        boardMarksSelectorAllPositions
+//          .find { case (_, position) =>
+//            mousePosition >= position &&
+//            mousePosition <= position + Coordinate.square(boardMarksSelectorSize)
+//          }
+//          .map(_._1)
+//      case _ =>
+//        None
+//    }
 
   val myBoardWaterCoordinatesSeqProperty: ReadableProperty[List[Coordinate]] =
     gamePresenter.meProperty.transform(_.map(_.myBoard)).transform {
@@ -612,6 +620,7 @@ class BoardView(
       case _ =>
         Nil
     }
+
 //
 //  def paint(): Unit = {
 //    val GameModel(
@@ -817,7 +826,7 @@ class BoardView(
       gamePresenter.gameStateProperty,
       combine(
         screenModel.subProp(_.tick),
-        screenModel.subProp(_.canvasSize), // TODO remove?
+        screenModel.subProp(_.mainBoardCanvasSize), // TODO remove?
         screenModel.subProp(_.hoverMove),
       ),
       combine(
@@ -875,6 +884,7 @@ class BoardView(
             Some(GameState(_, _, me, enemy, PlayingMode(isMyTurn, _, _, _, _))),
             screenModelDataTick
           ) =>
+        println((smallBoardCanvas.width, smallBoardCanvas.height))
         clearCanvas(smallBoardCanvas)
         drawMyBoard(
           canvas = smallBoardCanvas,
@@ -905,7 +915,7 @@ class BoardView(
 
     val renderingCtx = canvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
 
-    val boardPosition: Coordinate = MyBoardPreGamePos.get
+    val boardPosition: Coordinate = MainBoardPos.get
     val squareSize = (canvas.width - boardPosition.x) / boardSize.x
 
     drawBoardLimits(
@@ -937,7 +947,7 @@ class BoardView(
 
     (mousePositionOpt, selectedShipOpt) match {
       case (Some(mousePosition), Some(ship)) =>
-        myBoardMouseCoordinate.get match {
+        mainBoardMouseCoordinate.get match {
           case Some(boardCoor) =>
             val roundedBoardCoor =
               boardCoor.roundTo(boardSize - ship.size + Coordinate(1, 1))
@@ -979,7 +989,7 @@ class BoardView(
 
     val renderingCtx = canvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
 
-    val boardPosition: Coordinate = MyBoardPreGamePos.get
+    val boardPosition: Coordinate = MainBoardPos.get
     val squareSize = (canvas.width - boardPosition.x) / boardSize.x
 
     drawBoardLimits(
@@ -1063,7 +1073,7 @@ class BoardView(
 
     val renderingCtx = canvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
 
-    val boardPosition: Coordinate = MyBoardPreGamePos.get
+    val boardPosition: Coordinate = MainBoardPos.get
     val squareSize = (canvas.width - boardPosition.x) / boardSize.x
 
     drawBoardLimits(
@@ -1127,7 +1137,7 @@ class BoardView(
       }
     }
 
-    enemyBoardMouseCoordinate.get.foreach { enemyBoardCoor =>
+    mainBoardMouseCoordinate.get.foreach { enemyBoardCoor =>
       selectedAction match {
         case GameAction.ShotSelector
             if turnAttacks.exists(!_.isPlaced) &&
@@ -1258,206 +1268,206 @@ class BoardView(
     }
   }
 
-  def drawMissiles(
-      renderingCtx: CanvasRenderingContext2D,
-      turnAttacks: List[Attack],
-      missilesPopupMillisOpt: Option[Int]
-  ): Unit = {
-    val missilesPos = MissilesInicialPos.get
-    val missilesSize = MissilesSqSize.get
-    val missilesPosDiff = MissilesPosDiff.get
+//  def drawMissiles(
+//      renderingCtx: CanvasRenderingContext2D,
+//      turnAttacks: List[Attack],
+//      missilesPopupMillisOpt: Option[Int]
+//  ): Unit = {
+//    val missilesPos = MissilesInicialPos.get
+//    val missilesSize = MissilesSqSize.get
+//    val missilesPosDiff = MissilesPosDiff.get
+//
+//    val currentMissilesSize: Int =
+//      missilesPopupMillisOpt match {
+//        case None =>
+//          missilesSize
+//        case Some(timeMillis) if timeMillis > MissilesFastPopupTime =>
+//          val perc: Double =
+//            (timeMillis - MissilesFastPopupTime).toDouble / MissilesInitialPopupTime
+//          (missilesSize *
+//            (1 + MissilesMaxOversize * (MissilesFastPerc + (1 - MissilesFastPerc) * perc))).toInt
+//        case Some(timeMillis) =>
+//          val perc: Double = timeMillis.toDouble / MissilesFastPopupTime
+//          (missilesSize * (1 + MissilesMaxOversize * MissilesFastPerc * perc)).toInt
+//      }
+//    val currentMissilesDiff: Coordinate =
+//      Coordinate.square((currentMissilesSize - missilesSize) / 2)
+//
+//    turnAttacks.zipWithIndex.foreach {
+//      case (Attack(attackType, coorOpt), index) =>
+//        if (coorOpt.nonEmpty)
+//          renderingCtx.globalAlpha = 0.25
+//        else
+//          renderingCtx.globalAlpha = 1.0
+//
+//        val image: CanvasImage =
+//          if (attackType == AttackType.Simple) attackSimpleImage else radarImage
+//
+//        drawImageAbs(
+//          renderingCtx,
+//          image.element,
+//          missilesPos.x + index * missilesPosDiff.x - currentMissilesDiff.x,
+//          missilesPos.y + index * missilesPosDiff.y - currentMissilesDiff.y,
+//          currentMissilesSize,
+//          currentMissilesSize,
+//          useAntiAliasing = true
+//        )
+//
+//        renderingCtx.globalAlpha = 1.0
+//      case _ =>
+//    }
+//  }
 
-    val currentMissilesSize: Int =
-      missilesPopupMillisOpt match {
-        case None =>
-          missilesSize
-        case Some(timeMillis) if timeMillis > MissilesFastPopupTime =>
-          val perc: Double =
-            (timeMillis - MissilesFastPopupTime).toDouble / MissilesInitialPopupTime
-          (missilesSize *
-            (1 + MissilesMaxOversize * (MissilesFastPerc + (1 - MissilesFastPerc) * perc))).toInt
-        case Some(timeMillis) =>
-          val perc: Double = timeMillis.toDouble / MissilesFastPopupTime
-          (missilesSize * (1 + MissilesMaxOversize * MissilesFastPerc * perc)).toInt
-      }
-    val currentMissilesDiff: Coordinate =
-      Coordinate.square((currentMissilesSize - missilesSize) / 2)
+//  def drawExtraTurnPopup(
+//      renderingCtx: CanvasRenderingContext2D,
+//      turnAttacks: List[Attack],
+//      extraTurnPopupOpt: Option[Int],
+//      extraTurnPopupText: String
+//  ): Unit =
+//    extraTurnPopupOpt.foreach { timeRemaining =>
+//      val middleX = mainBoardCanvas.width / 2
+//      val bottomY = mainBoardCanvas.height - SizeMedium.get
+//      val textSize = (SizeBig.get * 1.6).toInt
+//      val fadeAlpha =
+//        if (timeRemaining > ExtraTurnPopupTimeFade)
+//          1.0
+//        else
+//          timeRemaining.toDouble / ExtraTurnPopupTimeFade
+//      val extraTurnPopupMissileSize = SizeBig.get
+//      val missilesDiff: Coordinate =
+//        Coordinate(extraTurnPopupMissileSize, 0)
+//      val missilesInitialPos: Coordinate =
+//        Coordinate(
+//          (-missilesDiff.x * (turnAttacks.size / 2.0)).toInt,
+//          -textSize - extraTurnPopupMissileSize
+//        )
+//
+//      if (ExtraTurnAppear(timeRemaining)) {
+//        renderingCtx.fillStyle = s"rgb(0, 0, 0, $fadeAlpha)"
+//        renderingCtx.font = s"${textSize}px serif"
+//        renderingCtx.textBaseline = "bottom"
+//        renderingCtx.textAlign = "center"
+//        renderingCtx.fillText(extraTurnPopupText, middleX, bottomY)
+//
+//        renderingCtx.globalAlpha = fadeAlpha
+//        turnAttacks.zipWithIndex.foreach { case (Attack(attackType, _), index) =>
+//          val image: CanvasImage =
+//            if (attackType == AttackType.Simple) attackSimpleImage else radarImage
+//
+//          drawImageAbs(
+//            renderingCtx,
+//            image.element,
+//            middleX + missilesInitialPos.x + (missilesDiff * index).x,
+//            bottomY + missilesInitialPos.y + (missilesDiff * index).y,
+//            extraTurnPopupMissileSize,
+//            extraTurnPopupMissileSize,
+//            useAntiAliasing = false
+//          )
+//        }
+//        renderingCtx.globalAlpha = 1.0
+//      }
+//    }
 
-    turnAttacks.zipWithIndex.foreach {
-      case (Attack(attackType, coorOpt), index) =>
-        if (coorOpt.nonEmpty)
-          renderingCtx.globalAlpha = 0.25
-        else
-          renderingCtx.globalAlpha = 1.0
+//  def drawDestructionSummary(
+//      renderingCtx: CanvasRenderingContext2D,
+//      selectedShipOpt: Option[Ship]
+//  ): Unit = {
+//    val sqSize = SummaryShipsSqSize.get
+//    val hitCountSize = DestructionSummaryHitCountSize.get
+//    allShipsSummaryCoordinates.get.foreach { case (_, summaryCenter, hitCount, summaryShipList) =>
+//      if (hitCount > 0) {
+//        val relCoor = summaryCenter + Coordinate(-6, hitCountSize / 2)
+//        renderingCtx.fillStyle = s"rgb(0, 0, 0)"
+//        renderingCtx.font = s"bold ${sqSize}px serif"
+//        renderingCtx.textBaseline = "middle"
+//        renderingCtx.textAlign = "right"
+//        renderingCtx.fillText(s"+$hitCount", relCoor.x, relCoor.y)
+//      }
+//      summaryShipList.foreach { case SummaryShip(summaryShip, pieces, destroyed) =>
+//        pieces.foreach { shipPiece =>
+//          drawSquareAbs(renderingCtx, shipPiece, sqSize, CanvasColor.Ship())
+//
+//          selectedShipOpt.foreach {
+//            case selectedShip if selectedShip.shipId == summaryShip.shipId =>
+//              drawSquareAbs(
+//                renderingCtx,
+//                shipPiece,
+//                sqSize,
+//                CanvasColor.White(CanvasBorder.DashRed(lineWidth = 2.0))
+//              )
+//            case _ =>
+//          }
+//        }
+//
+//        if (destroyed)
+//          pieces.foreach(pieceCoor =>
+//            drawCrosshairAbs(
+//              renderingCtx,
+//              pieceCoor + Coordinate.square(2),
+//              sqSize - 4,
+//              lineWidth = 2.0,
+//              alpha = 1.0
+//            )
+//          )
+//      }
+//    }
+//  }
 
-        val image: CanvasImage =
-          if (attackType == AttackType.Simple) attackSimpleImage else radarImage
-
-        drawImageAbs(
-          renderingCtx,
-          image.element,
-          missilesPos.x + index * missilesPosDiff.x - currentMissilesDiff.x,
-          missilesPos.y + index * missilesPosDiff.y - currentMissilesDiff.y,
-          currentMissilesSize,
-          currentMissilesSize,
-          useAntiAliasing = true
-        )
-
-        renderingCtx.globalAlpha = 1.0
-      case _ =>
-    }
-  }
-
-  def drawExtraTurnPopup(
-      renderingCtx: CanvasRenderingContext2D,
-      turnAttacks: List[Attack],
-      extraTurnPopupOpt: Option[Int],
-      extraTurnPopupText: String
-  ): Unit =
-    extraTurnPopupOpt.foreach { timeRemaining =>
-      val middleX = mainBoardCanvas.width / 2
-      val bottomY = mainBoardCanvas.height - SizeMedium.get
-      val textSize = (SizeBig.get * 1.6).toInt
-      val fadeAlpha =
-        if (timeRemaining > ExtraTurnPopupTimeFade)
-          1.0
-        else
-          timeRemaining.toDouble / ExtraTurnPopupTimeFade
-      val extraTurnPopupMissileSize = SizeBig.get
-      val missilesDiff: Coordinate =
-        Coordinate(extraTurnPopupMissileSize, 0)
-      val missilesInitialPos: Coordinate =
-        Coordinate(
-          (-missilesDiff.x * (turnAttacks.size / 2.0)).toInt,
-          -textSize - extraTurnPopupMissileSize
-        )
-
-      if (ExtraTurnAppear(timeRemaining)) {
-        renderingCtx.fillStyle = s"rgb(0, 0, 0, $fadeAlpha)"
-        renderingCtx.font = s"${textSize}px serif"
-        renderingCtx.textBaseline = "bottom"
-        renderingCtx.textAlign = "center"
-        renderingCtx.fillText(extraTurnPopupText, middleX, bottomY)
-
-        renderingCtx.globalAlpha = fadeAlpha
-        turnAttacks.zipWithIndex.foreach { case (Attack(attackType, _), index) =>
-          val image: CanvasImage =
-            if (attackType == AttackType.Simple) attackSimpleImage else radarImage
-
-          drawImageAbs(
-            renderingCtx,
-            image.element,
-            middleX + missilesInitialPos.x + (missilesDiff * index).x,
-            bottomY + missilesInitialPos.y + (missilesDiff * index).y,
-            extraTurnPopupMissileSize,
-            extraTurnPopupMissileSize,
-            useAntiAliasing = false
-          )
-        }
-        renderingCtx.globalAlpha = 1.0
-      }
-    }
-
-  def drawDestructionSummary(
-      renderingCtx: CanvasRenderingContext2D,
-      selectedShipOpt: Option[Ship]
-  ): Unit = {
-    val sqSize = SummaryShipsSqSize.get
-    val hitCountSize = DestructionSummaryHitCountSize.get
-    allShipsSummaryCoordinates.get.foreach { case (_, summaryCenter, hitCount, summaryShipList) =>
-      if (hitCount > 0) {
-        val relCoor = summaryCenter + Coordinate(-6, hitCountSize / 2)
-        renderingCtx.fillStyle = s"rgb(0, 0, 0)"
-        renderingCtx.font = s"bold ${sqSize}px serif"
-        renderingCtx.textBaseline = "middle"
-        renderingCtx.textAlign = "right"
-        renderingCtx.fillText(s"+$hitCount", relCoor.x, relCoor.y)
-      }
-      summaryShipList.foreach { case SummaryShip(summaryShip, pieces, destroyed) =>
-        pieces.foreach { shipPiece =>
-          drawSquareAbs(renderingCtx, shipPiece, sqSize, CanvasColor.Ship())
-
-          selectedShipOpt.foreach {
-            case selectedShip if selectedShip.shipId == summaryShip.shipId =>
-              drawSquareAbs(
-                renderingCtx,
-                shipPiece,
-                sqSize,
-                CanvasColor.White(CanvasBorder.DashRed(lineWidth = 2.0))
-              )
-            case _ =>
-          }
-        }
-
-        if (destroyed)
-          pieces.foreach(pieceCoor =>
-            drawCrosshairAbs(
-              renderingCtx,
-              pieceCoor + Coordinate.square(2),
-              sqSize - 4,
-              lineWidth = 2.0,
-              alpha = 1.0
-            )
-          )
-      }
-    }
-  }
-
-  def drawBoardMarksSelector(
-      renderingCtx: CanvasRenderingContext2D,
-      selectedAction: GameAction,
-      showShootSelector: Boolean
-  ): Unit = {
-    val boardMarksSize = BoardMarksSelectorSize.get
-
-    BoardMarksSelectorAllPositions.get.foreach { case (boardMark, position) =>
-      val canvasBorder: CanvasBorder =
-        if (selectedAction == boardMark)
-          CanvasBorder.RedBold()
-        else
-          CanvasBorder.Standard()
-
-      val canvasColorOpt =
-        boardMark match {
-          case GameAction.ManualWaterSelector =>
-            Some(CanvasColor.Water(canvasBorder))
-          case GameAction.ManualShipSelector | GameAction.FillWaterSelector =>
-            Some(CanvasColor.Ship(canvasBorder))
-          case GameAction.ShotSelector if showShootSelector =>
-            Some(CanvasColor.White(canvasBorder))
-          case _ =>
-            None
-        }
-
-      canvasColorOpt.foreach { canvasColor =>
-        drawBoardSquare(renderingCtx, position, Coordinate.origin, boardMarksSize, canvasColor)
-      }
-
-      boardMark match {
-        case GameAction.FillWaterSelector =>
-          drawImageAbs(
-            renderingCtx,
-            fillWaterImage.element,
-            x = position.x + 3,
-            y = position.y + 3,
-            boardMarksSize - 6,
-            boardMarksSize - 6,
-            useAntiAliasing = true
-          )
-        case GameAction.ShotSelector if showShootSelector =>
-          drawImageAbs(
-            renderingCtx,
-            attackSimpleImage.element,
-            x = position.x + 3,
-            y = position.y + 3,
-            boardMarksSize - 6,
-            boardMarksSize - 6,
-            useAntiAliasing = true
-          )
-        case _ =>
-      }
-    }
-  }
+//  def drawBoardMarksSelector(
+//      renderingCtx: CanvasRenderingContext2D,
+//      selectedAction: GameAction,
+//      showShootSelector: Boolean
+//  ): Unit = {
+//    val boardMarksSize = BoardMarksSelectorSize.get
+//
+//    BoardMarksSelectorAllPositions.get.foreach { case (boardMark, position) =>
+//      val canvasBorder: CanvasBorder =
+//        if (selectedAction == boardMark)
+//          CanvasBorder.RedBold()
+//        else
+//          CanvasBorder.Standard()
+//
+//      val canvasColorOpt =
+//        boardMark match {
+//          case GameAction.ManualWaterSelector =>
+//            Some(CanvasColor.Water(canvasBorder))
+//          case GameAction.ManualShipSelector | GameAction.FillWaterSelector =>
+//            Some(CanvasColor.Ship(canvasBorder))
+//          case GameAction.ShotSelector if showShootSelector =>
+//            Some(CanvasColor.White(canvasBorder))
+//          case _ =>
+//            None
+//        }
+//
+//      canvasColorOpt.foreach { canvasColor =>
+//        drawBoardSquare(renderingCtx, position, Coordinate.origin, boardMarksSize, canvasColor)
+//      }
+//
+//      boardMark match {
+//        case GameAction.FillWaterSelector =>
+//          drawImageAbs(
+//            renderingCtx,
+//            fillWaterImage.element,
+//            x = position.x + 3,
+//            y = position.y + 3,
+//            boardMarksSize - 6,
+//            boardMarksSize - 6,
+//            useAntiAliasing = true
+//          )
+//        case GameAction.ShotSelector if showShootSelector =>
+//          drawImageAbs(
+//            renderingCtx,
+//            attackSimpleImage.element,
+//            x = position.x + 3,
+//            y = position.y + 3,
+//            boardMarksSize - 6,
+//            boardMarksSize - 6,
+//            useAntiAliasing = true
+//          )
+//        case _ =>
+//      }
+//    }
+//  }
 
   def drawRulesSummary(
       renderingCtx: CanvasRenderingContext2D,
@@ -1473,7 +1483,7 @@ class BoardView(
     renderingCtx.textAlign = "right"
 
     val initialCoordinate: Coordinate =
-      screenModel.get.canvasSize.map { case Coordinate(x, _) =>
+      screenModel.get.mainBoardCanvasSize.map { case Coordinate(x, _) =>
         Coordinate(x - SquareSizeBig.get, SquareSizeBig.get)
       }
 
@@ -1544,7 +1554,7 @@ class BoardView(
     val lineMargin = 15
 
     val initialCoordinateText: Coordinate =
-      screenModel.get.canvasSize.map { case Coordinate(x, _) =>
+      screenModel.get.mainBoardCanvasSize.map { case Coordinate(x, _) =>
         Coordinate(x - SquareSizeSmall.get, SquareSizeBig.get + 100)
       }
 
@@ -1578,7 +1588,7 @@ class BoardView(
     val textSize = 23
 
     val counterPosition: Coordinate =
-      screenModel.get.canvasSize.map { case Coordinate(x, y) =>
+      screenModel.get.mainBoardCanvasSize.map { case Coordinate(x, y) =>
         Coordinate(x / 2, y - textSize)
       }
 
@@ -1609,7 +1619,7 @@ class BoardView(
     renderingCtx.textAlign = "right"
 
     val initialCoordinate: Coordinate =
-      screenModel.get.canvasSize.map { case Coordinate(x, y) =>
+      screenModel.get.mainBoardCanvasSize.map { case Coordinate(x, y) =>
         Coordinate(x - SquareSizeBig.get, y - textSize)
       }
 
@@ -1627,7 +1637,7 @@ class BoardView(
       produce(
         combine(
           preGameModel.subProp(_.rules).transform(_.gameFleet),
-          screenModel.subProp(_.canvasSize),
+          screenModel.subProp(_.mainBoardCanvasSize),
           gameModel.subProp(_.shipsLeftToPlace),
         )
       ) { case (gameFleet, canvasSize, shipsLeftToPlace) =>
@@ -1712,7 +1722,7 @@ class BoardView(
       produce(
         combine(
           preGameModel.subProp(_.rules).transform(_.gameFleet),
-          screenModel.subProp(_.canvasSize),
+          screenModel.subProp(_.mainBoardCanvasSize),
           gameModel.subProp(_.shipsLeftToPlace),
         )
       ) { case (gameFleet, canvasSize, shipsLeftToPlace) =>

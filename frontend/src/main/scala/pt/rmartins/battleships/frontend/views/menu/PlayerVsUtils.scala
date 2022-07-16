@@ -398,14 +398,10 @@ class PlayerVsUtils(
                 Some(PlayingMode(isMyTurn, Turn(currentTurn, extraTurn), turnAttackTypes, _, _)),
                 nested
               ) =>
-            val extraTurnDiv =
+            val extraTurnDiv: JsDom.TypedTag[Div] =
               extraTurn match {
-                case Some(value) =>
-                  div(
-                    b(value)
-                  )
-                case None =>
-                  div()
+                case Some(value) => div(b(value))
+                case None        => div()
               }
 
             val turnNumberDiv =
@@ -518,7 +514,7 @@ class PlayerVsUtils(
                 secondsOpt
                   .map {
                     case 0 =>
-                      span(b(" + "), b(GameStyles.redText, "00")) // TODO red
+                      span(" + ", b(GameStyles.redText, "00"))
                     case seconds if seconds >= 60 =>
                       span(" + %02d:%02d".format(seconds / 60, seconds % 60))
                     case seconds =>

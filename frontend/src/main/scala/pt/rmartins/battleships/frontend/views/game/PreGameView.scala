@@ -408,7 +408,7 @@ class PreGameView(
           preGameModel.subProp(_.previewBoardOpt),
           translationsModel.subProp(_.previewBoardTitle),
           screenModel.subProp(_.screenResized),
-          screenModel.subProp(_.canvasSize)
+          screenModel.subProp(_.mainBoardCanvasSize)
         )
       ) {
         case (boardSize, previewBoardOpt, previewBoardTitle, _, defaultCanvasSize) =>
@@ -532,7 +532,7 @@ class PreGameView(
       produce(
         combine(
           preGameModel.subProp(_.rules).transform(_.gameFleet),
-          screenModel.subProp(_.canvasSize)
+          screenModel.subProp(_.mainBoardCanvasSize)
         )
       ) { case (gameFleet, canvasSize) =>
         val fleetSorted: List[(Ship, Int)] =

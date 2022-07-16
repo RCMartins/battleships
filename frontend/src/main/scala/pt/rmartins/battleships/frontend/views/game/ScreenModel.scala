@@ -5,7 +5,8 @@ import pt.rmartins.battleships.frontend.views.model.ErrorModalType
 import pt.rmartins.battleships.shared.model.game.{Coordinate, Turn}
 
 case class ScreenModel(
-    canvasSize: Coordinate,
+    mainBoardCanvasSize: Coordinate,
+    smallBoardNewSize: Coordinate,
     selectedTab: String,
     lastSeenMessagesChat: Int,
     lastSeenMessagesMyMoves: Int,
@@ -36,7 +37,8 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
   val Default: ScreenModel =
     resetScreenModel(
       ScreenModel(
-        canvasSize = Coordinate.square(1),
+        mainBoardCanvasSize = Coordinate.square(1),
+        smallBoardNewSize = Coordinate.square(1),
         selectedTab = chatTab,
         lastSeenMessagesChat = 0,
         lastSeenMessagesMyMoves = 0,
@@ -61,7 +63,8 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
 
   def resetScreenModel(model: ScreenModel): ScreenModel = {
     model.copy(
-      canvasSize = Coordinate.square(320),
+      mainBoardCanvasSize = Coordinate.square(300),
+      smallBoardNewSize = Coordinate.square(100),
       selectedTab = chatTab,
       lastSeenMessagesChat = 0,
       lastSeenMessagesMyMoves = 0,

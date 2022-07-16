@@ -47,7 +47,7 @@ class MousePresenter(
             Some(gameState @ GameState(gameId, _, me, _, PlayingOrGameOver())),
             None
           ) if selectedAction != ShotSelector =>
-        (boardView.enemyBoardMouseCoordinate.get, button) match {
+        (boardView.mainBoardMouseCoordinate.get, button) match {
           case (Some(enemyBoardCoor), 2) =>
             removeBoardMark(me.enemyBoardMarks, enemyBoardCoor).foreach {
               case (boardMarksUpdated, updatedBoardMarksList) =>
@@ -84,7 +84,7 @@ class MousePresenter(
               )
             )
           ) if selectedAction != ShotSelector =>
-        (boardView.enemyBoardMouseCoordinate.get, button) match {
+        (boardView.mainBoardMouseCoordinate.get, button) match {
           case (Some(enemyBoardCoor), 2) =>
             removeBoardMark(boardMarks, enemyBoardCoor).foreach { case (boardMarksUpdated, _) =>
               gamePresenter.gamePuzzleStateProperty.set(
@@ -172,30 +172,24 @@ class MousePresenter(
       boardView: BoardView,
       selectedShipOpt: Option[Ship],
       gameState: GameState
-  ): Unit = {
-    boardView.shipToPlaceHover.get.map(_.ship) match {
-      case Some(ship) =>
-        gameModel.subProp(_.selectedShip).set(Some(ship))
-      case None =>
-        (selectedShipOpt, boardView.myBoardMouseCoordinate.get) match {
-          case (Some(ship), Some(boardCoor)) =>
-            val roundedBoardCoor =
-              boardCoor.roundTo(gameState.me.myBoard.boardSize - ship.size + Coordinate(1, 1))
+  ): Unit =
+    (selectedShipOpt, boardView.mainBoardMouseCoordinate.get) match {
+      case (Some(ship), Some(boardCoor)) =>
+        val roundedBoardCoor =
+          boardCoor.roundTo(gameState.me.myBoard.boardSize - ship.size + Coordinate(1, 1))
 
-            gamePresenter.tryToPlaceShipInBoard(gameState, gameState.me, ship, roundedBoardCoor)
-          case (Some(_), None) =>
-            gameModel.subProp(_.selectedShip).set(None)
-          case _ =>
-        }
+        gamePresenter.tryToPlaceShipInBoard(gameState, gameState.me, ship, roundedBoardCoor)
+      case (Some(_), None) =>
+        gameModel.subProp(_.selectedShip).set(None)
+      case _ =>
     }
-  }
 
   private def rightMouseDownPlacingShips(
       boardView: BoardView,
       gameState: GameState,
       placingShipsMode: PlacingShipsMode
   ): Unit =
-    boardView.myBoardMouseCoordinate.get match {
+    boardView.mainBoardMouseCoordinate.get match {
       case Some(boardCoor) =>
         gameState.me.myBoard.removeShipAt(boardCoor) match {
           case (_, None) =>
@@ -224,7 +218,7 @@ class MousePresenter(
   ): Unit = {
     val GameState(gameId, _, me, _, mode) = gameState
 
-    boardView.enemyBoardMouseCoordinate.get match {
+    boardView.mainBoardMouseCoordinate.get match {
       case Some(enemyBoardCoor) =>
         removeBoardMark(me.enemyBoardMarks, enemyBoardCoor).foreach {
           case (boardMarksUpdated, updatedBoardMarksList) =>
@@ -252,14 +246,14 @@ class MousePresenter(
             gameModel.subProp(_.turnAttacksQueuedStatus).set(AttacksQueuedStatus.NotSet)
         }
       case None =>
-        (selectedShipOpt, boardView.summaryShipHover.get) match {
-          case (Some(currentSelectedShip), Some(summaryShipHover))
-              if currentSelectedShip.shipId == summaryShipHover.shipId =>
-            gameModel.subProp(_.selectedShip).set(None)
-          case (Some(_), None) =>
-            gameModel.subProp(_.selectedShip).set(None)
-          case _ =>
-        }
+//        (selectedShipOpt, boardView.summaryShipHover.get) match {
+//          case (Some(currentSelectedShip), Some(summaryShipHover))
+//              if currentSelectedShip.shipId == summaryShipHover.shipId =>
+//            gameModel.subProp(_.selectedShip).set(None)
+//          case (Some(_), None) =>
+//            gameModel.subProp(_.selectedShip).set(None)
+//          case _ =>
+//        }
     }
   }
 
@@ -268,18 +262,11 @@ class MousePresenter(
       selectedShipOpt: Option[Ship]
   ): Unit = {
     (
-      boardView.enemyBoardMouseCoordinate.get,
-      boardView.boardMarkHover.get,
+      boardView.mainBoardMouseCoordinate.get,
       selectedShipOpt,
-      boardView.summaryShipHover.get
     ) match {
-      case (_, _, Some(currentSelectedShip), Some(summaryShipHover))
-          if currentSelectedShip.shipId == summaryShipHover.shipId =>
+      case (None, Some(_)) =>
         gameModel.subProp(_.selectedShip).set(None)
-      case (None, None, Some(_), None) =>
-        gameModel.subProp(_.selectedShip).set(None)
-      case (_, _, _, Some(summaryShipHover)) =>
-        gameModel.subProp(_.selectedShip).set(Some(summaryShipHover))
       case _ =>
     }
   }
@@ -303,8 +290,8 @@ class MousePresenter(
     ) = gameModelValue
     val GameState(gameId, Rules(boardSize, _, _, _, _), me, _, _) = gameState
 
-    (boardView.enemyBoardMouseCoordinate.get, boardView.boardMarkHover.get) match {
-      case (Some(enemyBoardCoor), None)
+    boardView.mainBoardMouseCoordinate.get match {
+      case Some(enemyBoardCoor)
           if gameState.gameMode.isPlaying &&
             turnAttacksSent == AttacksQueuedStatus.NotSet &&
             gamePresenter.isValidCoordinateTarget(enemyBoardCoor) &&
@@ -331,7 +318,7 @@ class MousePresenter(
             setFirstMissile(turnAttacks)
 
         gameModel.subProp(_.turnAttacks).set(turnAttackUpdated)
-      case (Some(enemyBoardCoor), None) =>
+      case Some(enemyBoardCoor) =>
         setBoardMark(
           selectedAction,
           enemyBoardCoor,
@@ -344,10 +331,6 @@ class MousePresenter(
           )
           gameRpc.sendBoardMarks(gameId, updatedBoardMarksList)
         }
-      case (None, Some(newSelectedAction)) if selectedAction != newSelectedAction =>
-        gameModel.subProp(_.selectedAction).set(newSelectedAction)
-      case (None, None) if selectedAction != ShotSelector =>
-        gameModel.subProp(_.selectedAction).set(ShotSelector)
       case _ =>
     }
 
@@ -358,7 +341,7 @@ class MousePresenter(
       boardView: BoardView,
       gamePuzzleState: GamePuzzleState
   ): Unit =
-    boardView.enemyBoardMouseCoordinate.get match {
+    boardView.mainBoardMouseCoordinate.get match {
       case Some(puzzleBoardCoor) =>
         removeBoardMark(gamePuzzleState.boardMarks, puzzleBoardCoor).foreach {
           case (boardMarksUpdated, _) =>
@@ -378,8 +361,8 @@ class MousePresenter(
     val GamePuzzleState(_, _, puzzleBoardMarks, PlayerPuzzle(boardSize, _, _, _, _), _) =
       gamePuzzleState
 
-    (boardView.enemyBoardMouseCoordinate.get, boardView.boardMarkHover.get) match {
-      case (Some(enemyBoardCoor), None) if selectedAction != ShotSelector =>
+    boardView.mainBoardMouseCoordinate.get match {
+      case Some(enemyBoardCoor) if selectedAction != ShotSelector =>
         setBoardMark(
           selectedAction,
           enemyBoardCoor,
@@ -391,10 +374,6 @@ class MousePresenter(
             Some(gamePuzzleState.modify(_.boardMarks).setTo(updatedBoardMarks))
           )
         }
-      case (None, Some(newSelectedAction)) if selectedAction != newSelectedAction =>
-        gameModel.subProp(_.selectedAction).set(newSelectedAction)
-      case (None, None) if selectedAction != ShotSelector =>
-        gameModel.subProp(_.selectedAction).set(ShotSelector)
       case _ =>
     }
 

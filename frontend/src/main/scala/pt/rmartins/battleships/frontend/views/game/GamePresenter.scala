@@ -879,19 +879,22 @@ class GamePresenter(
   }
 
   def onCanvasResize(div: Div, canvas: Canvas): Unit = {
-    println((div.clientHeight, div.parentNode.asInstanceOf[Div].clientHeight))
-    println(
-      (
-        div.style.marginTop,
-        div.style.marginBottom,
-        div.style.paddingTop,
-        div.style.paddingBottom,
-      )
-    )
-
+//    println((div.clientHeight, div.parentNode.asInstanceOf[Div].clientHeight))
+//    println(
+//      (
+//        div.style.marginTop,
+//        div.style.marginBottom,
+//        div.style.paddingTop,
+//        div.style.paddingBottom,
+//      )
+//    )
+//
     val newSizeInt = div.clientHeight - 20 // - div.style.marginTop.toInt
     val newSize = Coordinate.square(newSizeInt)
-    screenModel.subProp(_.canvasSize).set(newSize)
+    screenModel.subProp(_.mainBoardCanvasSize).set(newSize)
+
+    val smallBoardNewSize = Coordinate.square(newSizeInt / 3)
+    screenModel.subProp(_.smallBoardNewSize).set(smallBoardNewSize)
   }
 
   override def onClose(): Unit = {
