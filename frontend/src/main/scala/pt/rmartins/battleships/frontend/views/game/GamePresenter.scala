@@ -11,6 +11,7 @@ import pt.rmartins.battleships.frontend.routing.{RoutingInGameState, RoutingLogi
 import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
 import pt.rmartins.battleships.frontend.services.{TranslationsService, UserContextService}
 import pt.rmartins.battleships.frontend.views.game.BoardView.GameAction
+import pt.rmartins.battleships.frontend.views.game.GamePresenter._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.frontend.views.model.JoinedPreGame.PlayingAgainstPlayer
 import pt.rmartins.battleships.frontend.views.model.ModeType._
@@ -889,11 +890,12 @@ class GamePresenter(
 //      )
 //    )
 //
-    val newSizeInt = div.clientHeight - 20 // - div.style.marginTop.toInt
+    val newSizeInt = div.clientHeight - MainBoardHeightMargin // - div.style.marginTop.toInt
     val newSize = Coordinate.square(newSizeInt)
     screenModel.subProp(_.mainBoardCanvasSize).set(newSize)
 
-    val smallBoardNewSize = Coordinate.square(newSizeInt / 3)
+    val smallBoardNewSize: Coordinate =
+      Coordinate.square((newSizeInt * SmallBoardSizeMultiplier).toInt)
     screenModel.subProp(_.smallBoardNewSize).set(smallBoardNewSize)
   }
 
@@ -1393,5 +1395,12 @@ class GamePresenter(
       preGameModel.subProp(_.selectedNamedRule).set(Some(updatedNamedRules))
     }
   }
+
+}
+
+object GamePresenter {
+
+  val MainBoardHeightMargin: Int = 20
+  val SmallBoardSizeMultiplier: Double = 0.3
 
 }

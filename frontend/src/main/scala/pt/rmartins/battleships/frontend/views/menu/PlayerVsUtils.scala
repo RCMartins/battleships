@@ -429,7 +429,7 @@ class PlayerVsUtils(
               div(`class` := "col-12", turnAttacksDiv)
             ).render
           case _ =>
-            ???
+            div.render
         }
       )
     ).render
@@ -463,7 +463,7 @@ class PlayerVsUtils(
     div(
       `class` := "row m-1",
       div(
-        `class` := "col-12",
+        `class` := "col-12 my-3",
         playerStatsSummaryDiv(
           nested,
           chatModel.subProp(_.username).transform(Some(_)),
@@ -472,7 +472,7 @@ class PlayerVsUtils(
         )
       ),
       div(
-        `class` := "col-12",
+        `class` := "col-12 my-3",
         playerStatsSummaryDiv(
           nested,
           presenter.enemyUsernameProperty,
@@ -489,52 +489,54 @@ class PlayerVsUtils(
       timeRemainingProperty: ReadableProperty[Option[TimeRemaining]]
   ): Div =
     div(
-      `class` := "row",
+      `class` := "row m-0",
       div(
-        `class` := "col-12",
+        `class` := "col-12 d-flex justify-content-center my-1",
         nested(produce(playerUsername) {
           case Some(Username(username)) => span(b(username)).render
           case None                     => span.render
         })
       ),
       div(
-        `class` := "col-12 border rounded border-dark p-2",
+        `class` := "col-12 border rounded border-dark p-2 my-1 d-flex justify-content-center",
         nested(translatedDynamic(playerProgressKey0)(_.apply())),
       ),
       div(
-        `class` := "col-12 border rounded border-dark p-2",
-        nested(translatedDynamic(Translations.Game.remainingTime)(_.apply())),
-        nested(
-          produceWithNested(timeRemainingProperty) {
-            case (Some(timeRemaining), nested) =>
-              def toTimeStr(seconds: Int): JsDom.TypedTag[Span] =
-                span("%02d:%02d".format(seconds / 60, seconds % 60))
+        `class` := "col-12 border rounded border-dark p-2 my-1 d-flex justify-content-center",
+        div(
+          nested(translatedDynamic(Translations.Game.remainingTime)(_.apply())),
+          nested(
+            produceWithNested(timeRemainingProperty) {
+              case (Some(timeRemaining), nested) =>
+                def toTimeStr(seconds: Int): JsDom.TypedTag[Span] =
+                  span("%02d:%02d".format(seconds / 60, seconds % 60))
 
-              def toShortTimeStr(secondsOpt: Option[Int]): JsDom.TypedTag[Span] =
-                secondsOpt
-                  .map {
-                    case 0 =>
-                      span(" + ", b(GameStyles.redText, "00"))
-                    case seconds if seconds >= 60 =>
-                      span(" + %02d:%02d".format(seconds / 60, seconds % 60))
-                    case seconds =>
-                      span(" + %02d".format(seconds))
-                  }
-                  .getOrElse(span())
+                def toShortTimeStr(secondsOpt: Option[Int]): JsDom.TypedTag[Span] =
+                  secondsOpt
+                    .map {
+                      case 0 =>
+                        span(" + ", b(GameStyles.redText, "00"))
+                      case seconds if seconds >= 60 =>
+                        span(" + %02d:%02d".format(seconds / 60, seconds % 60))
+                      case seconds =>
+                        span(" + %02d".format(seconds))
+                    }
+                    .getOrElse(span())
 
-              val textSpan: Span =
-                span(
-                  toTimeStr(timeRemaining.totalTimeRemainingMillis / 1000),
-                  toShortTimeStr(timeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000))
+                val textSpan: Span =
+                  span(
+                    toTimeStr(timeRemaining.totalTimeRemainingMillis / 1000),
+                    toShortTimeStr(timeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000))
+                  ).render
+
+                div(
+                  `class` := "row m-1",
+                  div(`class` := "col-12", textSpan)
                 ).render
-
-              div(
-                `class` := "row m-1",
-                div(`class` := "col-12", textSpan)
-              ).render
-            case _ =>
-              div.render
-          }
+              case _ =>
+                div.render
+            }
+          )
         )
       )
     ).render

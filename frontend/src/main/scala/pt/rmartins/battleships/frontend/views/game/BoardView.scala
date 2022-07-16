@@ -10,7 +10,6 @@ import pt.rmartins.battleships.frontend.views.game.BoardView._
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.frontend.views.model.AttacksQueuedStatus
-import pt.rmartins.battleships.frontend.views.model.ModeType._
 import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit
@@ -101,51 +100,51 @@ class BoardView(
     event.preventDefault()
   }
 
-  private val BoardSizeProperty: ReadableProperty[Int] =
-    combine(
-      gamePresenter.rulesProperty.transform(_.map(_.boardSize)),
-      gamePresenter.gamePuzzleStateProperty.transform(_.map(_.playerPuzzle.boardSize))
-    ).transform { case (boardSizeOpt1, boardSizeOpt2) =>
-      boardSizeOpt1.orElse(boardSizeOpt2).map(_.x).getOrElse(1)
-    }
-
-  private val squareSizesProperty: ReadableProperty[IndexedSeq[Int]] =
-    BoardSizeProperty.transform { boardSize =>
-      IndexedSeq(70, 100, 120, 150, 200, 300).map(_ / boardSize)
-    }
-
-  private val sizes: IndexedSeq[Int] = IndexedSeq(7, 10, 12, 15, 20, 30)
-
-  private def checkSize(sizes: IndexedSeq[Int], screenSize: Int, defaultSizeIndex: Int): Int =
-    sizes((if (screenSize < 500) 0 else if (screenSize < 680) 1 else 2) + defaultSizeIndex)
-
-  private val SizeBig: ReadableProperty[Int] =
-    screenModel.subProp(_.mainBoardCanvasSize).transform { canvasSize =>
-      checkSize(sizes, canvasSize.x, 3)
-    }
-
-  private val SizeMedium: ReadableProperty[Int] =
-    screenModel.subProp(_.mainBoardCanvasSize).transform { canvasSize =>
-      checkSize(sizes, canvasSize.x, 2)
-    }
-
-  private val SquareSizeBig: ReadableProperty[Int] =
-    combine(screenModel.subProp(_.mainBoardCanvasSize), squareSizesProperty).transform {
-      case (canvasSize, sizes) =>
-        checkSize(sizes, canvasSize.x, 3)
-    }
-
-  private val SquareSizeMedium: ReadableProperty[Int] =
-    combine(screenModel.subProp(_.mainBoardCanvasSize), squareSizesProperty).transform {
-      case (canvasSize, sizes) =>
-        checkSize(sizes, canvasSize.x, 2)
-    }
-
-  private val SquareSizeSmall: ReadableProperty[Int] =
-    combine(screenModel.subProp(_.mainBoardCanvasSize), squareSizesProperty).transform {
-      case (canvasSize, sizes) =>
-        checkSize(sizes, canvasSize.x, 1)
-    }
+//  private val BoardSizeProperty: ReadableProperty[Int] =
+//    combine(
+//      gamePresenter.rulesProperty.transform(_.map(_.boardSize)),
+//      gamePresenter.gamePuzzleStateProperty.transform(_.map(_.playerPuzzle.boardSize))
+//    ).transform { case (boardSizeOpt1, boardSizeOpt2) =>
+//      boardSizeOpt1.orElse(boardSizeOpt2).map(_.x).getOrElse(1)
+//    }
+//
+//  private val squareSizesProperty: ReadableProperty[IndexedSeq[Int]] =
+//    BoardSizeProperty.transform { boardSize =>
+//      IndexedSeq(70, 100, 120, 150, 200, 300).map(_ / boardSize)
+//    }
+//
+//  private val sizes: IndexedSeq[Int] = IndexedSeq(7, 10, 12, 15, 20, 30)
+//
+//  private def checkSize(sizes: IndexedSeq[Int], screenSize: Int, defaultSizeIndex: Int): Int =
+//    sizes((if (screenSize < 500) 0 else if (screenSize < 680) 1 else 2) + defaultSizeIndex)
+//
+//  private val SizeBig: ReadableProperty[Int] =
+//    screenModel.subProp(_.mainBoardCanvasSize).transform { canvasSize =>
+//      checkSize(sizes, canvasSize.x, 3)
+//    }
+//
+//  private val SizeMedium: ReadableProperty[Int] =
+//    screenModel.subProp(_.mainBoardCanvasSize).transform { canvasSize =>
+//      checkSize(sizes, canvasSize.x, 2)
+//    }
+//
+//  private val SquareSizeBig: ReadableProperty[Int] =
+//    combine(screenModel.subProp(_.mainBoardCanvasSize), squareSizesProperty).transform {
+//      case (canvasSize, sizes) =>
+//        checkSize(sizes, canvasSize.x, 3)
+//    }
+//
+//  private val SquareSizeMedium: ReadableProperty[Int] =
+//    combine(screenModel.subProp(_.mainBoardCanvasSize), squareSizesProperty).transform {
+//      case (canvasSize, sizes) =>
+//        checkSize(sizes, canvasSize.x, 2)
+//    }
+//
+//  private val SquareSizeSmall: ReadableProperty[Int] =
+//    combine(screenModel.subProp(_.mainBoardCanvasSize), squareSizesProperty).transform {
+//      case (canvasSize, sizes) =>
+//        checkSize(sizes, canvasSize.x, 1)
+//    }
 
 //  private val MyBoardPreGameSqSize = SquareSizeBig
 //  private val EnemyBoardSqSize = SquareSizeBig
@@ -166,6 +165,9 @@ class BoardView(
       case _ =>
         1
     }
+
+  private val MainBoardTurnTextSize: ReadableProperty[Int] =
+    PreGameSquareSize.transform(sqSize => (sqSize * 0.6).toInt)
 
 //  private val EnemyBoardPos: ReadableProperty[Coordinate] =
 //    EnemyBoardMargin.transform(size => Coordinate.square(size))
@@ -884,7 +886,6 @@ class BoardView(
             Some(GameState(_, _, me, enemy, PlayingMode(isMyTurn, _, _, _, _))),
             screenModelDataTick
           ) =>
-        println((smallBoardCanvas.width, smallBoardCanvas.height))
         clearCanvas(smallBoardCanvas)
         drawMyBoard(
           canvas = smallBoardCanvas,
@@ -900,6 +901,7 @@ class BoardView(
     }
 
     div(
+      `class` := "d-flex justify-content-center",
       smallBoardCanvas
     ).render
   }
@@ -1105,8 +1107,7 @@ class BoardView(
           coor,
           size = squareSize,
           turnNumber,
-          // TODO to property (use same as drawGameOverEnemyBoard)
-          textSize = (SquareSizeBig.get * 0.6).toInt
+          textSize = MainBoardTurnTextSize.get
         )
       }
     }
@@ -1237,7 +1238,7 @@ class BoardView(
           coor,
           size = squareSize,
           turnPlay.turn,
-          textSize = (SquareSizeBig.get * 0.6).toInt // TODO to property (use same as Enemy board)
+          textSize = MainBoardTurnTextSize.get
         )
       }
 
@@ -1469,168 +1470,168 @@ class BoardView(
 //    }
 //  }
 
-  def drawRulesSummary(
-      renderingCtx: CanvasRenderingContext2D,
-      rules: Rules,
-      translationsData: TranslationsModel
-  ): Unit = {
-    val textSize = 23
-    val lineMargin = 7
+//  def drawRulesSummary(
+//      renderingCtx: CanvasRenderingContext2D,
+//      rules: Rules,
+//      translationsData: TranslationsModel
+//  ): Unit = {
+//    val textSize = 23
+//    val lineMargin = 7
+//
+//    renderingCtx.fillStyle = s"rgb(0, 0, 0)"
+//    renderingCtx.font = s"${textSize}px serif"
+//    renderingCtx.textBaseline = "middle"
+//    renderingCtx.textAlign = "right"
+//
+//    val initialCoordinate: Coordinate =
+//      screenModel.get.mainBoardCanvasSize.map { case Coordinate(x, _) =>
+//        Coordinate(x - SquareSizeBig.get, SquareSizeBig.get)
+//      }
+//
+//    val rulesDataList: List[String] =
+//      List(
+//        rules.timeLimit match {
+//          case WithoutRuleTimeLimit =>
+//            List(translationsData.withoutRuleTimeLimit.innerText)
+//          case WithRuleTimeLimit(
+//                initialTotalTimeSeconds,
+//                additionalTurnTimeSecondsOpt
+//              ) =>
+//            List(
+//              translationsData.withRuleTimeLimit.innerText,
+//              List(
+//                initialTotalTimeSeconds,
+//                translationsData.seconds.innerText,
+//                translationsData.totalTime.innerText
+//              ).mkString(" ")
+//            ) ++
+//              additionalTurnTimeSecondsOpt.map { case (additionalTurnTimeSeconds, _) =>
+//                List(
+//                  s"+$additionalTurnTimeSeconds",
+//                  translationsData.seconds.innerText,
+//                  translationsData.eachTurn.innerText
+//                ).mkString(" ")
+//              }.toList
+//        },
+//        List(""),
+//        List(s"${translationsData.amountOfShots.innerText}: ${rules.defaultTurnAttacks.size}"),
+//        List(""),
+//        Some(rules.gameBonuses.nonEmpty)
+//          .map(_ => translationsData.turnBonuses.innerText + ":")
+//          .toList, {
+//          def rewardsToString(bonusRewardList: List[BonusReward]): String =
+//            bonusRewardList
+//              .map { case BonusReward.ExtraTurn(attackTypes) =>
+//                s"${attackTypes.size} ${translationsData.shots.innerText}"
+//              }
+//              .mkString(", ")
+//
+//          rules.gameBonuses.map {
+//            case GameBonus(BonusType.FirstBlood, bonusRewardList) =>
+//              s"${translationsData.bonusFirstBlood.innerText}: ${rewardsToString(bonusRewardList)}"
+//            case GameBonus(BonusType.DoubleKill, bonusRewardList) =>
+//              s"${translationsData.bonusDoubleKill.innerText}: ${rewardsToString(bonusRewardList)}"
+//            case GameBonus(BonusType.TripleKill, bonusRewardList) =>
+//              s"${translationsData.bonusTripleKill.innerText}: ${rewardsToString(bonusRewardList)}"
+//            case GameBonus(BonusType.UltraKill, bonusRewardList) =>
+//              s"${translationsData.bonusUltraKill.innerText}: ${rewardsToString(bonusRewardList)}"
+//          }
+//        }
+//      ).flatten
+//
+//    rulesDataList.foldLeft(initialCoordinate) {
+//      case (Coordinate(lineLeftPosX, lineLeftPosY), lineStr) =>
+//        renderingCtx.fillText(lineStr, lineLeftPosX, lineLeftPosY)
+//        Coordinate(lineLeftPosX, lineLeftPosY + textSize + lineMargin)
+//    }
+//  }
+//
+//  def drawPlayerPuzzleObjective(
+//      renderingCtx: CanvasRenderingContext2D,
+//      playerPuzzle: PlayerPuzzle,
+//      translationsData: TranslationsModel
+//  ): Unit = {
+//    val textSize = 23
+//    val lineMargin = 15
+//
+//    val initialCoordinateText: Coordinate =
+//      screenModel.get.mainBoardCanvasSize.map { case Coordinate(x, _) =>
+//        Coordinate(x - SquareSizeSmall.get, SquareSizeBig.get + 100)
+//      }
+//
+//    playerPuzzle.puzzleObjective match {
+//      case PuzzleObjective.CorrectShipBoardMarks =>
+//        renderingCtx.fillStyle = s"rgb(0, 0, 0)"
+//        renderingCtx.font = s"bold ${textSize}px serif"
+//        renderingCtx.textBaseline = "middle"
+//        renderingCtx.textAlign = "right"
+//        renderingCtx.fillText(
+//          translationsData.placeMarksCorrectly1.innerText,
+//          initialCoordinateText.x,
+//          initialCoordinateText.y
+//        )
+//
+//        renderingCtx.fillText(
+//          s"${translationsData.placeMarksCorrectly2.innerText} '${translationsData.sendPuzzleAnswer.innerText}'",
+//          initialCoordinateText.x,
+//          initialCoordinateText.y + textSize + lineMargin
+//        )
+//      case PuzzleObjective.WinInXTurns(maximumTurns) =>
+//        ???
+//    }
+//  }
+//
+//  def drawPuzzleCounter(
+//      renderingCtx: CanvasRenderingContext2D,
+//      puzzleSolvedCounter: Int,
+//      translationsData: TranslationsModel
+//  ): Unit = {
+//    val textSize = 23
+//
+//    val counterPosition: Coordinate =
+//      screenModel.get.mainBoardCanvasSize.map { case Coordinate(x, y) =>
+//        Coordinate(x / 2, y - textSize)
+//      }
+//
+//    renderingCtx.fillStyle = s"rgb(0, 0, 0)"
+//    renderingCtx.font = s"bold ${textSize}px serif"
+//    renderingCtx.textBaseline = "bottom"
+//    renderingCtx.textAlign = "center"
+//    renderingCtx.fillText(
+//      s"${translationsData.solvedPuzzles.innerText}: $puzzleSolvedCounter",
+//      counterPosition.x,
+//      counterPosition.y
+//    )
+//  }
 
-    renderingCtx.fillStyle = s"rgb(0, 0, 0)"
-    renderingCtx.font = s"${textSize}px serif"
-    renderingCtx.textBaseline = "middle"
-    renderingCtx.textAlign = "right"
-
-    val initialCoordinate: Coordinate =
-      screenModel.get.mainBoardCanvasSize.map { case Coordinate(x, _) =>
-        Coordinate(x - SquareSizeBig.get, SquareSizeBig.get)
-      }
-
-    val rulesDataList: List[String] =
-      List(
-        rules.timeLimit match {
-          case WithoutRuleTimeLimit =>
-            List(translationsData.withoutRuleTimeLimit.innerText)
-          case WithRuleTimeLimit(
-                initialTotalTimeSeconds,
-                additionalTurnTimeSecondsOpt
-              ) =>
-            List(
-              translationsData.withRuleTimeLimit.innerText,
-              List(
-                initialTotalTimeSeconds,
-                translationsData.seconds.innerText,
-                translationsData.totalTime.innerText
-              ).mkString(" ")
-            ) ++
-              additionalTurnTimeSecondsOpt.map { case (additionalTurnTimeSeconds, _) =>
-                List(
-                  s"+$additionalTurnTimeSeconds",
-                  translationsData.seconds.innerText,
-                  translationsData.eachTurn.innerText
-                ).mkString(" ")
-              }.toList
-        },
-        List(""),
-        List(s"${translationsData.amountOfShots.innerText}: ${rules.defaultTurnAttacks.size}"),
-        List(""),
-        Some(rules.gameBonuses.nonEmpty)
-          .map(_ => translationsData.turnBonuses.innerText + ":")
-          .toList, {
-          def rewardsToString(bonusRewardList: List[BonusReward]): String =
-            bonusRewardList
-              .map { case BonusReward.ExtraTurn(attackTypes) =>
-                s"${attackTypes.size} ${translationsData.shots.innerText}"
-              }
-              .mkString(", ")
-
-          rules.gameBonuses.map {
-            case GameBonus(BonusType.FirstBlood, bonusRewardList) =>
-              s"${translationsData.bonusFirstBlood.innerText}: ${rewardsToString(bonusRewardList)}"
-            case GameBonus(BonusType.DoubleKill, bonusRewardList) =>
-              s"${translationsData.bonusDoubleKill.innerText}: ${rewardsToString(bonusRewardList)}"
-            case GameBonus(BonusType.TripleKill, bonusRewardList) =>
-              s"${translationsData.bonusTripleKill.innerText}: ${rewardsToString(bonusRewardList)}"
-            case GameBonus(BonusType.UltraKill, bonusRewardList) =>
-              s"${translationsData.bonusUltraKill.innerText}: ${rewardsToString(bonusRewardList)}"
-          }
-        }
-      ).flatten
-
-    rulesDataList.foldLeft(initialCoordinate) {
-      case (Coordinate(lineLeftPosX, lineLeftPosY), lineStr) =>
-        renderingCtx.fillText(lineStr, lineLeftPosX, lineLeftPosY)
-        Coordinate(lineLeftPosX, lineLeftPosY + textSize + lineMargin)
-    }
-  }
-
-  def drawPlayerPuzzleObjective(
-      renderingCtx: CanvasRenderingContext2D,
-      playerPuzzle: PlayerPuzzle,
-      translationsData: TranslationsModel
-  ): Unit = {
-    val textSize = 23
-    val lineMargin = 15
-
-    val initialCoordinateText: Coordinate =
-      screenModel.get.mainBoardCanvasSize.map { case Coordinate(x, _) =>
-        Coordinate(x - SquareSizeSmall.get, SquareSizeBig.get + 100)
-      }
-
-    playerPuzzle.puzzleObjective match {
-      case PuzzleObjective.CorrectShipBoardMarks =>
-        renderingCtx.fillStyle = s"rgb(0, 0, 0)"
-        renderingCtx.font = s"bold ${textSize}px serif"
-        renderingCtx.textBaseline = "middle"
-        renderingCtx.textAlign = "right"
-        renderingCtx.fillText(
-          translationsData.placeMarksCorrectly1.innerText,
-          initialCoordinateText.x,
-          initialCoordinateText.y
-        )
-
-        renderingCtx.fillText(
-          s"${translationsData.placeMarksCorrectly2.innerText} '${translationsData.sendPuzzleAnswer.innerText}'",
-          initialCoordinateText.x,
-          initialCoordinateText.y + textSize + lineMargin
-        )
-      case PuzzleObjective.WinInXTurns(maximumTurns) =>
-        ???
-    }
-  }
-
-  def drawPuzzleCounter(
-      renderingCtx: CanvasRenderingContext2D,
-      puzzleSolvedCounter: Int,
-      translationsData: TranslationsModel
-  ): Unit = {
-    val textSize = 23
-
-    val counterPosition: Coordinate =
-      screenModel.get.mainBoardCanvasSize.map { case Coordinate(x, y) =>
-        Coordinate(x / 2, y - textSize)
-      }
-
-    renderingCtx.fillStyle = s"rgb(0, 0, 0)"
-    renderingCtx.font = s"bold ${textSize}px serif"
-    renderingCtx.textBaseline = "bottom"
-    renderingCtx.textAlign = "center"
-    renderingCtx.fillText(
-      s"${translationsData.solvedPuzzles.innerText}: $puzzleSolvedCounter",
-      counterPosition.x,
-      counterPosition.y
-    )
-  }
-
-  def drawPuzzleCorrectSolution(
-      renderingCtx: CanvasRenderingContext2D,
-      correctState: Boolean,
-      translationsData: TranslationsModel
-  ): Unit = {
-    val textSize = 23
-    renderingCtx.fillStyle =
-      if (correctState)
-        s"rgb(${CanvasColor.DarkGreen().fillColor})"
-      else
-        s"rgb(${CanvasColor.Red().fillColor})"
-    renderingCtx.font = s"bold ${textSize}px serif"
-    renderingCtx.textBaseline = "bottom"
-    renderingCtx.textAlign = "right"
-
-    val initialCoordinate: Coordinate =
-      screenModel.get.mainBoardCanvasSize.map { case Coordinate(x, y) =>
-        Coordinate(x - SquareSizeBig.get, y - textSize)
-      }
-
-    val text: String =
-      if (correctState)
-        translationsData.puzzleCorrect.innerText
-      else
-        translationsData.puzzleIncorrect.innerText
-
-    renderingCtx.fillText(text, initialCoordinate.x, initialCoordinate.y)
-  }
+//  def drawPuzzleCorrectSolution(
+//      renderingCtx: CanvasRenderingContext2D,
+//      correctState: Boolean,
+//      translationsData: TranslationsModel
+//  ): Unit = {
+//    val textSize = 23
+//    renderingCtx.fillStyle =
+//      if (correctState)
+//        s"rgb(${CanvasColor.DarkGreen().fillColor})"
+//      else
+//        s"rgb(${CanvasColor.Red().fillColor})"
+//    renderingCtx.font = s"bold ${textSize}px serif"
+//    renderingCtx.textBaseline = "bottom"
+//    renderingCtx.textAlign = "right"
+//
+//    val initialCoordinate: Coordinate =
+//      screenModel.get.mainBoardCanvasSize.map { case Coordinate(x, y) =>
+//        Coordinate(x - SquareSizeBig.get, y - textSize)
+//      }
+//
+//    val text: String =
+//      if (correctState)
+//        translationsData.puzzleCorrect.innerText
+//      else
+//        translationsData.puzzleIncorrect.innerText
+//
+//    renderingCtx.fillText(text, initialCoordinate.x, initialCoordinate.y)
+//  }
 
   def createFleetPlacePreview(nested: NestedInterceptor): Binding = {
     nested(
