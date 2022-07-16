@@ -9,7 +9,7 @@ import io.udash.component.ComponentId
 import io.udash.css.CssView
 import io.udash.i18n._
 import io.udash.properties.single.Property
-import org.scalajs.dom.html.Div
+import org.scalajs.dom.html.{Div, Span}
 import org.scalajs.dom.{UIEvent, html, window}
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasImage
@@ -21,7 +21,7 @@ import pt.rmartins.battleships.frontend.views.model.ModeType._
 import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game.GameMode._
-import pt.rmartins.battleships.shared.model.game.{AttackType, Coordinate, Turn}
+import pt.rmartins.battleships.shared.model.game._
 import scalatags.JsDom
 import scalatags.JsDom.all.{span, _}
 
@@ -31,6 +31,7 @@ class PlayerVsUtils(
     preGameModel: ModelProperty[PreGameModel],
     gameModel: ModelProperty[GameModel],
     screenModel: ModelProperty[ScreenModel],
+    chatModel: ModelProperty[ChatModel],
     presenter: GamePresenter,
     boardView: BoardView,
     preGameView: PreGameView,
@@ -231,7 +232,7 @@ class PlayerVsUtils(
     screenModel.subProp(_.hideMyBoard).set(!screenModel.get.hideMyBoard)
   }
 
-  def mainDiv(nested: NestedInterceptor): Div = {
+  def mainDiv(nested: NestedInterceptor): Div =
     div(
       nested(produceWithNested(presenter.modeTypeProperty) {
         case (Some(PlacingGameModeType), nested) =>
@@ -239,12 +240,11 @@ class PlayerVsUtils(
         case (Some(PlayingModeType), nested) =>
           gameDiv(nested)
         case (Some(GameOverModeType), nested) =>
-          div.render
+          div("Game over!").render
         case _ =>
           div.render
       })
     ).render
-  }
 
   private def placingShipsDiv(nested: NestedInterceptor): Div = {
     val gameDiv: Div =
@@ -282,14 +282,14 @@ class PlayerVsUtils(
     ).render
   }
 
-  private def placingShipsFooter(nested: NestedInterceptor): Div = {
+  private def placingShipsFooter(nested: NestedInterceptor): Div =
     div(
       `class` := "card-footer",
       nested(
         produce(presenter.placingShipsModeProperty) {
           case Some(PlacingShipsMode(false, _)) =>
             div(
-              `class` := "row justify-content-between mx-0",
+              `class` := "d-flex justify-content-around mx-0",
               div(
                 `class` := "row mx-0",
                 div(`class` := "mx-2", confirmShipsButton),
@@ -301,7 +301,7 @@ class PlayerVsUtils(
             ).render
           case Some(PlacingShipsMode(true, _)) =>
             div(
-              `class` := "row mx-0",
+              `class` := "d-flex justify-content-center mx-0",
               div(`class` := "mx-2", undoButton),
               div(`class` := "mx-2", resetButton)
             ).render
@@ -310,7 +310,6 @@ class PlayerVsUtils(
         }
       )
     ).render
-  }
 
   private def gameDiv(nested: NestedInterceptor): Div = {
     val gameDiv: Div =
@@ -319,15 +318,27 @@ class PlayerVsUtils(
         GameStyles.mainCardHeight,
         div(
           `class` := "row",
-          currentTurnDiv(nested),
-          boardView.createFleetPreview(nested)
+          div(
+            `class` := "col-12",
+            currentTurnDiv(nested)
+          ),
+          div(
+            `class` := "col-12",
+            boardView.createFleetPreview(nested)
+          )
         ),
         boardView.drawMainBoardDiv(nested),
         chatUtils.chatAndMovesDiv(nested),
         div(
           `class` := "row",
-          currentTurnDiv(nested),
-          boardView.drawSmallBoardDiv(nested),
+          div(
+            `class` := "col-12",
+            gameTimeDiv(nested)
+          ),
+          div(
+            `class` := "col-12",
+            boardView.drawSmallBoardDiv(nested)
+          ),
         ),
       ).render
 
@@ -358,34 +369,16 @@ class PlayerVsUtils(
     ).render
   }
 
-  private def gameFooter(nested: NestedInterceptor): Div = {
+  private def gameFooter(nested: NestedInterceptor): Div =
     div(
       `class` := "card-footer",
       nested(
         produce(presenter.gameModeProperty) {
-          case Some(PlacingShipsMode(false, _)) =>
-            div(
-              `class` := "row justify-content-between mx-0",
-              div(
-                `class` := "row mx-0",
-                div(`class` := "mx-2", confirmShipsButton),
-                div(`class` := "mx-2", undoButton),
-                div(`class` := "mx-2", resetButton),
-                div(`class` := "mx-2", randomPlacementButton)
-              ),
-              div(`class` := "mx-2", editRulesButton)
-            ).render
-          case Some(PlacingShipsMode(true, _)) =>
-            div(
-              `class` := "row mx-0",
-              div(`class` := "mx-2", undoButton),
-              div(`class` := "mx-2", resetButton)
-            ).render
           case Some(PlayingMode(_, _, _, _, _)) =>
             div(
-              `class` := "row justify-content-between mx-0",
+              `class` := "d-flex justify-content-around mx-0",
               div(
-                `class` := "row mx-0",
+                `class` := "d-flex mx-0",
                 div(`class` := "ml-2", cancelQueuedAttacksButton),
                 div(`class` := "mx-1", launchAttackButton)
               ),
@@ -396,9 +389,8 @@ class PlayerVsUtils(
         }
       )
     ).render
-  }
 
-  private def currentTurnDiv(nested: NestedInterceptor): Div = {
+  private def currentTurnDiv(nested: NestedInterceptor): Div =
     div(
       nested(
         produceWithNested(presenter.gameModeProperty) {
@@ -425,8 +417,10 @@ class PlayerVsUtils(
                   FontAwesome.Solid.infoCircle
                 ),
                 nested(translatedDynamic(Translations.Game.turn)(_.apply())),
+                " ",
                 currentTurn,
-                ":"
+                ":",
+                isMyTurn.toString
               )
 
             val turnAttacksDiv =
@@ -443,7 +437,6 @@ class PlayerVsUtils(
         }
       )
     ).render
-  }
 
   private def createExtraTurnDiv(
       nested: NestedInterceptor,
@@ -469,5 +462,85 @@ class PlayerVsUtils(
       attackTypes.map { attackType => createAttackTypeDiv(attackType, 1) }
     )
   }
+
+  private def gameTimeDiv(nested: NestedInterceptor): Div =
+    div(
+      `class` := "row m-1",
+      div(
+        `class` := "col-12",
+        playerStatsSummaryDiv(
+          nested,
+          chatModel.subProp(_.username).transform(Some(_)),
+          Translations.Game.myProgress,
+          gameModel.subProp(_.timeRemaining).transform(_.map(_._1))
+        )
+      ),
+      div(
+        `class` := "col-12",
+        playerStatsSummaryDiv(
+          nested,
+          presenter.enemyUsernameProperty,
+          Translations.Game.enemyProgress,
+          gameModel.subProp(_.timeRemaining).transform(_.map(_._2))
+        )
+      ),
+    ).render
+
+  private def playerStatsSummaryDiv(
+      nested: NestedInterceptor,
+      playerUsername: ReadableProperty[Option[Username]],
+      playerProgressKey0: TranslationKey0,
+      timeRemainingProperty: ReadableProperty[Option[TimeRemaining]]
+  ): Div =
+    div(
+      `class` := "row",
+      div(
+        `class` := "col-12",
+        nested(produce(playerUsername) {
+          case Some(Username(username)) => span(b(username)).render
+          case None                     => span.render
+        })
+      ),
+      div(
+        `class` := "col-12 border rounded border-dark p-2",
+        nested(translatedDynamic(playerProgressKey0)(_.apply())),
+      ),
+      div(
+        `class` := "col-12 border rounded border-dark p-2",
+        nested(translatedDynamic(Translations.Game.remainingTime)(_.apply())),
+        nested(
+          produceWithNested(timeRemainingProperty) {
+            case (Some(timeRemaining), nested) =>
+              def toTimeStr(seconds: Int): JsDom.TypedTag[Span] =
+                span("%02d:%02d".format(seconds / 60, seconds % 60))
+
+              def toShortTimeStr(secondsOpt: Option[Int]): JsDom.TypedTag[Span] =
+                secondsOpt
+                  .map {
+                    case 0 =>
+                      span(b(" + "), b(GameStyles.redText, "00")) // TODO red
+                    case seconds if seconds >= 60 =>
+                      span(" + %02d:%02d".format(seconds / 60, seconds % 60))
+                    case seconds =>
+                      span(" + %02d".format(seconds))
+                  }
+                  .getOrElse(span())
+
+              val textSpan: Span =
+                span(
+                  toTimeStr(timeRemaining.totalTimeRemainingMillis / 1000),
+                  toShortTimeStr(timeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000))
+                ).render
+
+              div(
+                `class` := "row m-1",
+                div(`class` := "col-12", textSpan)
+              ).render
+            case _ =>
+              div.render
+          }
+        )
+      )
+    ).render
 
 }

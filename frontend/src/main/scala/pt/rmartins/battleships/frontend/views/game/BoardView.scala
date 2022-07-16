@@ -817,7 +817,7 @@ class BoardView(
       gamePresenter.gameStateProperty,
       combine(
         screenModel.subProp(_.tick),
-        screenModel.subProp(_.canvasSize),
+        screenModel.subProp(_.canvasSize), // TODO remove?
         screenModel.subProp(_.hoverMove),
       ),
       combine(
@@ -842,15 +842,9 @@ class BoardView(
           hideMyBoard = false,
         )
       case (
-            Some(GameState(_, _, me, enemy, PlayingMode(isMyTurn, _, _, _, _))),
+            Some(GameState(_, _, me, _, PlayingMode(isMyTurn, _, _, _, _))),
             (screenModelDataTick, _, hoverMove),
-            (
-              mousePositionOpt,
-              selectedShipOpt,
-              selectedAction,
-              turnAttacksQueuedStatus,
-              turnAttacks
-            ),
+            (_, selectedShipOpt, selectedAction, turnAttacksQueuedStatus, turnAttacks),
           ) =>
         clearCanvas(mainBoardCanvas)
         drawEnemyBoard(
@@ -875,27 +869,21 @@ class BoardView(
   def drawSmallBoardDiv(nested: NestedInterceptor): Div = {
     combine(
       gamePresenter.gameStateProperty,
-      screenModel.subProp(_.tick),
-      screenModel.subProp(_.canvasSize),
-      gameModel.subProp(_.mousePosition),
-      gameModel.subProp(_.selectedShip),
+      screenModel.subProp(_.tick)
     ).listen {
       case (
             Some(GameState(_, _, me, enemy, PlayingMode(isMyTurn, _, _, _, _))),
-            screenModelDataTick,
-            _,
-            mousePositionOpt,
-            _,
+            screenModelDataTick
           ) =>
         clearCanvas(smallBoardCanvas)
         drawMyBoard(
           canvas = smallBoardCanvas,
           myBoard = me.myBoard,
           turnPlayHistory = enemy.turnPlayHistory,
-          mousePositionOpt = mousePositionOpt,
-          fillEmptySquares = false,
+          mousePositionOpt = None,
+          fillEmptySquares = true,
           hideMyBoard = false,
-          isMyTurn = isMyTurn,
+          isMyTurn = !isMyTurn,
           tick = screenModelDataTick
         )
       case _ =>
@@ -954,23 +942,16 @@ class BoardView(
             val roundedBoardCoor =
               boardCoor.roundTo(boardSize - ship.size + Coordinate(1, 1))
 
-            def drawCoordinate(coor: Coordinate): Unit =
-              if (canPlaceInBoard(myBoard, ship, roundedBoardCoor))
-                drawBoardSquare(
-                  renderingCtx,
-                  boardPosition,
-                  coor,
-                  squareSize,
-                  CanvasColor.Ship(CanvasBorder.Standard(alpha = 0.9), alpha = 0.9)
-                )
-              else
-                drawBoardSquare(
-                  renderingCtx,
-                  boardPosition,
-                  coor,
-                  squareSize,
-                  CanvasColor.Red(CanvasBorder.Standard(alpha = 0.75), alpha = 0.75)
-                )
+            def drawCoordinate(coor: Coordinate): Unit = {
+              val alpha = if (canPlaceInBoard(myBoard, ship, roundedBoardCoor)) 0.9 else 0.75
+              drawBoardSquare(
+                renderingCtx,
+                boardPosition,
+                coor,
+                squareSize,
+                CanvasColor.Ship(CanvasBorder.Standard(alpha = alpha), alpha = alpha)
+              )
+            }
 
             ship.pieces.map(_ + roundedBoardCoor).foreach(drawCoordinate)
           case _ =>
@@ -1151,20 +1132,18 @@ class BoardView(
         case GameAction.ShotSelector
             if turnAttacks.exists(!_.isPlaced) &&
               gamePresenter.isValidCoordinateTarget(enemyBoardCoor) =>
-          turnAttacks.find(_.coordinateOpt.isEmpty) match {
-            case Some(Attack(attackType, _)) =>
-              val image: CanvasImage =
-                if (attackType == AttackType.Simple) attackSimpleImage else radarImage
-              drawImageAbs(
-                renderingCtx,
-                image.element,
-                x = boardPosition.x + enemyBoardCoor.x * squareSize + 2,
-                y = boardPosition.y + enemyBoardCoor.y * squareSize + 2,
-                squareSize - 4,
-                squareSize - 4,
-                useAntiAliasing = true
-              )
-            case None =>
+          turnAttacks.find(_.coordinateOpt.isEmpty).foreach { case Attack(attackType, _) =>
+            val image: CanvasImage =
+              if (attackType == AttackType.Simple) attackSimpleImage else radarImage
+            drawImageAbs(
+              renderingCtx,
+              image.element,
+              x = boardPosition.x + enemyBoardCoor.x * squareSize + 2,
+              y = boardPosition.y + enemyBoardCoor.y * squareSize + 2,
+              squareSize - 4,
+              squareSize - 4,
+              useAntiAliasing = true
+            )
           }
         case _ =>
           val boardMark = me.enemyBoardMarks(enemyBoardCoor.x)(enemyBoardCoor.y)._2

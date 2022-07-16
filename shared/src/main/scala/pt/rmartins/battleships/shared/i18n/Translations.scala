@@ -75,8 +75,11 @@ object Translations {
     val loggedInAs = key("game.header.logged_in_as")
     val playingAgainst = key("game.header.playing_against")
     val turn = key("game.header.turn")
-    val myTime = key("game.header.my_time")
-    val enemyTime = key("game.header.enemy_time")
+//    val myTime = key("game.header.my_time")
+//    val enemyTime = key("game.header.enemy_time")
+    val remainingTime = key("game.header.remaining_time")
+    val myProgress = key("game.header.my_progress")
+    val enemyProgress = key("game.header.enemy_progress")
 
     val startGameVsBot = key("game.buttons.start_game_bot")
     val invitePlayerButton = key("game.buttons.invite_player")

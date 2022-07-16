@@ -42,4 +42,8 @@ object GameStyles extends CssBase {
     whiteSpace.nowrap.important
   )
 
+  val redText: CssStyle = style(
+    color :=! "#FF0000"
+  )
+
 }
