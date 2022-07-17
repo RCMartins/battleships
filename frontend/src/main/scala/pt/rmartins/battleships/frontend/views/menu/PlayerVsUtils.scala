@@ -13,7 +13,7 @@ import org.scalajs.dom.html.{Div, Span}
 import org.scalajs.dom.{UIEvent, html, window}
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasImage
-import pt.rmartins.battleships.frontend.views.game.Utils.combine
+import pt.rmartins.battleships.frontend.views.game.Utils._
 import pt.rmartins.battleships.frontend.views.game._
 import pt.rmartins.battleships.frontend.views.model.AttacksQueuedStatus
 import pt.rmartins.battleships.frontend.views.model.JoinedPreGame.PlayingAgainstPlayer
@@ -515,29 +515,40 @@ class PlayerVsUtils(
                 Some(PlayingMode(isMyTurn, Turn(currentTurn, extraTurn), turnAttackTypes, _, _)),
                 nested
               ) =>
-            val extraTurnDiv: JsDom.TypedTag[Div] =
-              extraTurn match {
-                case Some(value) => div(b(value))
-                case None        => div()
-              }
+            val isMyTurnKey0: TranslationKey0 =
+              if (isMyTurn)
+                Translations.Game.yourTurn
+              else
+                Translations.Game.enemyTurn
 
             val turnNumberDiv =
               div(
                 `class` := "d-flex align-items-center",
                 span(
-                  `class` := "m-2",
+                  `class` := "my-2 mr-2",
                   FontAwesome.Modifiers.Sizing.x2,
                   FontAwesome.Solid.infoCircle
                 ),
-                nested(translatedDynamic(Translations.Game.turn)(_.apply())),
-                " ",
-                currentTurn,
-                ":",
-                isMyTurn.toString
+                h3(
+                  span(nested(translatedDynamic(Translations.Game.turn)(_.apply()))),
+                  span(nbsp),
+                  span(currentTurn),
+                  span(":"),
+                  span(nbsp),
+                  b(nested(translatedDynamic(isMyTurnKey0)(_.apply()))),
+                )
               )
 
-            val turnAttacksDiv =
-              createExtraTurnDiv(nested, turnAttackTypes)
+            val extraTurnDiv: JsDom.TypedTag[Div] =
+              extraTurn match {
+                case Some(_) =>
+                  div(b(nested(translatedDynamic(Translations.Game.extraTurn)(_.apply()))))
+                case None =>
+                  div()
+              }
+
+            val turnAttacksDiv: JsDom.TypedTag[Div] =
+              createAttackTypesDiv(nested, turnAttackTypes)
 
             div(
               `class` := "row m-1",
@@ -551,7 +562,7 @@ class PlayerVsUtils(
       )
     ).render
 
-  private def createExtraTurnDiv(
+  private def createAttackTypesDiv(
       nested: NestedInterceptor,
       attackTypes: List[AttackType]
   ): JsDom.TypedTag[Div] = {

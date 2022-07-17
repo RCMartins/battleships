@@ -619,7 +619,7 @@ class GamePresenter(
 
     translationsModel
       .subProp(_.extraTurnText)
-      .set(span(translatedDynamic(Translations.Game.extraTurnPopup)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.Game.extraTurn)(_.apply())).render)
     translationsModel
       .subProp(_.myBoardTitle)
       .set(span(translatedDynamic(Translations.Game.myBoardTitle)(_.apply())).render)

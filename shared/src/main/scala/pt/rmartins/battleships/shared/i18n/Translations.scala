@@ -80,6 +80,7 @@ object Translations {
     val remainingTime = key("game.header.remaining_time")
     val myProgress = key("game.header.my_progress")
     val enemyProgress = key("game.header.enemy_progress")
+    val extraTurn = key("game.header.extra_turn")
 
     val startGameVsBot = key("game.buttons.start_game_bot")
     val invitePlayerButton = key("game.buttons.invite_player")
@@ -105,8 +106,6 @@ object Translations {
     val hideEnemyBoardButton = key("game.buttons.hide_enemy_board")
     val showEnemyBoardButton = key("game.buttons.show_enemy_board")
     val closeButton = key("game.buttons.close")
-
-    val extraTurnPopup = key("game.popup.extra_turn")
 
     val myBoardTitle = key("game.board.my_board_title")
     val enemyBoardTitle = key("game.board.enemy_board_title")
