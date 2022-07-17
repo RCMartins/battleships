@@ -421,7 +421,7 @@ class ChatUtils(
     }
 
     div(
-      `class` := "row",
+      `class` := "row m-0",
       div(
         `class` := "col-8",
         ul(

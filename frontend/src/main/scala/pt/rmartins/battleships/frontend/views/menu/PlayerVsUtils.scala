@@ -18,7 +18,7 @@ import pt.rmartins.battleships.frontend.views.game._
 import pt.rmartins.battleships.frontend.views.model.AttacksQueuedStatus
 import pt.rmartins.battleships.frontend.views.model.JoinedPreGame.PlayingAgainstPlayer
 import pt.rmartins.battleships.frontend.views.model.ModeType._
-import pt.rmartins.battleships.shared.css.GameStyles
+import pt.rmartins.battleships.shared.css.GameStyles._
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game._
@@ -303,7 +303,7 @@ class PlayerVsUtils(
     val mainDiv: Div =
       div(
         `class` := "d-flex justify-content-center",
-        GameStyles.mainCardHeight,
+        mainCardHeight,
         boardView.drawMainBoardDiv(nested),
         boardView.createFleetPlacePreview(nested)
       ).render
@@ -367,30 +367,42 @@ class PlayerVsUtils(
   private def gameDiv(nested: NestedInterceptor): Div = {
     val mainDiv: Div =
       div(
-        `class` := "d-flex justify-content-center",
-        GameStyles.mainCardHeight,
+        `class` := "d-flex justify-content-center row m-0",
+        mainCardHeight,
         div(
-          `class` := "row",
+          `class` := "col-2 px-1",
           div(
-            `class` := "col-12",
-            currentTurnDiv(nested)
-          ),
-          div(
-            `class` := "col-12",
-            boardView.createFleetPreview(nested)
+            `class` := "row m-0",
+            div(
+              `class` := "col-12 pr-0",
+              currentTurnDiv(nested)
+            ),
+            div(
+              `class` := "col-12 pr-0",
+              boardView.createFleetPreview(nested)
+            )
           )
         ),
-        boardView.drawMainBoardDiv(nested),
-        chatUtils.chatAndMovesDiv(nested),
         div(
-          `class` := "row",
+          `class` := "col-5 px-1",
+          boardView.drawMainBoardDiv(nested),
+        ),
+        div(
+          `class` := "col-3 px-1",
+          chatUtils.chatAndMovesDiv(nested),
+        ),
+        div(
+          `class` := "col-2 px-1",
           div(
-            `class` := "col-12",
-            gameTimeDiv(nested)
-          ),
-          div(
-            `class` := "col-12",
-            boardView.drawSmallBoardDiv(nested)
+            `class` := "row m-0",
+            div(
+              `class` := "col-12",
+              gameTimeDiv(nested)
+            ),
+            div(
+              `class` := "col-12",
+              boardView.drawSmallBoardDiv(nested)
+            ),
           ),
         ),
       ).render
@@ -447,7 +459,7 @@ class PlayerVsUtils(
     val mainDiv: Div =
       div(
         `class` := "d-flex justify-content-center",
-        GameStyles.mainCardHeight,
+        mainCardHeight,
         boardView.drawMainBoardDiv(nested),
         chatUtils.chatAndMovesDiv(nested),
         div(
@@ -515,11 +527,19 @@ class PlayerVsUtils(
                 Some(PlayingMode(isMyTurn, Turn(currentTurn, extraTurn), turnAttackTypes, _, _)),
                 nested
               ) =>
-            val isMyTurnKey0: TranslationKey0 =
+            val isMyTurnDiv: JsDom.TypedTag[Div] =
               if (isMyTurn)
-                Translations.Game.yourTurn
+                div(
+                  `class` := "m-0",
+                  growAndShrink,
+                  b(nested(translatedDynamic(Translations.Game.yourTurn)(_.apply()))),
+                )
               else
-                Translations.Game.enemyTurn
+                div(
+                  `class` := "m-0",
+                  turnTextSize,
+                  b(nested(translatedDynamic(Translations.Game.enemyTurn)(_.apply()))),
+                )
 
             val turnNumberDiv =
               div(
@@ -529,13 +549,15 @@ class PlayerVsUtils(
                   FontAwesome.Modifiers.Sizing.x2,
                   FontAwesome.Solid.infoCircle
                 ),
-                h3(
-                  span(nested(translatedDynamic(Translations.Game.turn)(_.apply()))),
-                  span(nbsp),
-                  span(currentTurn),
-                  span(":"),
-                  span(nbsp),
-                  b(nested(translatedDynamic(isMyTurnKey0)(_.apply()))),
+                div(
+                  h3(
+                    `class` := "m-0",
+                    span(nested(translatedDynamic(Translations.Game.turn)(_.apply()))),
+                    span(nbsp),
+                    span(currentTurn),
+                    span(":"),
+                  ),
+                  isMyTurnDiv
                 )
               )
 
@@ -552,9 +574,9 @@ class PlayerVsUtils(
 
             div(
               `class` := "row m-1",
-              div(`class` := "col-12", turnNumberDiv),
-              div(`class` := "col-12", extraTurnDiv),
-              div(`class` := "col-12", turnAttacksDiv)
+              div(`class` := "col-12 p-0 mb-2", turnNumberDiv),
+              div(`class` := "col-12 p-0", extraTurnDiv),
+              div(`class` := "col-12 p-0", turnAttacksDiv)
             ).render
           case _ =>
             div.render
@@ -662,7 +684,7 @@ class PlayerVsUtils(
                   secondsOpt
                     .map {
                       case 0 =>
-                        span(" + ", b(GameStyles.redText, "00"))
+                        span(" + ", b(redTextStyle, "00"))
                       case seconds if seconds >= 60 =>
                         span(" + %02d:%02d".format(seconds / 60, seconds % 60))
                       case seconds =>

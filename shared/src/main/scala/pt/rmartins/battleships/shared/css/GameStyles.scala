@@ -2,6 +2,7 @@ package pt.rmartins.battleships.shared.css
 
 import io.udash.css._
 
+import scala.concurrent.duration.DurationInt
 import scala.language.postfixOps
 
 object GameStyles extends CssBase {
@@ -42,8 +43,30 @@ object GameStyles extends CssBase {
     whiteSpace.nowrap.important
   )
 
-  val redText: CssStyle = style(
+  val blackTextStyle: CssStyle = style(
+    color :=! "#000000"
+  )
+
+  val redTextStyle: CssStyle = style(
     color :=! "#FF0000"
+  )
+
+  val turnTextSize: CssStyle = style(
+    fontSize :=! "20px"
+  )
+
+  private val growAndShrinkKeyFrames = style(
+    keyframes(
+      0.0 -> keyframe(blackTextStyle, turnTextSize, height :=! "30px"),
+      50.0 -> keyframe(redTextStyle, fontSize :=! "26px", height :=! "30px"),
+      100.0 -> keyframe(blackTextStyle, turnTextSize, height :=! "30px"),
+    )
+  )
+
+  val growAndShrink: CssStyle = style(
+    animationName(growAndShrinkKeyFrames),
+    animationIterationCount.infinite,
+    animationDuration(2 seconds),
   )
 
 }

@@ -909,7 +909,6 @@ class BoardView(
     }
 
     div(
-      `class` := "mx-1",
       mainBoardCanvas
     ).render
   }
