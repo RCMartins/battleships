@@ -12,7 +12,7 @@ import io.udash.css.CssView
 import io.udash.i18n._
 import org.scalajs.dom
 import org.scalajs.dom.document
-import org.scalajs.dom.html.{Canvas, Div, LI}
+import org.scalajs.dom.html.{Canvas, Div, Input, LI}
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.frontend.views.game._
@@ -23,6 +23,8 @@ import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.BoardUtils._
 import scalatags.JsDom
 import scalatags.JsDom.all._
+
+import scala.util.chaining.scalaUtilChainingOps
 
 class ChatUtils(
     chatModel: ModelProperty[ChatModel],
@@ -163,19 +165,162 @@ class ChatUtils(
       msgForm
     ).render
 
-  private def myMovesTabItem(nested: NestedInterceptor): Div =
+  private def myMovesTabItem(nested: NestedInterceptor): Div = {
+    val showAllMovesCheckbox: Input =
+      input(
+        `class` := "form-control px-1",
+        id := "allMoves-checkbox",
+        width := "32px",
+        `type` := "checkbox"
+      ).render
+
+    showAllMovesCheckbox.onchange = _ => {
+      screenModel.subProp(_.showAllMoves).set(showAllMovesCheckbox.checked)
+    }
+
+    val missesMovesCheckbox: Input =
+      input(
+        `class` := "form-control px-1",
+        id := "missesMoves-checkbox",
+        width := "32px",
+        `type` := "checkbox"
+      ).render
+
+    screenModel
+      .subProp(_.showMissesMoves)
+      .listen(
+        { showMissesMoves =>
+          if (missesMovesCheckbox.checked != showMissesMoves)
+            missesMovesCheckbox.checked = showMissesMoves
+        },
+        initUpdate = true
+      )
+
+    missesMovesCheckbox.onchange = _ => {
+      screenModel.subProp(_.showMissesMoves).set(missesMovesCheckbox.checked)
+    }
+
+    val disabledMovesCheckbox: Input =
+      input(
+        `class` := "form-control px-1",
+        id := "disabledMoves-checkbox",
+        width := "32px",
+        `type` := "checkbox"
+      ).render
+
+    screenModel
+      .subProp(_.showDisabledMoves)
+      .listen(
+        { showDisabledMoves =>
+          if (disabledMovesCheckbox.checked != showDisabledMoves)
+            disabledMovesCheckbox.checked = showDisabledMoves
+        },
+        initUpdate = true
+      )
+
+    disabledMovesCheckbox.onchange = _ => {
+      screenModel.subProp(_.showDisabledMoves).set(disabledMovesCheckbox.checked)
+    }
+
+    val optionsContentDiv: Div =
+      div(
+        `class` := "position-absolute mr-4 border rounded border-black invisible",
+        style := "left: 0; bottom: 0",
+        div(
+          `class` := "row m-0 px-0 bg-white",
+          div(
+            `class` := "col-12 btn-group m-2",
+            showAllMovesCheckbox,
+            label(
+              `class` := "input-group-text",
+              `for` := "allMoves-checkbox",
+              style := "user-select: none",
+              span(
+                `class` := "pl-1",
+                nested(translatedDynamic(Translations.Game.allMoves)(_.apply()))
+              )
+            )
+          ),
+          div(
+            `class` := "col-12 btn-group m-2 ml-5",
+            missesMovesCheckbox,
+            label(
+              `class` := "input-group-text",
+              `for` := "missesMoves-checkbox",
+              style := "user-select: none",
+              span(
+                `class` := "pl-1",
+                nested(translatedDynamic(Translations.Game.missesMoves)(_.apply()))
+              )
+            )
+          ),
+          div(
+            `class` := "col-12 btn-group m-2 ml-5",
+            disabledMovesCheckbox,
+            label(
+              `class` := "input-group-text",
+              `for` := "disabledMoves-checkbox",
+              style := "user-select: none",
+              span(
+                `class` := "pl-1",
+                nested(translatedDynamic(Translations.Game.disabledMoves)(_.apply()))
+              )
+            )
+          )
+        )
+      ).render
+
+    screenModel
+      .subProp(_.showAllMoves)
+      .listen(
+        { showAllMoves =>
+          if (showAllMovesCheckbox.checked != showAllMoves)
+            showAllMovesCheckbox.checked = showAllMoves
+          missesMovesCheckbox.disabled = showAllMovesCheckbox.checked
+          disabledMovesCheckbox.disabled = showAllMovesCheckbox.checked
+        },
+        initUpdate = true
+      )
+
     div(
-      `class` := "tab-pane fade" +
+      `class` := "position-relative tab-pane fade" +
         (if (presenter.selectedTabProperty.get == ScreenModel.myMovesTab)
            " show active"
          else ""),
       id := ScreenModel.myMovesTab,
       role := "tabpanel",
-      ChatStyles.myMovesWindow,
-      nested(produce(presenter.myMovesHistoryProperty) { turnPlaySeqProperty =>
-        turnPlaySeqProperty.flatMap(turnPlay => turnPlaysToHtml(showCheckbox = true, turnPlay))
-      })
+      div(
+        ChatStyles.myMovesWindow,
+        nested(produceWithNested(screenModel.subProp(_.showAllMoves)) {
+          case (showAllMoves, nested) =>
+            div(
+              nested(produce(presenter.myMovesHistoryProperty) { turnPlaySeqProperty =>
+                turnPlaySeqProperty.flatMap(turnPlay =>
+                  turnPlaysToHtml(showCheckbox = !showAllMoves, turnPlay)
+                )
+              })
+            ).render
+        })
+      ),
+      optionsContentDiv,
+      div(
+        `class` := "p-1 position-absolute",
+        style := "left: 0; bottom: 0",
+        span(
+          style := "cursor: pointer",
+          FontAwesome.fas("gear"),
+          FontAwesome.Modifiers.Sizing.x2,
+        ),
+      ).render.tap { optionsDiv =>
+        optionsDiv.onclick = _ => {
+          if (optionsContentDiv.classList.contains("invisible"))
+            optionsContentDiv.classList.remove("invisible")
+          else
+            optionsContentDiv.classList.add("invisible")
+        }
+      }
     ).render
+  }
 
   private def enemyMovesTabItem(nested: NestedInterceptor): Div =
     div(
@@ -185,7 +330,7 @@ class ChatUtils(
          else ""),
       id := ScreenModel.enemyMovesTab,
       role := "tabpanel",
-      ChatStyles.myMovesWindow,
+      ChatStyles.enemyMovesWindow,
       nested(repeat(presenter.enemyMovesHistoryProperty) { turnPlayProperty =>
         turnPlaysToHtml(showCheckbox = false, turnPlayProperty.get)
       })
@@ -376,56 +521,11 @@ class ChatUtils(
         nested(button)
       )
 
-    val missesMovesCheckbox =
-      input(
-        `class` := "form-control px-1",
-        id := "missesMoves-checkbox",
-        width := "32px",
-        `type` := "checkbox"
-      ).render
-
-    screenModel
-      .subProp(_.showMissesMoves)
-      .listen(
-        { showMissesMoves =>
-          if (missesMovesCheckbox.checked != showMissesMoves)
-            missesMovesCheckbox.checked = showMissesMoves
-        },
-        initUpdate = true
-      )
-
-    missesMovesCheckbox.onchange = _ => {
-      screenModel.subProp(_.showMissesMoves).set(missesMovesCheckbox.checked)
-    }
-
-    val disabledMovesCheckbox =
-      input(
-        `class` := "form-control px-1",
-        id := "disabledMoves-checkbox",
-        width := "32px",
-        `type` := "checkbox"
-      ).render
-
-    screenModel
-      .subProp(_.showDisabledMoves)
-      .listen(
-        { showDisabledMoves =>
-          if (disabledMovesCheckbox.checked != showDisabledMoves)
-            disabledMovesCheckbox.checked = showDisabledMoves
-        },
-        initUpdate = true
-      )
-
-    disabledMovesCheckbox.onchange = _ => {
-      screenModel.subProp(_.showDisabledMoves).set(disabledMovesCheckbox.checked)
-    }
-
     div(
-      `class` := "row m-0",
+      `class` := "my-2 p-1 border rounded border-black",
       div(
-        `class` := "col-8",
         ul(
-          `class` := "nav nav-tabs",
+          `class` := "nav nav-pills nav-justified",
           `role` := "tablist",
           makeNavItem(chatTabButton),
           makeNavItem(myMovesTabButton),
@@ -436,37 +536,6 @@ class ChatUtils(
           messagesTabItem(nested),
           myMovesTabItem(nested),
           enemyMovesTabItem(nested)
-        )
-      ),
-      div(
-        `class` := "col-4 px-0",
-        div(
-          `class` := "btn-group m-3 mt-5",
-          missesMovesCheckbox,
-          label(
-            `class` := "input-group-text",
-            `for` := "missesMoves-checkbox",
-            style := "user-select: none",
-            span(FontAwesome.Solid.eye),
-            span(
-              `class` := "pl-1",
-              nested(translatedDynamic(Translations.Game.missesMoves)(_.apply()))
-            )
-          )
-        ),
-        div(
-          `class` := "btn-group m-3",
-          disabledMovesCheckbox,
-          label(
-            `class` := "input-group-text",
-            `for` := "disabledMoves-checkbox",
-            style := "user-select: none",
-            span(FontAwesome.Solid.eye),
-            span(
-              `class` := "pl-1",
-              nested(translatedDynamic(Translations.Game.disabledMoves)(_.apply()))
-            )
-          )
         )
       )
     )

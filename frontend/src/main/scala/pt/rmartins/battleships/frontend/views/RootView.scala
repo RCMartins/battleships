@@ -31,7 +31,10 @@ class RootView(translationsService: TranslationsService) extends ContainerView w
     div(
       // loads Bootstrap and FontAwesome styles from CDN
       UdashBootstrap.loadBootstrapStyles(),
-      UdashBootstrap.loadFontAwesome(),
+      link(
+        rel := "stylesheet",
+        href := "https://use.fontawesome.com/releases/v6.1.1/css/all.css"
+      ).render,
       childViewContainer
     )
 //    div(

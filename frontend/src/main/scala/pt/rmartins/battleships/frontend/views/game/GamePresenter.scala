@@ -325,15 +325,24 @@ class GamePresenter(
     combine(
       gameStateProperty,
       gamePuzzleStateProperty,
+      screenModel.subProp(_.showAllMoves),
       screenModel.subProp(_.showMissesMoves),
       screenModel.subProp(_.showDisabledMoves),
       screenModel.subProp(_.disabledMovesSet)
     ).transformToSeq {
-      case (gameStateOpt, gamePuzzleState, showMissesMoves, showDisabledMoves, disabledMovesSet) =>
+      case (
+            gameStateOpt,
+            gamePuzzleState,
+            showAllMoves,
+            showMissesMoves,
+            showDisabledMoves,
+            disabledMovesSet
+          ) =>
         gameStateOpt
           .map(_.me.turnPlayHistory)
           .orElse(gamePuzzleState.map(_.playerPuzzle.turnPlayHistory))
           .map(_.filter { turnPlay =>
+            showAllMoves ||
             (showMissesMoves || turnPlay.hitHints.exists(_.isShip)) &&
             (showDisabledMoves || !disabledMovesSet(turnPlay.turn))
           })

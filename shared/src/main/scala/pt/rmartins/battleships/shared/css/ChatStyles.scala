@@ -8,12 +8,17 @@ object ChatStyles extends CssBase {
   import dsl._
 
   val messagesWindow: CssStyle = style(
-    height :=! "calc(50vh - 218px)",
+    height :=! "calc(100vh - 257px)",
     overflowY.auto
   )
 
   val myMovesWindow: CssStyle = style(
-    height :=! "calc(50vh - 172px)",
+    height :=! "calc(100vh - 211px)",
+    overflowY.auto
+  )
+
+  val enemyMovesWindow: CssStyle = style(
+    height :=! "calc(100vh - 211px)",
     overflowY.auto
   )
 
@@ -38,4 +43,5 @@ object ChatStyles extends CssBase {
     display.flex,
     alignItems.center
   )
+
 }

@@ -458,21 +458,30 @@ class PlayerVsUtils(
   private def gameOverDiv(nested: NestedInterceptor): Div = {
     val mainDiv: Div =
       div(
-        `class` := "d-flex justify-content-center",
+        `class` := "d-flex justify-content-center row m-0",
         mainCardHeight,
-        boardView.drawMainBoardDiv(nested),
-        chatUtils.chatAndMovesDiv(nested),
         div(
-          `class` := "row",
-          div(
-            `class` := "col-12",
-            gameTimeDiv(nested)
-          ),
-          div(
-            `class` := "col-12",
-            boardView.drawSmallBoardDiv(nested)
-          ),
+          `class` := "col-5 px-1",
+          boardView.drawMainBoardDiv(nested)
         ),
+        div(
+          `class` := "col-3 px-1",
+          chatUtils.chatAndMovesDiv(nested)
+        ),
+        div(
+          `class` := "col-4 px-1",
+          div(
+            `class` := "row",
+            div(
+              `class` := "col-12",
+              gameTimeDiv(nested)
+            ),
+            div(
+              `class` := "col-12",
+              boardView.drawSmallBoardDiv(nested)
+            ),
+          )
+        )
       ).render
 
     window.onresize = (_: UIEvent) => {

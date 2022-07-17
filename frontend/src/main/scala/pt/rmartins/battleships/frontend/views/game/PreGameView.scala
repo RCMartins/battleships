@@ -13,7 +13,6 @@ import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.frontend.views.model.NamedRules
-import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game.RuleTimeLimit._
 import pt.rmartins.battleships.shared.model.game._
@@ -37,12 +36,9 @@ class PreGameView(
 
   private val MaxCustomNamedRules = 5
 
-//  private val defaultHeight = 360
-//  private val PreviewBoardHeight = 320
-//  private val BonusEditorCardHeight = 285
   private val fleetMaxSize: Coordinate = Ship.allShipsFleetMaxX.maxSize
   private val sqSize: Int = Math.min(100 / fleetMaxSize.x, 50 / fleetMaxSize.y)
-  private val canvasSize: Coordinate = fleetMaxSize * sqSize + Coordinate.square(4)
+  private val shipCanvasSize: Coordinate = fleetMaxSize * sqSize + Coordinate.square(4)
 
   private val MinBoardSize = 4
   private val MaxBoardSize = 20
@@ -112,7 +108,7 @@ class PreGameView(
   private def createAllShipElems: Modifier = {
     def createShipCanvas(ship: Ship): Canvas =
       viewUtils.createShipCanvas(
-        canvasSize,
+        shipCanvasSize,
         sqSize,
         ship,
         destroyed = false,
@@ -406,12 +402,11 @@ class PreGameView(
         combine(
           preGameModel.subProp(_.rules).transform(_.boardSize),
           preGameModel.subProp(_.previewBoardOpt),
-          translationsModel.subProp(_.previewBoardTitle),
           screenModel.subProp(_.screenResized),
           screenModel.subProp(_.mainBoardCanvasSize)
         )
       ) {
-        case (boardSize, previewBoardOpt, previewBoardTitle, _, defaultCanvasSize) =>
+        case (boardSize, previewBoardOpt, _, defaultCanvasSize) =>
 //          val usableWidth = PreviewBoardHeight
 
           val boardMargin = Coordinate(1, 1)
@@ -429,15 +424,11 @@ class PreGameView(
             else
               Some(CanvasColor.Water())
 
-          val boardSizeText: String =
-            "%02dx%02d".format(boardSize.x, boardSize.y)
-
-          val boardTitle: String =
-            previewBoardTitle.innerText + " - " + boardSizeText
+//          val boardSizeText: String =
+//            "%02d x %02d".format(boardSize.x, boardSize.y)
 
           canvasUtils.drawBoardLimits(
             renderingCtx,
-//            boardTitle,
             boardSize,
             boardMargin,
             sqSize,

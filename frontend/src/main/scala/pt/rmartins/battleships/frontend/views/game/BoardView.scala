@@ -1789,7 +1789,7 @@ class BoardView(
               )
             ).render.tap { shipDiv =>
               if (amountLeftToPlace > 0)
-                shipDiv.onclick = { _ =>
+                shipDiv.onclick = _ => {
                   gameModel.subProp(_.selectedShip).set(Some(ship))
                 }
             }
