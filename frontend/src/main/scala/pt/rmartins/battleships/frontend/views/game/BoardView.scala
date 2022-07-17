@@ -919,8 +919,11 @@ class BoardView(
       gamePresenter.gameStateProperty,
       combine(
         screenModel.subProp(_.tick),
+        screenModel.subProp(_.hideMyBoard),
         screenModel.subProp(_.revealEnemyBoard),
-        screenModel.subProp(_.hoverMove),
+        screenModel.subProp(_.hoverMove)
+      ),
+      combine(
         SmallBoardPos,
         SmallBoardSquareSize,
         SmallBoardTurnTextSize,
@@ -929,7 +932,8 @@ class BoardView(
     ).listen {
       case (
             Some(GameState(_, _, me, enemy, PlayingMode(isMyTurn, _, _, _, _))),
-            (screenModelDataTick, _, _, boardPos, squareSize, textSize),
+            (screenModelDataTick, hideMyBoard, _, _),
+            (boardPos, squareSize, textSize),
             _
           ) =>
         clearCanvas(smallBoardCanvas)
@@ -942,13 +946,14 @@ class BoardView(
           turnPlayHistory = enemy.turnPlayHistory,
           mousePositionOpt = None,
           fillEmptySquares = true,
-          hideMyBoard = false,
+          hideMyBoard = hideMyBoard,
           isMyTurn = !isMyTurn,
           tick = screenModelDataTick
         )
       case (
             Some(GameState(_, _, me, _, GameOverMode(_, _, _, _, enemyRealBoard))),
-            (_, true, hoverMoveOpt, boardPos, squareSize, textSize),
+            (_, _, true, hoverMoveOpt),
+            (boardPos, squareSize, textSize),
             selectedShipOpt
           ) =>
         clearCanvas(smallBoardCanvas)
@@ -964,7 +969,8 @@ class BoardView(
         )
       case (
             Some(GameState(_, _, me, enemy, GameOverMode(_, _, _, _, _))),
-            (screenModelDataTick, false, _, boardPos, squareSize, textSize),
+            (screenModelDataTick, _, false, _),
+            (boardPos, squareSize, textSize),
             _
           ) =>
         clearCanvas(smallBoardCanvas)
@@ -985,8 +991,13 @@ class BoardView(
     }
 
     div(
-      `class` := "d-flex justify-content-center",
-      smallBoardCanvas
+      `class` := "d-flex justify-content-center position-relative",
+      smallBoardCanvas,
+//      div(
+//        `class` := "position-absolute",
+//        style := "top: 50%; left: 50%",
+//        h1("Hidden")
+//      )
     ).render
   }
 
