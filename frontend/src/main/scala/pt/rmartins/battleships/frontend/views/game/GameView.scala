@@ -52,34 +52,6 @@ class GameView(
 
   import translationsService._
 
-//  private def reloadBoardView(): Unit = {
-//    if (!presenter.onCanvasResize(boardView)) {
-//      window.setTimeout(
-//        () => boardView.paint(),
-//        1
-//      )
-//    }
-//  }
-
-//  gameStateModel.listen(_ => reloadBoardView())
-//
-//  screenModel.subProp(_.canvasSize).listen(_ => reloadBoardView())
-//  screenModel.subProp(_.missilesPopupMillisOpt).listen(_ => reloadBoardView())
-//  screenModel.subProp(_.extraTurnPopup).listen(_ => reloadBoardView())
-//  screenModel.subProp(_.screenResized).listen(_ => reloadBoardView())
-//  screenModel.subProp(_.hoverMove).listen(_ => reloadBoardView())
-//  screenModel.subProp(_.tick).listen(_ => reloadBoardView())
-//  translationsService.currentLangProperty.listen(_ => reloadBoardView())
-//  translationsModel.listen(_ => reloadBoardView())
-//
-//  gameModel.subProp(_.mousePosition).listen(_ => reloadBoardView())
-//  gameModel.subProp(_.mouseDown).listen(_ => reloadBoardView())
-//  gameModel.subProp(_.selectedShip).listen(_ => reloadBoardView())
-//  gameModel.subProp(_.turnAttacks).listen(_ => reloadBoardView())
-//  gameModel.subProp(_.turnAttacksQueuedStatus).listen(_ => reloadBoardView())
-//  gameModel.subProp(_.selectedAction).listen(_ => reloadBoardView())
-//  gameModel.subProp(_.lineDashOffset).listen(_ => reloadBoardView())
-
   private val invitePlayerButton = UdashButton(
     buttonStyle = Color.Primary.toProperty,
     block = true.toProperty,
@@ -170,30 +142,6 @@ class GameView(
     )(_ =>
       Seq[Modifier](`class` := "btn-sm col-4 p-0 ml-2", span(FontAwesome.Solid.plus, " 30s").render)
     )
-
-  private val revealEnemyBoardButton =
-    UdashButton(
-      buttonStyle = screenModel.subProp(_.revealEnemyBoard).transform {
-        case true  => Color.Secondary
-        case false => Color.Primary
-      },
-      block = true.toProperty,
-      componentId = ComponentId("hide-enemy-board-button")
-    )(nested =>
-      Seq(nested(produceWithNested(screenModel.subProp(_.revealEnemyBoard)) {
-        case (true, nested) =>
-          span(nested(translatedDynamic(Translations.Game.hideEnemyBoardButton)(_.apply()))).render
-        case (false, nested) =>
-          span(nested(translatedDynamic(Translations.Game.showEnemyBoardButton)(_.apply()))).render
-      }))
-    )
-
-  private val rematchButton =
-    UdashButton(
-      buttonStyle = Color.Primary.toProperty,
-      block = true.toProperty,
-      componentId = ComponentId("rematch-button")
-    )(nested => Seq(nested(translatedDynamic(Translations.Game.rematchButton)(_.apply()))))
 
   private val mainGameForm = UdashForm(
     componentId = ComponentId("main-game-from")
@@ -291,8 +239,8 @@ class GameView(
           case ((_, _, Some(GameOverModeType), _, _), _) =>
             div(
               `class` := "row justify-content-between mx-0",
-              div(`class` := "mx-2", rematchButton),
-              div(`class` := "mx-2", revealEnemyBoardButton)
+//              div(`class` := "mx-2", rematchButton),
+//              div(`class` := "mx-2", revealEnemyBoardButton)
             ).render
           case _ =>
             span.render
@@ -311,14 +259,6 @@ class GameView(
 
   solvePuzzleButton.listen { _ =>
     presenter.startNewPuzzle()
-  }
-
-  rematchButton.listen { _ =>
-    presenter.rematchGame()
-  }
-
-  revealEnemyBoardButton.listen { _ =>
-    screenModel.subProp(_.revealEnemyBoard).set(!screenModel.get.revealEnemyBoard)
   }
 
   addEnemyTimeButton.listen { _ =>
@@ -398,9 +338,9 @@ class GameView(
         )
       ) {
         case ((true, _), nested) =>
-          playerVsUtils.mainDiv(nested)
+          playerVsUtils.createaMainDiv(nested)
         case ((_, true), nested) =>
-          puzzlesView.createGameDiv(nested)
+          puzzlesView.createMainDiv(nested)
         case ((false, false), nested) =>
           div(
             nested(
@@ -433,8 +373,8 @@ class GameView(
     div(
       `class` := "row m-0 p-0 vh-100",
       // loads Bootstrap and FontAwesome styles from CDN
-      UdashBootstrap.loadBootstrapStyles(),
-      UdashBootstrap.loadFontAwesome(),
+//      UdashBootstrap.loadBootstrapStyles(),
+//      UdashBootstrap.loadFontAwesome(),
       BootstrapStyles.containerFluid,
       div(
         `class` := "navbar col-12",

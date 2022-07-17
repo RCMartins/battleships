@@ -59,8 +59,8 @@ class PuzzlesView(
     presenter.startNewPuzzle()
   }
 
-  def createGameDiv(nested: NestedInterceptor): Div = {
-    val gameDiv: Div =
+  def createMainDiv(nested: NestedInterceptor): Div = {
+    val mainDiv: Div =
       div(
         `class` := "d-flex justify-content-center",
         GameStyles.mainCardHeight,
@@ -69,14 +69,14 @@ class PuzzlesView(
       ).render
 
     window.onresize = (_: UIEvent) => {
-      presenter.onCanvasResize(gameDiv, boardView.mainBoardCanvas)
+      presenter.onCanvasResize(mainDiv, boardView.mainBoardCanvas)
     }
 
     var handle: Int = 0
     handle = window.setInterval(
       () => {
-        if (gameDiv.clientWidth != 0) {
-          presenter.onCanvasResize(gameDiv, boardView.mainBoardCanvas)
+        if (mainDiv.clientWidth != 0) {
+          presenter.onCanvasResize(mainDiv, boardView.mainBoardCanvas)
           window.clearTimeout(handle)
         }
       },
@@ -88,7 +88,7 @@ class PuzzlesView(
       div(
         `class` := "card-body p-0",
         div(
-          gameDiv
+          mainDiv
         )
       ),
       createFooter(nested)

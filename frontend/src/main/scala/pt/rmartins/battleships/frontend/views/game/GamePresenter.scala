@@ -1403,7 +1403,7 @@ class GamePresenter(
 
 object GamePresenter {
 
-  val MainBoardHeightMargin: Int = 20
+  val MainBoardHeightMargin: Int = 32
   val SmallBoardSizeMultiplier: Double = 0.3
 
 }

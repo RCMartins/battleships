@@ -1,10 +1,9 @@
 package pt.rmartins.battleships.frontend.views.game
 
 import org.scalajs.dom
-import org.scalajs.dom.{CanvasRenderingContext2D, Event}
 import org.scalajs.dom.html.{Canvas, Image}
 import org.scalajs.dom.raw.HTMLImageElement
-import pt.rmartins.battleships.frontend.views.game.BoardView.MinTextSize
+import org.scalajs.dom.{CanvasRenderingContext2D, Event}
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasColor
 import pt.rmartins.battleships.shared.model.game.{AttackType, Coordinate, Turn}
 import scalatags.JsDom.all.canvas
@@ -36,7 +35,6 @@ class CanvasUtils(gamePresenter: GamePresenter) {
 
   def drawBoardLimits(
       renderingCtx: CanvasRenderingContext2D,
-//      boardTitle: String,
       boardSize: Coordinate,
       boardPosition: Coordinate,
       squareSize: Int,
@@ -95,13 +93,6 @@ class CanvasUtils(gamePresenter: GamePresenter) {
       )
       renderingCtx.stroke()
     }
-
-//    val fontSize = MinTextSize
-//    renderingCtx.fillStyle = s"rgb(0, 0, 0)"
-//    renderingCtx.font = s"${fontSize}px serif"
-//    renderingCtx.textBaseline = "bottom"
-//    renderingCtx.textAlign = "left"
-//    renderingCtx.fillText(boardTitle, boardPosition.x, boardPosition.y - 2)
   }
 
 }

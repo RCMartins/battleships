@@ -253,7 +253,39 @@ class PlayerVsUtils(
     screenModel.subProp(_.hideMyBoard).set(!screenModel.get.hideMyBoard)
   }
 
-  def mainDiv(nested: NestedInterceptor): Div =
+  private val rematchButton =
+    UdashButton(
+      buttonStyle = Color.Primary.toProperty,
+      block = true.toProperty,
+      componentId = ComponentId("rematch-button")
+    )(nested => Seq(nested(translatedDynamic(Translations.Game.rematchButton)(_.apply()))))
+
+  rematchButton.listen { _ =>
+    presenter.rematchGame()
+  }
+
+  private val revealEnemyBoardButton =
+    UdashButton(
+      buttonStyle = screenModel.subProp(_.revealEnemyBoard).transform {
+        case true  => Color.Secondary
+        case false => Color.Primary
+      },
+      block = true.toProperty,
+      componentId = ComponentId("hide-enemy-board-button")
+    )(nested =>
+      Seq(nested(produceWithNested(screenModel.subProp(_.revealEnemyBoard)) {
+        case (true, nested) =>
+          span(nested(translatedDynamic(Translations.Game.hideEnemyBoardButton)(_.apply()))).render
+        case (false, nested) =>
+          span(nested(translatedDynamic(Translations.Game.showEnemyBoardButton)(_.apply()))).render
+      }))
+    )
+
+  revealEnemyBoardButton.listen { _ =>
+    screenModel.subProp(_.revealEnemyBoard).set(!screenModel.get.revealEnemyBoard)
+  }
+
+  def createaMainDiv(nested: NestedInterceptor): Div =
     div(
       nested(produceWithNested(presenter.modeTypeProperty) {
         case (Some(PlacingGameModeType), nested) =>
@@ -261,14 +293,14 @@ class PlayerVsUtils(
         case (Some(PlayingModeType), nested) =>
           gameDiv(nested)
         case (Some(GameOverModeType), nested) =>
-          div("Game over!").render
+          gameOverDiv(nested)
         case _ =>
           div.render
       })
     ).render
 
   private def placingShipsDiv(nested: NestedInterceptor): Div = {
-    val gameDiv: Div =
+    val mainDiv: Div =
       div(
         `class` := "d-flex justify-content-center",
         GameStyles.mainCardHeight,
@@ -277,14 +309,14 @@ class PlayerVsUtils(
       ).render
 
     window.onresize = (_: UIEvent) => {
-      presenter.onCanvasResize(gameDiv, boardView.mainBoardCanvas)
+      presenter.onCanvasResize(mainDiv, boardView.mainBoardCanvas)
     }
 
     var handle: Int = 0
     handle = window.setInterval(
       () => {
-        if (gameDiv.clientWidth != 0) {
-          presenter.onCanvasResize(gameDiv, boardView.mainBoardCanvas)
+        if (mainDiv.clientWidth != 0) {
+          presenter.onCanvasResize(mainDiv, boardView.mainBoardCanvas)
           window.clearTimeout(handle)
         }
       },
@@ -296,7 +328,7 @@ class PlayerVsUtils(
       div(
         `class` := "card-body p-0",
         div(
-          gameDiv
+          mainDiv
         )
       ),
       placingShipsFooter(nested)
@@ -333,7 +365,7 @@ class PlayerVsUtils(
     ).render
 
   private def gameDiv(nested: NestedInterceptor): Div = {
-    val gameDiv: Div =
+    val mainDiv: Div =
       div(
         `class` := "d-flex justify-content-center",
         GameStyles.mainCardHeight,
@@ -364,14 +396,14 @@ class PlayerVsUtils(
       ).render
 
     window.onresize = (_: UIEvent) => {
-      presenter.onCanvasResize(gameDiv, boardView.mainBoardCanvas)
+      presenter.onCanvasResize(mainDiv, boardView.mainBoardCanvas)
     }
 
     var handle: Int = 0
     handle = window.setInterval(
       () => {
-        if (gameDiv.clientWidth != 0) {
-          presenter.onCanvasResize(gameDiv, boardView.mainBoardCanvas)
+        if (mainDiv.clientWidth != 0) {
+          presenter.onCanvasResize(mainDiv, boardView.mainBoardCanvas)
           window.clearTimeout(handle)
         }
       },
@@ -383,7 +415,7 @@ class PlayerVsUtils(
       div(
         `class` := "card-body p-0",
         div(
-          gameDiv
+          mainDiv
         )
       ),
       gameFooter(nested)
@@ -404,6 +436,70 @@ class PlayerVsUtils(
                 div(`class` := "mx-1", launchAttackButton)
               ),
               div(`class` := "mx-2", hideMyBoardButton)
+            ).render
+          case _ =>
+            div.render
+        }
+      )
+    ).render
+
+  private def gameOverDiv(nested: NestedInterceptor): Div = {
+    val mainDiv: Div =
+      div(
+        `class` := "d-flex justify-content-center",
+        GameStyles.mainCardHeight,
+        boardView.drawMainBoardDiv(nested),
+        chatUtils.chatAndMovesDiv(nested),
+        div(
+          `class` := "row",
+          div(
+            `class` := "col-12",
+            gameTimeDiv(nested)
+          ),
+          div(
+            `class` := "col-12",
+            boardView.drawSmallBoardDiv(nested)
+          ),
+        ),
+      ).render
+
+    window.onresize = (_: UIEvent) => {
+      presenter.onCanvasResize(mainDiv, boardView.mainBoardCanvas)
+    }
+
+    var handle: Int = 0
+    handle = window.setInterval(
+      () => {
+        if (mainDiv.clientWidth != 0) {
+          presenter.onCanvasResize(mainDiv, boardView.mainBoardCanvas)
+          window.clearTimeout(handle)
+        }
+      },
+      timeout = 20
+    )
+
+    div(
+      `class` := "card",
+      div(
+        `class` := "card-body p-0",
+        div(
+          mainDiv
+        )
+      ),
+      gameOverFooter(nested)
+    ).render
+  }
+
+  private def gameOverFooter(nested: NestedInterceptor): Div =
+    div(
+      `class` := "card-footer",
+      nested(
+        produce(presenter.gameModeProperty) {
+          case Some(GameOverMode(_, _, _, _, _)) =>
+            div(
+              `class` := "row justify-content-between mx-0",
+              div(`class` := "mx-2", rematchButton),
+              div(`class` := "mx-2", revealEnemyBoardButton)
             ).render
           case _ =>
             div.render
