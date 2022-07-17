@@ -42,6 +42,27 @@ class PlayerVsUtils(
 
   import translationsService._
 
+  private def getDestroyedShips(history: List[TurnPlay]): Int =
+    history.map(_.hitHints.count(_.isDestroyed)).sum
+
+  val myProgressProperty: ReadableProperty[Option[(Int, Int)]] =
+    combine(presenter.fleetProperty, presenter.meProperty.transform(_.map(_.turnPlayHistory)))
+      .transform {
+        case (Some(gameFleet), Some(turnPlayHistory)) =>
+          Some((getDestroyedShips(turnPlayHistory), gameFleet.shipsAmount))
+        case _ =>
+          None
+      }
+
+  val enemyProgressProperty: ReadableProperty[Option[(Int, Int)]] =
+    combine(presenter.fleetProperty, presenter.enemyProperty.transform(_.map(_.turnPlayHistory)))
+      .transform {
+        case (Some(gameFleet), Some(turnPlayHistory)) =>
+          Some((getDestroyedShips(turnPlayHistory), gameFleet.shipsAmount))
+        case _ =>
+          None
+      }
+
   val startGameVsBotButton: UdashButton =
     UdashButton(
       buttonStyle = Color.Primary.toProperty,
@@ -468,7 +489,8 @@ class PlayerVsUtils(
           nested,
           chatModel.subProp(_.username).transform(Some(_)),
           Translations.Game.myProgress,
-          gameModel.subProp(_.timeRemaining).transform(_.map(_._1))
+          myProgressProperty,
+          gameModel.subProp(_.timeRemaining).transform(_.map(_._1)),
         )
       ),
       div(
@@ -477,7 +499,8 @@ class PlayerVsUtils(
           nested,
           presenter.enemyUsernameProperty,
           Translations.Game.enemyProgress,
-          gameModel.subProp(_.timeRemaining).transform(_.map(_._2))
+          enemyProgressProperty,
+          gameModel.subProp(_.timeRemaining).transform(_.map(_._2)),
         )
       ),
     ).render
@@ -486,6 +509,7 @@ class PlayerVsUtils(
       nested: NestedInterceptor,
       playerUsername: ReadableProperty[Option[Username]],
       playerProgressKey0: TranslationKey0,
+      playerProgressProperty: ReadableProperty[Option[(Int, Int)]],
       timeRemainingProperty: ReadableProperty[Option[TimeRemaining]]
   ): Div =
     div(
@@ -499,7 +523,23 @@ class PlayerVsUtils(
       ),
       div(
         `class` := "col-12 border rounded border-dark p-2 my-1 d-flex justify-content-center",
-        nested(translatedDynamic(playerProgressKey0)(_.apply())),
+        div(
+          nested(translatedDynamic(playerProgressKey0)(_.apply())),
+          nested(
+            produce(playerProgressProperty) {
+              case Some((shipsDestoyed, shipsAmount)) =>
+                div(
+                  `class` := "row m-1",
+                  div(
+                    `class` := "col-12 d-flex justify-content-center",
+                    span(shipsDestoyed, " / ", b(shipsAmount))
+                  )
+                ).render
+              case _ =>
+                div.render
+            }
+          )
+        )
       ),
       div(
         `class` := "col-12 border rounded border-dark p-2 my-1 d-flex justify-content-center",
@@ -531,7 +571,10 @@ class PlayerVsUtils(
 
                 div(
                   `class` := "row m-1",
-                  div(`class` := "col-12", textSpan)
+                  div(
+                    `class` := "col-12 d-flex justify-content-center",
+                    textSpan
+                  )
                 ).render
               case _ =>
                 div.render

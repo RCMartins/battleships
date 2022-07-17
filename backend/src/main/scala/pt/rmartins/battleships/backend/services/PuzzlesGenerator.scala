@@ -141,8 +141,8 @@ object PuzzlesGenerator {
       ServerEnemyBoard(
         boardSize = board.boardSize,
         BoardUtils.createEmptyBoardMarks(board.boardSize),
-        rules.gameFleet.shipAmount,
-        rules.gameFleet.shipAmount
+        rules.gameFleet.shipsAmount,
+        rules.gameFleet.shipsAmount
       )
 
     val botPlayer: ServerPlayer =

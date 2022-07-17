@@ -120,9 +120,12 @@ class GamePresenter(
   val rulesProperty: ReadableProperty[Option[Rules]] =
     gameStateProperty.transform(_.map(_.rules))
 
+  val fleetProperty: ReadableProperty[Option[Fleet]] =
+    rulesProperty.transform(_.map(_.gameFleet))
+
   val gameFleetMaxSize: ReadableProperty[Coordinate] =
     combine(
-      rulesProperty.transform(_.map(_.gameFleet)),
+      fleetProperty,
       gamePuzzleStateProperty.transform(_.map(_.playerPuzzle.gameFleet.shipsList))
     ).transform { case (gameFleetOpt, shipsListOpt) =>
       gameFleetOpt
@@ -935,7 +938,7 @@ class GamePresenter(
     val preGame = preGameModel.get
     if (preGame.previewBoardOpt.forall(_._2 < PreGameModel.MinPreviewTries))
       Left(ErrorModalType.SmallBoardError)
-    else if (preGame.rules.gameFleet.shipAmount == 0)
+    else if (preGame.rules.gameFleet.shipsAmount == 0)
       Left(ErrorModalType.EmptyFleetError)
     else {
       Right(preGame.rules)
