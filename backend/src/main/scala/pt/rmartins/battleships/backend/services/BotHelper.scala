@@ -120,41 +120,38 @@ class BotHelper(gameId: GameId, val rules: Rules, val logger: BotHelperLogger) {
       hitHints.flatMap(_.shipIdDestroyedOpt).foldLeft(updatedBotBoardMarks2) {
         case (botBoardMarks, destroyedShipId) =>
           val shipGuesser = allShipGuessers(destroyedShipId)
-          shipGuesser.checkPossiblePositions(botBoardMarks) match {
-            case Some(shipGuesses) =>
-              val possibleShipPositionsSet: Set[List[List[Coordinate]]] =
-                shipGuesser.possibleShipPositions(botBoardMarks, shipGuesses)
+          val shipGuesses = shipGuesser.checkPossiblePositions(botBoardMarks)
+          val possibleShipPositionsSet: Set[List[List[Coordinate]]] =
+            shipGuesser.possibleShipPositions(botBoardMarks, shipGuesses)
 
-              if (possibleShipPositionsSet.sizeIs == 1) {
-                val shipPos: Set[Coordinate] =
-                  possibleShipPositionsSet.flatten.flatten
-                val water: Set[Coordinate] =
-                  (shipPos.flatMap(_.get8CoorAround) -- shipPos).filter(_.isInsideBoard(boardSize))
-                val outsideTurnCoordinates: Set[Coordinate] =
-                  shipGuesser.getTurnsWithShip.flatMap { case TurnPlay(_, turnAttacks, _) =>
-                    turnAttacks.flatMap(_.coordinateOpt)
-                  }.toSet -- shipPos -- water
-                val updates: Set[(Coordinate, BotBoardMark)] =
-                  shipPos.map(_ -> BotBoardMark.ShipExclusive(Set(destroyedShipId))) ++
-                    water.map(_ -> (BotBoardMark.Water: BotBoardMark)) ++
-                    outsideTurnCoordinates.flatMap { coor =>
-                      getMark(botBoardMarks, coor) match {
-                        case ShipOrWater(shipIds) =>
-                          Some(coor -> shipOrWater(shipIds - destroyedShipId))
-                        case ShipExclusive(shipIds) =>
-                          Some(coor -> ShipExclusive(shipIds - destroyedShipId))
-                        case _ =>
-                          None
-                      }
-                    }
-
-                updates.foldLeft(botBoardMarks) { case (upBoardMarks, (coor, botBoardMark)) =>
-                  forceSetBoardMark(upBoardMarks, coor, botBoardMark)
+          if (possibleShipPositionsSet.sizeIs != 1)
+            botBoardMarks
+          else {
+            val shipPos: Set[Coordinate] =
+              possibleShipPositionsSet.flatten.flatten
+            val water: Set[Coordinate] =
+              (shipPos.flatMap(_.get8CoorAround) -- shipPos).filter(_.isInsideBoard(boardSize))
+            val outsideTurnCoordinates: Set[Coordinate] =
+              shipGuesser.getTurnsWithShip.flatMap { case TurnPlay(_, turnAttacks, _) =>
+                turnAttacks.flatMap(_.coordinateOpt)
+              }.toSet -- shipPos -- water
+            val updates: Set[(Coordinate, BotBoardMark)] =
+              shipPos.map(_ -> BotBoardMark.ShipExclusive(Set(destroyedShipId))) ++
+                water.map(_ -> (BotBoardMark.Water: BotBoardMark)) ++
+                outsideTurnCoordinates.flatMap { coor =>
+                  getMark(botBoardMarks, coor) match {
+                    case ShipOrWater(shipIds) =>
+                      Some(coor -> shipOrWater(shipIds - destroyedShipId))
+                    case ShipExclusive(shipIds) =>
+                      Some(coor -> ShipExclusive(shipIds - destroyedShipId))
+                    case _ =>
+                      None
+                  }
                 }
-              } else
-                botBoardMarks
-            case _ =>
-              botBoardMarks
+
+            updates.foldLeft(botBoardMarks) { case (upBoardMarks, (coor, botBoardMark)) =>
+              forceSetBoardMark(upBoardMarks, coor, botBoardMark)
+            }
           }
       }
 

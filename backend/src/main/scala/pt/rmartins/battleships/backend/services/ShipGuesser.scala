@@ -28,7 +28,7 @@ case class ShipGuesser(rules: Rules, shipId: ShipId, botHelper: BotHelper) {
     if (turnPlay.hitHints.exists(_.shipIdOpt.contains(shipId)))
       turnsWithShip = turnPlay :: turnsWithShip
 
-  def checkPossiblePositions(boardMarks: BotBoardMarks): Option[List[ShipGuess]] = {
+  def checkPossiblePositions(boardMarks: BotBoardMarks): List[ShipGuess] = {
     val possiblePositionsList: List[(List[HitHint], List[Coordinate])] =
       turnsWithShip
         .map { case TurnPlay(_, turnAttacks, hitHints) =>
@@ -49,94 +49,92 @@ case class ShipGuesser(rules: Rules, shipId: ShipId, botHelper: BotHelper) {
         }
         .filter(_._2.nonEmpty)
 
-    Some(
-      if (shipsCounter == 1) {
-        if (possiblePositionsList.nonEmpty) {
-          logLine(s"possiblePositionsList: ${possiblePositionsList.size}")
-          logLine(possiblePositionsList.mkString("\n"))
-        }
+    if (shipsCounter == 1) {
+      if (possiblePositionsList.nonEmpty) {
+        logLine(s"possiblePositionsList: ${possiblePositionsList.size}")
+        logLine(possiblePositionsList.mkString("\n"))
+      }
 
-        oneShipFilterLoop(possiblePositionsList, None).map(SingleShipGuess)
-      } else {
-        @tailrec
-        def filterLoop(
-            remainingPositionsList: List[(List[HitHint], List[Coordinate])],
-            currentPossibilitiesByAmount: List[(Int, List[List[List[Coordinate]]])]
-        ): List[List[List[Coordinate]]] =
-          remainingPositionsList match {
-            case Nil =>
-              currentPossibilitiesByAmount.flatMap(_._2)
-            case (hitHints, coordinates) :: next =>
-              val totalAmount: Int = hitHints.flatMap(_.shipIdOpt).count(_ == shipId)
-              val maxShips: Int =
-                currentPossibilitiesByAmount
-                  .maxByOption(_._1)
-                  .map(_._1)
-                  .getOrElse(0) + totalAmount
+      oneShipFilterLoop(possiblePositionsList, None).map(SingleShipGuess)
+    } else {
+      @tailrec
+      def filterLoop(
+          remainingPositionsList: List[(List[HitHint], List[Coordinate])],
+          currentPossibilitiesByAmount: List[(Int, List[List[List[Coordinate]]])]
+      ): List[List[List[Coordinate]]] =
+        remainingPositionsList match {
+          case Nil =>
+            currentPossibilitiesByAmount.flatMap(_._2)
+          case (hitHints, coordinates) :: next =>
+            val totalAmount: Int = hitHints.flatMap(_.shipIdOpt).count(_ == shipId)
+            val maxShips: Int =
+              currentPossibilitiesByAmount
+                .maxByOption(_._1)
+                .map(_._1)
+                .getOrElse(0) + totalAmount
 
-              /*
-               * [List of different alternatives of [List of ships of [List of coordinates]]]
-               */
-              def shipsLoop(
-                  nShips: Int
-              ): Option[List[List[List[Coordinate]]]] = {
+            /*
+             * [List of different alternatives of [List of ships of [List of coordinates]]]
+             */
+            def shipsLoop(
+                nShips: Int
+            ): Option[List[List[List[Coordinate]]]] = {
 //                val amount: Int =
 //                    if (nShips == 1)
 //                      totalAmount
 //                    else
 //                  Math.min(totalAmount, nShips)
 
-                if (nShips == 1) {
-                  val comb: List[List[Coordinate]] =
-                    Utils.combinations(coordinates, amount = totalAmount)
-                  currentPossibilitiesByAmount.find(_._1 == 1) match {
-                    case None =>
-                      Some(comb.map(List(_))).tap(println)
-                    case Some((_, currentPossibilities)) =>
-                      Some(
-                        currentPossibilities.map(
-                          _.flatMap(list => comb.map(list ++ _))
-                        )
+              if (nShips == 1) {
+                val comb: List[List[Coordinate]] =
+                  Utils.combinations(coordinates, amount = totalAmount)
+                currentPossibilitiesByAmount.find(_._1 == 1) match {
+                  case None =>
+                    Some(comb.map(List(_))).tap(println)
+                  case Some((_, currentPossibilities)) =>
+                    Some(
+                      currentPossibilities.map(
+                        _.flatMap(list => comb.map(list ++ _))
                       )
-                  }
-                } else if (nShips == 2) {
-                  val comb: List[List[List[Coordinate]]] =
-                    Utils
-                      .combinationGroups(coordinates, List(1, 1))
-                      .map(_.map(_.toList).toList)
-                      .toList
+                    )
+                }
+              } else if (nShips == 2) {
+                val comb: List[List[List[Coordinate]]] =
+                  Utils
+                    .combinationGroups(coordinates, List(1, 1))
+                    .map(_.map(_.toList).toList)
+                    .toList
 
-                  currentPossibilitiesByAmount.find(_._1 == 2) match {
-                    case None =>
-                      Some(comb).tap(println)
-                    case Some((_, currentPossibilities)) =>
-                      ???
-                  }
-                } else
-                  ???
+                currentPossibilitiesByAmount.find(_._1 == 2) match {
+                  case None =>
+                    Some(comb).tap(println)
+                  case Some((_, currentPossibilities)) =>
+                    ???
+                }
+              } else
+                ???
+            }
+
+            val updatedPossibilitiesByAmount: List[(Int, List[List[List[Coordinate]]])] =
+              (1 to maxShips).toList.flatMap { nShips =>
+                shipsLoop(nShips).map((nShips, _)).tap(println)
               }
 
-              val updatedPossibilitiesByAmount: List[(Int, List[List[List[Coordinate]]])] =
-                (1 to maxShips).toList.flatMap { nShips =>
-                  shipsLoop(nShips).map((nShips, _)).tap(println)
-                }
-
-              filterLoop(next, updatedPossibilitiesByAmount)
-          }
-
-        if (possiblePositionsList.nonEmpty) {
-          logLine(s"possiblePositionsList: ${possiblePositionsList.size}")
-          logLine(possiblePositionsList.mkString("\n"))
+            filterLoop(next, updatedPossibilitiesByAmount)
         }
 
-        filterLoop(possiblePositionsList, List.empty)
-          .map {
-            case List(oneList) => SingleShipGuess(oneList)
-            case list          => MultipleShipGuess(list)
-          }
-          .tap(println)
+      if (possiblePositionsList.nonEmpty) {
+        logLine(s"possiblePositionsList: ${possiblePositionsList.size}")
+        logLine(possiblePositionsList.mkString("\n"))
       }
-    )
+
+      filterLoop(possiblePositionsList, List.empty)
+        .map {
+          case List(oneList) => SingleShipGuess(oneList)
+          case list          => MultipleShipGuess(list)
+        }
+        .tap(println)
+    }
   }
 
   def baseShipsHit(boardMarks: BotBoardMarks): Option[List[ShipGuess]] = {
@@ -149,7 +147,7 @@ case class ShipGuesser(rules: Rules, shipId: ShipId, botHelper: BotHelper) {
     if (aliveShips == 0)
       None
     else
-      checkPossiblePositions(boardMarks)
+      Some(checkPossiblePositions(boardMarks))
   }
 
   private val getBlindShipPositions: (BotBoardMarks, Int) => LazyList[(Ship, Coordinate)] = {
