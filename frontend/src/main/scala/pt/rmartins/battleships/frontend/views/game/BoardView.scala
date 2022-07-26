@@ -14,6 +14,7 @@ import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game.HitHint.ShipHit
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.BoardUtils.canPlaceInBoard
+import scalatags.JsDom
 import scalatags.JsDom.all._
 
 import scala.util.chaining.scalaUtilChainingOps
@@ -1816,53 +1817,96 @@ class BoardView(
         combine(
           preGameModel.subProp(_.rules).transform(_.gameFleet),
           screenModel.subProp(_.mainBoardCanvasSize),
-          gameModel.subProp(_.shipsLeftToPlace),
+          gamePresenter.meProperty
         )
-      ) { case (gameFleet, canvasSize, shipsLeftToPlace) =>
-        val fleetSorted: List[(Ship, Int)] =
-          gameFleet.shipCounterList
-            .filter(_._2._1 > 0)
-            .map { case (shipId, (amount, rotation)) => (Ship.getShip(shipId, rotation), amount) }
-            .sortBy { case (ship, _) => (ship.piecesSize, ship.shipId.id) }
+      ) {
+        case (gameFleet, canvasSize, Some(Player(_, _, turnPlayHistory))) =>
+          val shipsDestroyed: Map[ShipId, Int] =
+            turnPlayHistory
+              .flatMap(_.hitHints)
+              .flatMap(_.shipIdDestroyedOpt)
+              .groupBy(identity)
+              .map { case (shipId, list) =>
+                shipId -> list.size
+              }
 
-        val maxTotalHeight1column = 40
-        val totalFleetYSize = Math.max(10, fleetSorted.map(_._1.size.y).sum + fleetSorted.size)
-        val (previewSqSize, twoColumns) =
-          if (totalFleetYSize <= maxTotalHeight1column)
-            (Math.max(7, canvasSize.y / totalFleetYSize - 2), false)
-          else
-            (Math.max(7, canvasSize.y / (totalFleetYSize / 2) - 2), true)
+          val extraShipHits: Map[ShipId, Int] =
+            turnPlayHistory
+              .flatMap(_.hitHints)
+              .flatMap(_.shipIdOpt)
+              .groupBy(identity)
+              .map { case (shipId, list) =>
+                val piecesSize = Ship.getShip(shipId, Rotation.Rotation0).piecesSize
+                shipId -> (list.size - shipsDestroyed.getOrElse(shipId, 0) * piecesSize)
+              }
 
-        def createShipCanvas(ship: Ship): Canvas = {
-          val canvasSize: Coordinate = ship.size * previewSqSize + Coordinate.square(4)
-          viewUtils.createShipCanvas(
-            canvasSize,
-            previewSqSize,
-            ship,
-            destroyed = false,
-            centerXCanvas = true,
-            centerYCanvas = true,
-            drawRadar = false
-          )
-        }
+          val fleetSorted: List[(Ship, Int)] =
+            gameFleet.shipCounterList
+              .filter(_._2._1 > 0)
+              .map { case (shipId, (amount, rotation)) => (Ship.getShip(shipId, rotation), amount) }
+              .sortBy { case (ship, _) => (ship.piecesSize, ship.shipId.id) }
 
-        val fleetDivs: List[Div] =
-          fleetSorted.map { case (ship, amount) =>
-            div(
-              `class` := (if (twoColumns) "col-6" else "col-12"),
-              div(
-                (1 to amount).map(_ => createShipCanvas(ship))
-              )
-            ).render
+          val maxTotalHeight1column = 40
+          val totalFleetYSize = Math.max(10, fleetSorted.map(_._1.size.y).sum + fleetSorted.size)
+          val (previewSqSize, twoColumns) =
+            if (totalFleetYSize <= maxTotalHeight1column)
+              (Math.max(7, canvasSize.y / totalFleetYSize - 2), false)
+            else
+              (Math.max(7, canvasSize.y / (totalFleetYSize / 2) - 2), true)
+
+          def createShipCanvas(ship: Ship, destroyed: Boolean): Canvas = {
+            val canvasSize: Coordinate = ship.size * previewSqSize + Coordinate.square(4)
+            viewUtils.createShipCanvas(
+              canvasSize,
+              previewSqSize,
+              ship,
+              destroyed = destroyed,
+              centerXCanvas = true,
+              centerYCanvas = true,
+              drawRadar = false
+            )
           }
 
-        div(
-          `class` := "d-flex align-items-start",
+          def createShipExtraHits(shipId: ShipId): JsDom.TypedTag[Div] =
+            extraShipHits.get(shipId) match {
+              case Some(shipHits) if shipHits > 0 =>
+                div(
+                  fontSize := "30px",
+                  span("+", shipHits)
+                )
+              case _ =>
+                div(
+                  `class` := "invisible",
+                  fontSize := "30px",
+                  span("+0")
+                )
+            }
+
+          val fleetDivs: List[Div] =
+            fleetSorted.map { case (ship, amount) =>
+              val amountDestroyed = shipsDestroyed.getOrElse(ship.shipId, 0)
+              val amountAlive = amount - amountDestroyed
+
+              div(
+                `class` := (if (twoColumns) "col-6" else "col-12") + " p-0",
+                div(
+                  `class` := "d-flex align-items-center",
+                  createShipExtraHits(ship.shipId),
+                  (1 to amountDestroyed).map(_ => createShipCanvas(ship, destroyed = true)) ++
+                    (1 to amountAlive).map(_ => createShipCanvas(ship, destroyed = false))
+                )
+              ).render
+            }
+
           div(
-            `class` := "row mx-0 my-3",
-            fleetDivs
-          )
-        ).render
+            `class` := "d-flex align-items-start",
+            div(
+              `class` := "row mx-0 my-3",
+              fleetDivs
+            )
+          ).render
+        case _ =>
+          div.render
       }
     )
   }

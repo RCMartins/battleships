@@ -51,15 +51,17 @@ class ViewUtils(canvasUtils: CanvasUtils) {
         sqSize,
         canvasColor
       )
-      if (destroyed)
+      if (destroyed) {
+        val lineWidth = Math.max(1.0, sqSize / 15.0)
         CanvasUtils.drawCrosshair(
           renderingCtx,
           initialPositionShip,
           shipPiece,
           sqSize,
-          lineWidth = 1.5,
+          lineWidth = lineWidth,
           alpha = 1.0
         )
+      }
     }
     if (drawRadar) {
       val initialPositionRadar: Coordinate =

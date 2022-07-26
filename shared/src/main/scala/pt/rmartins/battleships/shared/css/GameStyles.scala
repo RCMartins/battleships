@@ -31,7 +31,6 @@ object GameStyles extends CssBase {
   )
 
   val mainCardHeight: CssStyle = style(
-//    height :=! "calc(100vh - 85px)",
     height :=! "calc(100vh - 140px)",
   )
 
