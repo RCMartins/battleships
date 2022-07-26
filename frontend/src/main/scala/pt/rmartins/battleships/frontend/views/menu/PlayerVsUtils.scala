@@ -604,7 +604,7 @@ class PlayerVsUtils(
               amount: Int,
               placed: Boolean
           ): JsDom.TypedTag[Div] = {
-            val alpha: Double = if (placed) 0.5 else 1.0
+            val alpha: Double = if (placed) 0.4 else 1.0
 
             div(
               `class` := "mr-4 d-flex align-items-center",
