@@ -135,6 +135,11 @@ object CanvasUtils {
       val lineWidth: Double = 3.0
     }
 
+    case class DashBlack(alpha: Double = 1.0, lineWidth: Double = 5.0) extends CanvasBorder {
+      val lineColor: String = "0, 0, 0"
+      override val lineDash: Option[Seq[Double]] = Some(Seq(10, 5))
+    }
+
     case class DashRed(alpha: Double = 1.0, lineWidth: Double = 3.0) extends CanvasBorder {
       val lineColor: String = "255, 0, 0"
       override val lineDash: Option[Seq[Double]] = Some(Seq(4, 2))
@@ -307,10 +312,15 @@ object CanvasUtils {
       y: Int,
       width: Int,
       height: Int,
-      useAntiAliasing: Boolean
+      useAntiAliasing: Boolean,
+      alpha: Double = 1.0
   ): Unit = {
+    if (alpha != 1.0)
+      renderingCtx.globalAlpha = alpha
     renderingCtx.imageSmoothingEnabled = useAntiAliasing
     renderingCtx.drawImage(image, 0, 0, 500, 500, x, y, width, height)
+    if (alpha != 1.0)
+      renderingCtx.globalAlpha = 1.0
   }
 
   def createEmptyCanvas(size: Coordinate): Canvas = {
@@ -329,7 +339,8 @@ object CanvasUtils {
       canvas: Canvas,
       position: Coordinate,
       canvasImage: CanvasImage,
-      size: Coordinate
+      size: Coordinate,
+      alpha: Double = 1.0
   ): Canvas = {
     def draw(): Unit =
       if (!canvasImage.element.complete) {
@@ -347,7 +358,8 @@ object CanvasUtils {
           y = position.y,
           size.x,
           size.y,
-          useAntiAliasing = true
+          useAntiAliasing = true,
+          alpha = alpha
         )
       }
 
@@ -355,7 +367,13 @@ object CanvasUtils {
     canvas
   }
 
-  def createCanvasImage(canvasImage: CanvasImage, size: Coordinate): Canvas =
-    drawCanvasImage(createEmptyCanvas(size), Coordinate(1, 1), canvasImage, size - Coordinate(2, 2))
+  def createCanvasImage(canvasImage: CanvasImage, size: Coordinate, alpha: Double = 1.0): Canvas =
+    drawCanvasImage(
+      createEmptyCanvas(size),
+      Coordinate(1, 1),
+      canvasImage,
+      size - Coordinate(2, 2),
+      alpha = alpha
+    )
 
 }

@@ -338,7 +338,7 @@ class GameView(
         )
       ) {
         case ((true, _), nested) =>
-          playerVsUtils.createaMainDiv(nested)
+          playerVsUtils.createMainDiv(nested)
         case ((_, true), nested) =>
           puzzlesView.createMainDiv(nested)
         case ((false, false), nested) =>

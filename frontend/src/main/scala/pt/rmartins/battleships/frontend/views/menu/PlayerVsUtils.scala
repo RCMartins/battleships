@@ -285,7 +285,7 @@ class PlayerVsUtils(
     screenModel.subProp(_.revealEnemyBoard).set(!screenModel.get.revealEnemyBoard)
   }
 
-  def createaMainDiv(nested: NestedInterceptor): Div =
+  def createMainDiv(nested: NestedInterceptor): Div =
     div(
       nested(produceWithNested(presenter.modeTypeProperty) {
         case (Some(PlacingGameModeType), nested) =>
@@ -533,7 +533,7 @@ class PlayerVsUtils(
       nested(
         produceWithNested(presenter.gameModeProperty) {
           case (
-                Some(PlayingMode(isMyTurn, Turn(currentTurn, extraTurn), turnAttackTypes, _, _)),
+                Some(PlayingMode(isMyTurn, Turn(currentTurn, extraTurn), _, _, _)),
                 nested
               ) =>
             val isMyTurnDiv: JsDom.TypedTag[Div] =
@@ -579,7 +579,7 @@ class PlayerVsUtils(
               }
 
             val turnAttacksDiv: JsDom.TypedTag[Div] =
-              createAttackTypesDiv(nested, turnAttackTypes)
+              createAttackTypesDiv(nested)
 
             div(
               `class` := "row m-1",
@@ -593,30 +593,45 @@ class PlayerVsUtils(
       )
     ).render
 
-  private def createAttackTypesDiv(
-      nested: NestedInterceptor,
-      attackTypes: List[AttackType]
-  ): JsDom.TypedTag[Div] = {
-    val imageSize = Coordinate.square(50)
+  private def createAttackTypesDiv(nested: NestedInterceptor): JsDom.TypedTag[Div] =
+    div(
+      nested(
+        produce(gameModel.subProp(_.turnAttacks)) { turnAttacks =>
+          val imageSize = Coordinate.square(50) // TODO make it dynamic somehow
 
-    def createAttackTypeDiv(attackType: AttackType, amount: Int): JsDom.TypedTag[Div] =
-      div(
-        `class` := "mr-4 d-flex align-items-center",
-        (1 to amount).map { _ =>
-          CanvasUtils
-            .createCanvasImage(CanvasImage.fromAttackType(attackType), imageSize)
-            .tap { canvas =>
-              canvas.classList.add("border")
-              canvas.classList.add("border-dark")
+          def createAttackTypeDiv(
+              attackType: AttackType,
+              amount: Int,
+              placed: Boolean
+          ): JsDom.TypedTag[Div] = {
+            val alpha: Double = if (placed) 0.5 else 1.0
+
+            div(
+              `class` := "mr-4 d-flex align-items-center",
+              (1 to amount).map { _ =>
+                CanvasUtils
+                  .createCanvasImage(
+                    CanvasImage.fromAttackType(attackType),
+                    imageSize,
+                    alpha = alpha
+                  )
+                  .tap { canvas =>
+                    canvas.classList.add("border")
+                    canvas.classList.add("border-" + (if (placed) "success" else "dark"))
+                  }
+              }
+            )
+          }
+
+          div(
+            `class` := "d-flex align-items-center",
+            turnAttacks.map { case Attack(attackType, coorOpt) =>
+              createAttackTypeDiv(attackType, amount = 1, placed = coorOpt.nonEmpty)
             }
+          ).render
         }
       )
-
-    div(
-      `class` := "d-flex align-items-center",
-      attackTypes.map { attackType => createAttackTypeDiv(attackType, 1) }
     )
-  }
 
   private def gameTimeDiv(nested: NestedInterceptor): Div =
     div(

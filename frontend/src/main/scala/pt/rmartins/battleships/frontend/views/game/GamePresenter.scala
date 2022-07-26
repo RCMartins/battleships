@@ -405,7 +405,7 @@ class GamePresenter(
       lineDashOffsetIntervalHandle = Some(
         window.setInterval(
           () => {
-            lineDashOffset.set((lineDashOffset.get + 1) % 17)
+            lineDashOffset.set(lineDashOffset.get + 1)
           },
           timeout = lineDashOffsetIntervalMillis
         )

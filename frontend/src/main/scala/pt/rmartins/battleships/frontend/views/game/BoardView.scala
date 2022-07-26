@@ -529,10 +529,6 @@ class BoardView(
           ) =>
         val relativeBoardCoor = mousePosition - myBoardPosPreGame
         Some(relativeBoardCoor)
-//          .filter(coor =>
-//            coor >= -PlaceShipBoardMargin &&
-//              coor <= (boardSize * preGameSquareSize + PlaceShipBoardMargin)
-//          )
           .map(_ / preGameSquareSize)
           .map(_.roundTo(boardSize))
       case _ =>
@@ -1240,7 +1236,8 @@ class BoardView(
               y = boardPosition.y + enemyBoardCoor.y * squareSize + 2,
               squareSize - 4,
               squareSize - 4,
-              useAntiAliasing = true
+              useAntiAliasing = true,
+              alpha = 0.7
             )
           }
         case _ =>
@@ -1285,6 +1282,13 @@ class BoardView(
           squareSize - 4,
           squareSize - 4,
           useAntiAliasing = true
+        )
+        drawBoardSquare(
+          renderingCtx,
+          boardPosition,
+          enemyBoardCoor,
+          squareSize,
+          CanvasColor.White(CanvasBorder.DashBlack())
         )
       case _ =>
     }
