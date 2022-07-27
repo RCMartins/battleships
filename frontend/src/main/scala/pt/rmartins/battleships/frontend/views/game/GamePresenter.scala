@@ -97,6 +97,9 @@ class GamePresenter(
       gamePuzzleStateProperty.transform(_.nonEmpty)
     )
 
+  val myBoardSizeProperty: ReadableProperty[Option[Coordinate]] =
+    gameStateProperty.transform(_.map(_.me.myBoard.boardSize))
+
   val mainBoardSizeProperty: ReadableProperty[Option[Coordinate]] =
     combine(
       gameStateProperty.transform(_.map(_.enemy.boardSize)),
@@ -457,7 +460,6 @@ class GamePresenter(
 
         selectedTabProperty.set(ScreenModel.chatTab)
         screenModel.subProp(_.lastSeenMessagesChat).set(chatMessagesSizeProperty.get)
-        screenModel.subProp(_.screenResized).set((), force = true)
       case (
             None | Some(_: PlacingShipsMode),
             Some(GameState(_, _, me, enemy, PlayingMode(_, _, turnAttackTypes, _, _)))
@@ -560,20 +562,12 @@ class GamePresenter(
     }
   }
 
-  private var newTurnAnimationHandle: Option[Int] = None
-  private val newTurnAnimationMillis: Int = 50
-
-  private def stopNewTurnAnimation(): Unit = {
-    newTurnAnimationHandle.foreach(window.clearTimeout)
-    newTurnAnimationHandle = None
-  }
-
   playingModeProperty
     .transform(
       _.map(inGameMode => (inGameMode.isMyTurn, inGameMode.turn, inGameMode.turnAttackTypes))
     )
     .listen {
-      case Some((isMyTurn, Turn(_, extraTurn), turnAttackTypes)) =>
+      case Some((isMyTurn, Turn(_, _), turnAttackTypes)) =>
         gameModel.get.turnAttacksQueuedStatus match {
           case AttacksQueuedStatus.NotSet =>
           case AttacksQueuedStatus.Queued if isMyTurn =>
@@ -581,38 +575,6 @@ class GamePresenter(
           case AttacksQueuedStatus.Sent =>
             gameModel.subProp(_.turnAttacksQueuedStatus).set(AttacksQueuedStatus.NotSet)
             gameModel.subProp(_.turnAttacks).set(turnAttackTypes.map(Attack(_, None)))
-            screenModel
-              .subProp(_.missilesPopupMillisOpt)
-              .set(Some(BoardView.MissilesInitialPopupTime))
-            screenModel
-              .subProp(_.extraTurnPopup)
-              .set(extraTurn.map(_ => BoardView.ExtraTurnPopupTime))
-
-            newTurnAnimationHandle.foreach(window.clearInterval)
-            newTurnAnimationHandle = Some(
-              window.setInterval(
-                () => {
-                  val screen = screenModel.get
-
-                  screen.missilesPopupMillisOpt.foreach { missilesPopupMillis =>
-                    val updatedTime = missilesPopupMillis - newTurnAnimationMillis
-                    screenModel
-                      .subProp(_.missilesPopupMillisOpt)
-                      .set(Some(updatedTime).filter(_ > 0))
-                  }
-                  screen.extraTurnPopup.foreach { timeRemaining =>
-                    val updatedTime = timeRemaining - newTurnAnimationMillis
-                    screenModel
-                      .subProp(_.extraTurnPopup)
-                      .set(Some(updatedTime).filter(_ > 0))
-                  }
-
-                  if (screen.missilesPopupMillisOpt.isEmpty && screen.extraTurnPopup.isEmpty)
-                    stopNewTurnAnimation()
-                },
-                newTurnAnimationMillis
-              )
-            )
         }
       case _ =>
     }
@@ -891,24 +853,14 @@ class GamePresenter(
     )
   }
 
-  def onCanvasResize(div: Div, canvas: Canvas): Unit = {
-//    println((div.clientHeight, div.parentNode.asInstanceOf[Div].clientHeight))
-//    println(
-//      (
-//        div.style.marginTop,
-//        div.style.marginBottom,
-//        div.style.paddingTop,
-//        div.style.paddingBottom,
-//      )
-//    )
-//
-    val newSizeInt = div.clientHeight - MainBoardHeightMargin // - div.style.marginTop.toInt
+  def onCanvasResize(div: Div): Unit = {
+    val newSizeInt = div.clientHeight - MainBoardHeightMargin
     val newSize = Coordinate.square(newSizeInt)
     screenModel.subProp(_.mainBoardCanvasSize).set(newSize)
 
     val smallBoardNewSize: Coordinate =
       Coordinate.square((newSizeInt * SmallBoardSizeMultiplier).toInt)
-    screenModel.subProp(_.smallBoardNewSize).set(smallBoardNewSize)
+    screenModel.subProp(_.smallBoardCanvasSize).set(smallBoardNewSize)
   }
 
   override def onClose(): Unit = {
@@ -1214,7 +1166,6 @@ class GamePresenter(
         if (isMyTurn) {
           gameModel.subProp(_.turnAttacksQueuedStatus).set(AttacksQueuedStatus.Sent)
           gameRpc.sendTurnAttacks(gameId, turn, turnAttacks)
-          stopNewTurnAnimation()
         } else {
           gameModel.subProp(_.turnAttacksQueuedStatus).set(AttacksQueuedStatus.Queued)
         }
@@ -1413,6 +1364,6 @@ class GamePresenter(
 object GamePresenter {
 
   val MainBoardHeightMargin: Int = 32
-  val SmallBoardSizeMultiplier: Double = 0.3
+  val SmallBoardSizeMultiplier: Double = 0.35
 
 }

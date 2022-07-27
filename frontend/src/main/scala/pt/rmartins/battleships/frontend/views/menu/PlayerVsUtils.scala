@@ -309,14 +309,14 @@ class PlayerVsUtils(
       ).render
 
     window.onresize = (_: UIEvent) => {
-      presenter.onCanvasResize(mainDiv, boardView.mainBoardCanvas)
+      presenter.onCanvasResize(mainDiv)
     }
 
     var handle: Int = 0
     handle = window.setInterval(
       () => {
         if (mainDiv.clientWidth != 0) {
-          presenter.onCanvasResize(mainDiv, boardView.mainBoardCanvas)
+          presenter.onCanvasResize(mainDiv)
           window.clearTimeout(handle)
         }
       },
@@ -408,14 +408,14 @@ class PlayerVsUtils(
       ).render
 
     window.onresize = (_: UIEvent) => {
-      presenter.onCanvasResize(mainDiv, boardView.mainBoardCanvas)
+      presenter.onCanvasResize(mainDiv)
     }
 
     var handle: Int = 0
     handle = window.setInterval(
       () => {
         if (mainDiv.clientWidth != 0) {
-          presenter.onCanvasResize(mainDiv, boardView.mainBoardCanvas)
+          presenter.onCanvasResize(mainDiv)
           window.clearTimeout(handle)
         }
       },
@@ -485,14 +485,14 @@ class PlayerVsUtils(
       ).render
 
     window.onresize = (_: UIEvent) => {
-      presenter.onCanvasResize(mainDiv, boardView.mainBoardCanvas)
+      presenter.onCanvasResize(mainDiv)
     }
 
     var handle: Int = 0
     handle = window.setInterval(
       () => {
         if (mainDiv.clientWidth != 0) {
-          presenter.onCanvasResize(mainDiv, boardView.mainBoardCanvas)
+          presenter.onCanvasResize(mainDiv)
           window.clearTimeout(handle)
         }
       },

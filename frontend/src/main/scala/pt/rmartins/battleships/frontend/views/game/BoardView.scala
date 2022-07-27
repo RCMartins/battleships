@@ -53,7 +53,7 @@ class BoardView(
     )
 
   screenModel
-    .subProp(_.smallBoardNewSize)
+    .subProp(_.smallBoardCanvasSize)
     .listen(
       { canvasSize =>
         smallBoardCanvas.setAttribute("width", canvasSize.x.toString)
@@ -65,9 +65,6 @@ class BoardView(
   mainBoardCanvas.onkeypress = (event: KeyboardEvent) => {
     gamePresenter.keyDown(event.key, event.ctrlKey)
   }
-
-//  val canvasDiv: Div =
-//    div(id := "canvas-div", mainBoardCanvas).render
 
   mainBoardCanvas.onmousemove = (mouseEvent: MouseEvent) => {
     val rect = mainBoardCanvas.getBoundingClientRect()
@@ -99,145 +96,60 @@ class BoardView(
     event.preventDefault()
   }
 
-//  private val BoardSizeProperty: ReadableProperty[Int] =
-//    combine(
-//      gamePresenter.rulesProperty.transform(_.map(_.boardSize)),
-//      gamePresenter.gamePuzzleStateProperty.transform(_.map(_.playerPuzzle.boardSize))
-//    ).transform { case (boardSizeOpt1, boardSizeOpt2) =>
-//      boardSizeOpt1.orElse(boardSizeOpt2).map(_.x).getOrElse(1)
-//    }
-//
-//  private val squareSizesProperty: ReadableProperty[IndexedSeq[Int]] =
-//    BoardSizeProperty.transform { boardSize =>
-//      IndexedSeq(70, 100, 120, 150, 200, 300).map(_ / boardSize)
-//    }
-//
-//  private val sizes: IndexedSeq[Int] = IndexedSeq(7, 10, 12, 15, 20, 30)
-//
-//  private def checkSize(sizes: IndexedSeq[Int], screenSize: Int, defaultSizeIndex: Int): Int =
-//    sizes((if (screenSize < 500) 0 else if (screenSize < 680) 1 else 2) + defaultSizeIndex)
-//
-//  private val SizeBig: ReadableProperty[Int] =
-//    screenModel.subProp(_.mainBoardCanvasSize).transform { canvasSize =>
-//      checkSize(sizes, canvasSize.x, 3)
-//    }
-//
-//  private val SizeMedium: ReadableProperty[Int] =
-//    screenModel.subProp(_.mainBoardCanvasSize).transform { canvasSize =>
-//      checkSize(sizes, canvasSize.x, 2)
-//    }
-//
-//  private val SquareSizeBig: ReadableProperty[Int] =
-//    combine(screenModel.subProp(_.mainBoardCanvasSize), squareSizesProperty).transform {
-//      case (canvasSize, sizes) =>
-//        checkSize(sizes, canvasSize.x, 3)
-//    }
-//
-//  private val SquareSizeMedium: ReadableProperty[Int] =
-//    combine(screenModel.subProp(_.mainBoardCanvasSize), squareSizesProperty).transform {
-//      case (canvasSize, sizes) =>
-//        checkSize(sizes, canvasSize.x, 2)
-//    }
-//
-//  private val SquareSizeSmall: ReadableProperty[Int] =
-//    combine(screenModel.subProp(_.mainBoardCanvasSize), squareSizesProperty).transform {
-//      case (canvasSize, sizes) =>
-//        checkSize(sizes, canvasSize.x, 1)
-//    }
+  private def createBoardSizes(
+      boardSizeProperty: ReadableProperty[Option[Coordinate]],
+      canvasSize: ReadableProperty[Coordinate],
+      defaultMargin: Int
+  ): ReadableProperty[(Coordinate, Int)] =
+    combine(boardSizeProperty, canvasSize).transform {
+      case (Some(boardSize), canvasSize) =>
+        val boardSquareSize: Int =
+          Math.min(
+            (canvasSize.x - defaultMargin * 2) / boardSize.x,
+            (canvasSize.y - defaultMargin * 2) / boardSize.y
+          )
+        val boardPos: Coordinate =
+          Coordinate(
+            (canvasSize.x - boardSquareSize * boardSize.x) / 2,
+            (canvasSize.y - boardSquareSize * boardSize.y) / 2
+          )
+        (boardPos, boardSquareSize)
+      case _ =>
+        (Coordinate.square(defaultMargin), 1)
+    }
 
-//  private val MyBoardPreGameSqSize = SquareSizeBig
-//  private val EnemyBoardSqSize = SquareSizeBig
-//  private val EnemyBoardMargin = SizeMedium
+  private val MainBoardSizes: ReadableProperty[(Coordinate, Int)] =
+    createBoardSizes(
+      gamePresenter.mainBoardSizeProperty,
+      screenModel.subProp(_.mainBoardCanvasSize),
+      MainBoardDefaultMargin
+    )
 
-  private val MainBoardPos: ReadableProperty[Coordinate] = Property(Coordinate.square(10))
-  private val SmallBoardPos: ReadableProperty[Coordinate] = Property(Coordinate.square(10))
-//  private val PlaceShipBoardMargin: Coordinate = Coordinate.square(20)
+  private val MainBoardPos: ReadableProperty[Coordinate] =
+    MainBoardSizes.transform(_._1)
 
   private val MainBoardSquareSize: ReadableProperty[Int] =
-    combine(
-      gamePresenter.meProperty,
-      screenModel.subProp(_.mainBoardCanvasSize),
-      MainBoardPos
-    ).transform {
-      case (Some(me), canvasSize, myBoardPreGamePos) =>
-        val boardSize = me.myBoard.boardSize
-        (canvasSize.x - myBoardPreGamePos.x * 2) / boardSize.x
-      case _ =>
-        1
-    }
+    MainBoardSizes.transform(_._2)
 
   private val MainBoardTurnTextSize: ReadableProperty[Int] =
     MainBoardSquareSize.transform(sqSize => Math.max(MinTextSize, (sqSize * 0.6).toInt))
 
+  private val SmallBoardSizes: ReadableProperty[(Coordinate, Int)] =
+    createBoardSizes(
+      gamePresenter.myBoardSizeProperty,
+      screenModel.subProp(_.smallBoardCanvasSize),
+      SmallBoardDefaultMargin
+    )
+
+  private val SmallBoardPos: ReadableProperty[Coordinate] =
+    SmallBoardSizes.transform(_._1)
+
   private val SmallBoardSquareSize: ReadableProperty[Int] =
-    combine(
-      gamePresenter.meProperty,
-      screenModel.subProp(_.smallBoardNewSize),
-      SmallBoardPos
-    ).transform {
-      case (Some(me), canvasSize, myBoardPreGamePos) =>
-        val boardSize = me.myBoard.boardSize
-        (canvasSize.x - myBoardPreGamePos.x * 2) / boardSize.x
-      case _ =>
-        1
-    }
+    SmallBoardSizes.transform(_._2)
 
   private val SmallBoardTurnTextSize: ReadableProperty[Int] =
     SmallBoardSquareSize.transform(sqSize => Math.max(MinTextSize, (sqSize * 0.6).toInt))
 
-//  private val EnemyBoardPos: ReadableProperty[Coordinate] =
-//    EnemyBoardMargin.transform(size => Coordinate.square(size))
-//
-//  private val BoardMarksSelectorSize = BoardView.BoardMarkSize.toProperty
-//  private val BoardMarksSelectorMargin = BoardView.BoardMarkMargin.toProperty
-//  private val BoardMarksSelectorPos: ReadableProperty[Coordinate] =
-//    combine(
-//      BoardSizeProperty,
-//      EnemyBoardPos,
-//      EnemyBoardSqSize,
-//      BoardMarksSelectorSize,
-//      BoardMarksSelectorMargin
-//    ).transform {
-//      case (
-//            boardSize,
-//            enemyBoardPos,
-//            enemyBoardSize,
-//            boardMarksSelectorSize,
-//            boardMarksSelectorMargin
-//          ) =>
-//        enemyBoardPos +
-//          Coordinate(
-//            (enemyBoardSize * boardSize) / 2 -
-//              (MarksSelectorOrder.size * boardMarksSelectorSize +
-//                (MarksSelectorOrder.size - 1) * boardMarksSelectorMargin) / 2,
-//            enemyBoardSize * boardSize + boardMarksSelectorMargin
-//          )
-//    }
-//
-//  private val BoardMarksSelectorCombined: ReadableProperty[(Coordinate, Int, Int)] =
-//    combine(BoardMarksSelectorPos, BoardMarksSelectorSize, BoardMarksSelectorMargin)
-
-//  private val MissilesInicialPos: ReadableProperty[Coordinate] =
-//    combine(BoardSizeProperty, EnemyBoardPos, SquareSizeBig, SizeBig).transform {
-//      case (boardSize, enemyBoardPos, squareSizeBig, sizeBig) =>
-//        enemyBoardPos + Coordinate(squareSizeBig * boardSize + sizeBig / 2, 0)
-//    }
-
-//  private val MissilesSqSize: ReadableProperty[Int] =
-//    SizeBig.transform(sizeBig => sizeBig * 2)
-//
-//  private val MissilesPosDiff: ReadableProperty[Coordinate] =
-//    MissilesSqSize.transform { missilesSqSize =>
-//      Coordinate(0, missilesSqSize)
-//    }
-
-//  private val PlaceShipsPos: ReadableProperty[Coordinate] =
-//    combine(BoardSizeProperty, MainBoardPos, MyBoardPreGameSqSize).transform {
-//      case (boardSize, myBoardPreGamePos, myBoardPreGameSqSize) =>
-//        myBoardPreGamePos +
-//          Coordinate(myBoardPreGameSqSize * boardSize + myBoardPreGameSqSize, 0)
-//    }
-//
 //  private val SummaryShipsSqSize: ReadableProperty[Int] = SquareSizeMedium
 //  private val DestructionSummaryHitCountSize: ReadableProperty[Int] = SquareSizeSmall
 //  private val SummaryMaxY: ReadableProperty[Int] =
@@ -1809,10 +1721,7 @@ object BoardView {
   val MissilesMaxOversize: Double = 0.5
   val MissilesFastPerc: Double = 0.9
 
-  val ExtraTurnPopupTime: Int = 7600
-  def ExtraTurnAppear(timeRemaining: Int): Boolean =
-    timeRemaining < 4000 || ((timeRemaining / 400) % 2 == 0)
-
-  val ExtraTurnPopupTimeFade: Int = 2000
+  val MainBoardDefaultMargin: Int = 10
+  val SmallBoardDefaultMargin: Int = 10
 
 }

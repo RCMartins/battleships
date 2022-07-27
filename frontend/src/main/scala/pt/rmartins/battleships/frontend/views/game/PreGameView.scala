@@ -402,13 +402,10 @@ class PreGameView(
         combine(
           preGameModel.subProp(_.rules).transform(_.boardSize),
           preGameModel.subProp(_.previewBoardOpt),
-          screenModel.subProp(_.screenResized),
           screenModel.subProp(_.mainBoardCanvasSize)
         )
       ) {
-        case (boardSize, previewBoardOpt, _, defaultCanvasSize) =>
-//          val usableWidth = PreviewBoardHeight
-
+        case (boardSize, previewBoardOpt, defaultCanvasSize) =>
           val boardMargin = Coordinate(1, 1)
           val maxWidthPixels = defaultCanvasSize.x
           val sqSize = maxWidthPixels / boardSize.max
