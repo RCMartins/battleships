@@ -354,20 +354,7 @@ class PlayerVsUtils(
         boardView.createFleetPlacePreview(nested)
       ).render
 
-    window.onresize = (_: UIEvent) => {
-      presenter.onCanvasResize(mainDiv)
-    }
-
-    var handle: Int = 0
-    handle = window.setInterval(
-      () => {
-        if (mainDiv.clientWidth != 0) {
-          presenter.onCanvasResize(mainDiv)
-          window.clearTimeout(handle)
-        }
-      },
-      timeout = 20
-    )
+    setWeirdResizeHandle(mainDiv)
 
     div(
       `class` := "card",
@@ -453,20 +440,7 @@ class PlayerVsUtils(
         ),
       ).render
 
-    window.onresize = (_: UIEvent) => {
-      presenter.onCanvasResize(mainDiv)
-    }
-
-    var handle: Int = 0
-    handle = window.setInterval(
-      () => {
-        if (mainDiv.clientWidth != 0) {
-          presenter.onCanvasResize(mainDiv)
-          window.clearTimeout(handle)
-        }
-      },
-      timeout = 20
-    )
+    setWeirdResizeHandle(mainDiv)
 
     div(
       `class` := "card",
@@ -508,10 +482,9 @@ class PlayerVsUtils(
       .subProp(_.selectedAction)
       .listen(
         { newSelectedAction =>
-          println(newSelectedAction)
           allSelectors.foreach {
             case (action, selectorDiv) if action == newSelectedAction =>
-              selectorDiv.style = "border-width:3px !important"
+              selectorDiv.style = "border-width:4px !important"
             case (_, selectorDiv) =>
               selectorDiv.style = "border-width:1px !important"
           }
@@ -579,20 +552,7 @@ class PlayerVsUtils(
         )
       ).render
 
-    window.onresize = (_: UIEvent) => {
-      presenter.onCanvasResize(mainDiv)
-    }
-
-    var handle: Int = 0
-    handle = window.setInterval(
-      () => {
-        if (mainDiv.clientWidth != 0) {
-          presenter.onCanvasResize(mainDiv)
-          window.clearTimeout(handle)
-        }
-      },
-      timeout = 20
-    )
+    setWeirdResizeHandle(mainDiv)
 
     div(
       `class` := "card",
@@ -831,6 +791,23 @@ class PlayerVsUtils(
         )
       )
     ).render
+
+  private def setWeirdResizeHandle(div: Div): Unit = {
+    window.onresize = (_: UIEvent) => {
+      presenter.onCanvasResize(div)
+    }
+
+    var handle: Int = 0
+    handle = window.setInterval(
+      () => {
+        if (div.clientWidth != 0) {
+          presenter.onCanvasResize(div)
+          window.clearTimeout(handle)
+        }
+      },
+      timeout = 20
+    )
+  }
 
 }
 
