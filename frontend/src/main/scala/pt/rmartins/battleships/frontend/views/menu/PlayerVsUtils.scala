@@ -9,12 +9,14 @@ import io.udash.component.ComponentId
 import io.udash.css.CssView
 import io.udash.i18n._
 import io.udash.properties.single.Property
-import org.scalajs.dom.html.{Div, Span}
+import org.scalajs.dom.html.{Canvas, Div, Span}
 import org.scalajs.dom.{UIEvent, html, window}
 import pt.rmartins.battleships.frontend.services.TranslationsService
-import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasImage
+import pt.rmartins.battleships.frontend.views.game.BoardView.GameAction
+import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.Utils._
 import pt.rmartins.battleships.frontend.views.game._
+import pt.rmartins.battleships.frontend.views.menu.PlayerVsUtils._
 import pt.rmartins.battleships.frontend.views.model.AttacksQueuedStatus
 import pt.rmartins.battleships.frontend.views.model.JoinedPreGame.PlayingAgainstPlayer
 import pt.rmartins.battleships.frontend.views.model.ModeType._
@@ -37,6 +39,7 @@ class PlayerVsUtils(
     preGameView: PreGameView,
     gameModals: GameModals,
     chatUtils: ChatUtils,
+    viewUtils: ViewUtils,
     translationsService: TranslationsService,
 ) extends CssView {
 
@@ -285,6 +288,49 @@ class PlayerVsUtils(
     screenModel.subProp(_.revealEnemyBoard).set(!screenModel.get.revealEnemyBoard)
   }
 
+  private def createSelectorButton(canvas: Canvas): Div =
+    div(
+      `class` := "border border-dark d-flex align-items-center",
+      style := "border-width:1px !important",
+      canvas
+    ).render
+
+  private def createSelectorTargetButton: Div =
+    createSelectorButton(
+      createCanvasImage(attackSimpleImage, DefaultSelectorCoor)
+    )
+
+  private def createSelectorWaterButton: Div =
+    createSelectorButton(
+      viewUtils.createWaterCanvas(
+        DefaultSelectorCoor,
+        DefaultSelectorSize + 2,
+        centerXCanvas = true,
+        centerYCanvas = true,
+        drawRadar = false,
+        margin = Coordinate.square(0)
+      )
+    )
+
+  private def createSelectorShipButton: Div =
+    createSelectorButton(
+      viewUtils.createShipCanvas(
+        DefaultSelectorCoor,
+        DefaultSelectorSize + 2,
+        ship = Ship.Submarine,
+        destroyed = false,
+        centerXCanvas = true,
+        centerYCanvas = true,
+        drawRadar = false,
+        margin = Coordinate.square(0)
+      )
+    )
+
+  private def createSelectorFillWaterButton: Div =
+    createSelectorButton(
+      createCanvasImage(fillWaterImage, DefaultSelectorCoor)
+    )
+
   def createMainDiv(nested: NestedInterceptor): Div =
     div(
       nested(produceWithNested(presenter.modeTypeProperty) {
@@ -304,7 +350,7 @@ class PlayerVsUtils(
       div(
         `class` := "d-flex justify-content-center",
         mainCardHeight,
-        boardView.drawMainBoardDiv(nested),
+        boardView.drawMainBoardDiv,
         boardView.createFleetPlacePreview(nested)
       ).render
 
@@ -385,7 +431,7 @@ class PlayerVsUtils(
         ),
         div(
           `class` := "col-5 px-1",
-          boardView.drawMainBoardDiv(nested),
+          boardView.drawMainBoardDiv,
         ),
         div(
           `class` := "col-3 px-1",
@@ -401,7 +447,7 @@ class PlayerVsUtils(
             ),
             div(
               `class` := "col-12",
-              boardView.drawSmallBoardDiv(nested)
+              boardView.drawSmallBoardDiv
             ),
           ),
         ),
@@ -434,26 +480,75 @@ class PlayerVsUtils(
     ).render
   }
 
-  private def gameFooter(nested: NestedInterceptor): Div =
+  private def gameFooter(nested: NestedInterceptor): Div = {
+    def addSelector(selectorDiv: Div, gameAction: GameAction): Unit = {
+      selectorDiv.onclick = _ => {
+        gameModel.subProp(_.selectedAction).set(gameAction)
+      }
+    }
+
+    val selectorTargetButton: Div =
+      createSelectorTargetButton.tap(addSelector(_, GameAction.ShotSelector))
+    val selectorShipButton: Div =
+      createSelectorShipButton.tap(addSelector(_, GameAction.ManualShipSelector))
+    val selectorWaterButton: Div =
+      createSelectorWaterButton.tap(addSelector(_, GameAction.ManualWaterSelector))
+    val selectorFillWaterButton: Div =
+      createSelectorFillWaterButton.tap(addSelector(_, GameAction.FillWaterSelector))
+
+    val allSelectors: List[(GameAction, Div)] =
+      List(
+        GameAction.ShotSelector -> selectorTargetButton,
+        GameAction.ManualShipSelector -> selectorShipButton,
+        GameAction.ManualWaterSelector -> selectorWaterButton,
+        GameAction.FillWaterSelector -> selectorFillWaterButton
+      )
+
+    gameModel
+      .subProp(_.selectedAction)
+      .listen(
+        { newSelectedAction =>
+          println(newSelectedAction)
+          allSelectors.foreach {
+            case (action, selectorDiv) if action == newSelectedAction =>
+              selectorDiv.style = "border-width:3px !important"
+            case (_, selectorDiv) =>
+              selectorDiv.style = "border-width:1px !important"
+          }
+        },
+        initUpdate = true
+      )
+
     div(
-      `class` := "card-footer",
+      `class` := "card-footer py-2",
       nested(
         produce(presenter.gameModeProperty) {
           case Some(PlayingMode(_, _, _, _, _)) =>
             div(
               `class` := "d-flex justify-content-around mx-0",
               div(
-                `class` := "d-flex mx-0",
+                `class` := "d-flex align-items-center mx-0",
                 div(`class` := "ml-2", cancelQueuedAttacksButton),
                 div(`class` := "mx-1", launchAttackButton)
               ),
-              div(`class` := "mx-2", hideMyBoardButton)
+              div(
+                `class` := "d-flex align-items-center mx-0",
+                div(`class` := "mx-2", selectorTargetButton),
+                div(`class` := "mx-2", selectorShipButton),
+                div(`class` := "mx-2", selectorWaterButton),
+                div(`class` := "mx-2", selectorFillWaterButton),
+              ),
+              div(
+                `class` := "d-flex align-items-center mx-2",
+                hideMyBoardButton
+              )
             ).render
           case _ =>
             div.render
         }
       )
     ).render
+  }
 
   private def gameOverDiv(nested: NestedInterceptor): Div = {
     val mainDiv: Div =
@@ -462,7 +557,7 @@ class PlayerVsUtils(
         mainCardHeight,
         div(
           `class` := "col-5 px-1",
-          boardView.drawMainBoardDiv(nested)
+          boardView.drawMainBoardDiv
         ),
         div(
           `class` := "col-3 px-1",
@@ -478,7 +573,7 @@ class PlayerVsUtils(
             ),
             div(
               `class` := "col-12",
-              boardView.drawSmallBoardDiv(nested)
+              boardView.drawSmallBoardDiv
             ),
           )
         )
@@ -699,8 +794,8 @@ class PlayerVsUtils(
         div(
           nested(translatedDynamic(Translations.Game.remainingTime)(_.apply())),
           nested(
-            produceWithNested(timeRemainingProperty) {
-              case (Some(timeRemaining), nested) =>
+            produce(timeRemainingProperty) {
+              case Some(timeRemaining) =>
                 def toTimeStr(seconds: Int): JsDom.TypedTag[Span] =
                   span("%02d:%02d".format(seconds / 60, seconds % 60))
 
@@ -736,5 +831,12 @@ class PlayerVsUtils(
         )
       )
     ).render
+
+}
+
+object PlayerVsUtils {
+
+  private val DefaultSelectorSize = 36
+  private val DefaultSelectorCoor = Coordinate.square(DefaultSelectorSize)
 
 }

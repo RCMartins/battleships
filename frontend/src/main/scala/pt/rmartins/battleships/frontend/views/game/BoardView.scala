@@ -740,11 +740,11 @@ class BoardView(
     renderingCtx.clearRect(0, 0, canvas.width, canvas.height)
   }
 
-  def drawPuzzleBoardDiv(nested: NestedInterceptor): Div = {
-    drawMainBoardDiv(nested)
+  def drawPuzzleBoardDiv: Div = {
+    drawMainBoardDiv
   }
 
-  def drawMainBoardDiv(nested: NestedInterceptor): Div = {
+  def drawMainBoardDiv: Div = {
     combine(
       gamePresenter.gameStateProperty,
       combine(
@@ -822,7 +822,7 @@ class BoardView(
     ).render
   }
 
-  def drawSmallBoardDiv(nested: NestedInterceptor): Div = {
+  def drawSmallBoardDiv: Div = {
     combine(
       gamePresenter.gameStateProperty,
       combine(
@@ -1682,11 +1682,11 @@ class BoardView(
 
 object BoardView {
 
-  case class ViewShip(ship: Ship, pieces: List[Coordinate])
+//  case class ViewShip(ship: Ship, pieces: List[Coordinate])
 
-  case class ToPlaceShip(ship: Ship, pieces: List[Coordinate], alreadyPlaced: Boolean)
+//  case class ToPlaceShip(ship: Ship, pieces: List[Coordinate], alreadyPlaced: Boolean)
 
-  case class SummaryShip(ship: Ship, pieces: List[Coordinate], destroyed: Boolean)
+//  case class SummaryShip(ship: Ship, pieces: List[Coordinate], destroyed: Boolean)
 
   val MinTextSize = 15
 
@@ -1702,9 +1702,9 @@ object BoardView {
 
     case object FillWaterSelector extends GameAction
 
-    object BoardMarkSelector {
-      def unapply(gameAction: GameAction): Boolean = gameAction != ShotSelector
-    }
+//    object BoardMarkSelector {
+//      def unapply(gameAction: GameAction): Boolean = gameAction != ShotSelector
+//    }
 
   }
 
@@ -1715,11 +1715,6 @@ object BoardView {
       GameAction.ManualWaterSelector,
       GameAction.FillWaterSelector
     )
-
-  val MissilesInitialPopupTime: Int = 2000
-  val MissilesFastPopupTime: Int = 600
-  val MissilesMaxOversize: Double = 0.5
-  val MissilesFastPerc: Double = 0.9
 
   val MainBoardDefaultMargin: Int = 10
   val SmallBoardDefaultMargin: Int = 10

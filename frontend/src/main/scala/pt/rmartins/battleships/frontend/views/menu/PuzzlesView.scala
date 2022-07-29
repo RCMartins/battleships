@@ -64,7 +64,7 @@ class PuzzlesView(
       div(
         `class` := "d-flex justify-content-center",
         GameStyles.mainCardHeight,
-        boardView.drawPuzzleBoardDiv(nested),
+        boardView.drawPuzzleBoardDiv,
 //        preGameView.createFleetPreview(nested)
       ).render
 
