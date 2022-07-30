@@ -482,34 +482,32 @@ class PreGameView(
               Coordinate.square(Math.max(MinBoardSize, boardSize.x - 1))
             )
 
-          Seq[Node](
+          div(
+            `class` := "row",
             div(
-              `class` := "row",
+              `class` := "col-12 p-0 mx-3",
+              maxWidth := maxWidthPixels,
+              previewCanvas,
               div(
-                `class` := "col-12 p-0 mx-3",
-                maxWidth := maxWidthPixels,
-                previewCanvas,
+                `class` := "col-12 p-0 progress",
+                progressBar
+              ),
+              div(
+                `class` := "col-12 p-0",
                 div(
-                  `class` := "col-12 p-0 progress",
-                  progressBar
-                ),
-                div(
-                  `class` := "col-12 p-0",
+                  `class` := "row m-0",
                   div(
-                    `class` := "row m-0",
-                    div(
-                      `class` := "col-6 p-1",
-                      minusButton,
-                    ),
-                    div(
-                      `class` := "col-6 p-1",
-                      plusButton,
-                    )
+                    `class` := "col-6 p-1",
+                    minusButton,
+                  ),
+                  div(
+                    `class` := "col-6 p-1",
+                    plusButton,
                   )
                 )
-              ),
-            ).render
-          )
+              )
+            ),
+          ).render
         case _ =>
           Seq.empty
       }

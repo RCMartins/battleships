@@ -1,6 +1,6 @@
 package pt.rmartins.battleships.frontend.views.game
 
-import io.udash.{HasModelPropertyCreator, ModelProperty}
+import io.udash.HasModelPropertyCreator
 import pt.rmartins.battleships.frontend.views.model.ErrorModalType
 import pt.rmartins.battleships.shared.model.game.{Coordinate, Turn}
 
@@ -59,8 +59,6 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
 
   def resetScreenModel(model: ScreenModel): ScreenModel = {
     model.copy(
-      mainBoardCanvasSize = Coordinate.square(300),
-      smallBoardCanvasSize = Coordinate.square(100),
       selectedTab = chatTab,
       lastSeenMessagesChat = 0,
       lastSeenMessagesMyMoves = 0,

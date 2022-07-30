@@ -732,68 +732,81 @@ class PlayerVsUtils(
           case None                     => span.render
         })
       ),
+      playerStatsSummaryDestroyedDiv(nested, playerProgressKey0, playerProgressProperty),
+      playerStatsSummaryTimeDiv(nested, timeRemainingProperty)
+    ).render
+
+  private def playerStatsSummaryDestroyedDiv(
+      nested: NestedInterceptor,
+      playerProgressKey0: TranslationKey0,
+      playerProgressProperty: ReadableProperty[Option[(Int, Int)]],
+  ): JsDom.TypedTag[Div] =
+    div(
+      `class` := "col-12 border rounded border-dark p-2 my-1 d-flex justify-content-center",
       div(
-        `class` := "col-12 border rounded border-dark p-2 my-1 d-flex justify-content-center",
-        div(
-          nested(translatedDynamic(playerProgressKey0)(_.apply())),
-          nested(
-            produce(playerProgressProperty) {
-              case Some((shipsDestroyed, shipsAmount)) =>
+        nested(translatedDynamic(playerProgressKey0)(_.apply())),
+        nested(
+          produce(playerProgressProperty) {
+            case Some((shipsDestroyed, shipsAmount)) =>
+              div(
+                `class` := "row m-1",
                 div(
-                  `class` := "row m-1",
-                  div(
-                    `class` := "col-12 d-flex justify-content-center",
-                    span(shipsDestroyed, " / ", b(shipsAmount))
-                  )
-                ).render
-              case _ =>
-                div.render
-            }
-          )
-        )
-      ),
-      div(
-        `class` := "col-12 border rounded border-dark p-2 my-1 d-flex justify-content-center",
-        div(
-          nested(translatedDynamic(Translations.Game.remainingTime)(_.apply())),
-          nested(
-            produce(timeRemainingProperty) {
-              case Some(timeRemaining) =>
-                def toTimeStr(seconds: Int): JsDom.TypedTag[Span] =
-                  span("%02d:%02d".format(seconds / 60, seconds % 60))
-
-                def toShortTimeStr(secondsOpt: Option[Int]): JsDom.TypedTag[Span] =
-                  secondsOpt
-                    .map {
-                      case 0 =>
-                        span(" + ", b(redTextStyle, "00"))
-                      case seconds if seconds >= 60 =>
-                        span(" + %02d:%02d".format(seconds / 60, seconds % 60))
-                      case seconds =>
-                        span(" + %02d".format(seconds))
-                    }
-                    .getOrElse(span())
-
-                val textSpan: Span =
-                  span(
-                    toTimeStr(timeRemaining.totalTimeRemainingMillis / 1000),
-                    toShortTimeStr(timeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000))
-                  ).render
-
-                div(
-                  `class` := "row m-1",
-                  div(
-                    `class` := "col-12 d-flex justify-content-center",
-                    textSpan
-                  )
-                ).render
-              case _ =>
-                div.render
-            }
-          )
+                  `class` := "col-12 d-flex justify-content-center",
+                  span(shipsDestroyed, " / ", b(shipsAmount))
+                )
+              ).render
+            case _ =>
+              div.render
+          }
         )
       )
-    ).render
+    )
+
+  private def playerStatsSummaryTimeDiv(
+      nested: NestedInterceptor,
+      timeRemainingProperty: ReadableProperty[Option[TimeRemaining]]
+  ): JsDom.TypedTag[Div] =
+    div(
+      `class` := "col-12 border rounded border-dark p-2 my-1 d-flex justify-content-center",
+      div(
+        nested(translatedDynamic(Translations.Game.remainingTime)(_.apply())),
+        nested(
+          produce(timeRemainingProperty) {
+            case Some(timeRemaining) =>
+              def toTimeStr(seconds: Int): JsDom.TypedTag[Span] =
+                span("%02d:%02d".format(seconds / 60, seconds % 60))
+
+              def toShortTimeStr(secondsOpt: Option[Int]): JsDom.TypedTag[Span] =
+                secondsOpt
+                  .map {
+                    case 0 =>
+                      span(" + ", b(redTextStyle, "00"))
+                    case seconds if seconds >= 60 =>
+                      span(" + %02d:%02d".format(seconds / 60, seconds % 60))
+                    case seconds =>
+                      span(" + %02d".format(seconds))
+                  }
+                  .getOrElse(span())
+
+              val textSpan: Span =
+                span(
+                  toTimeStr(timeRemaining.totalTimeRemainingMillis / 1000),
+                  toShortTimeStr(timeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000))
+                ).render
+
+              div(
+                `class` := "row m-1",
+                div(
+                  `class` := "col-12 d-flex justify-content-center",
+                  textSpan
+                )
+              ).render
+            case _ =>
+              div.render
+          }
+        )
+      )
+    )
 
   private def setWeirdResizeHandle(div: Div): Unit = {
     window.onresize = (_: UIEvent) => {
