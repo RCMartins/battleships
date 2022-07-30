@@ -54,6 +54,14 @@ object GameStyles extends CssBase {
     fontSize :=! "20px"
   )
 
+  val cursorPointer: CssStyle = style(
+    cursor :=! "pointer"
+  )
+
+  val unselectableText: CssStyle = style(
+    userSelect :=! "none"
+  )
+
   private val growAndShrinkKeyFrames = style(
     keyframes(
       0.0 -> keyframe(blackTextStyle, turnTextSize, height :=! "30px"),

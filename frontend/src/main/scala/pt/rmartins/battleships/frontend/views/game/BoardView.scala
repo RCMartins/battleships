@@ -1658,6 +1658,7 @@ class BoardView(
                 `class` := (if (twoColumns) "col-6" else "col-12") + " p-0",
                 div(
                   `class` := "d-flex align-items-center",
+                  GameStyles.unselectableText,
                   createShipExtraHits(ship.shipId),
                   (1 to amountDestroyed).map(_ => createShipCanvas(ship, destroyed = true)) ++
                     (1 to amountAlive).map(_ => createShipCanvas(ship, destroyed = false))

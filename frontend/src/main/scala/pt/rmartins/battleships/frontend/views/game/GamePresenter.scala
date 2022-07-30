@@ -4,7 +4,7 @@ import com.softwaremill.quicklens.ModifyPimp
 import io.udash._
 import io.udash.auth.AuthRequires
 import io.udash.i18n.translatedDynamic
-import org.scalajs.dom.html.{Canvas, Div}
+import org.scalajs.dom.html.Div
 import org.scalajs.dom.window
 import pt.rmartins.battleships.frontend.ApplicationContext.application
 import pt.rmartins.battleships.frontend.routing.{RoutingInGameState, RoutingLoginPageState}
@@ -137,14 +137,14 @@ class GamePresenter(
         .getOrElse(Coordinate.origin)
     }
 
-  val inPlacingShipsMode: ReadableProperty[Boolean] =
-    gameModeProperty.transform(_.exists(_.isPlacingShips))
-
-  val inPlayingMode: ReadableProperty[Boolean] =
-    gameModeProperty.transform(_.exists(_.isPlaying))
-
-  val inGameOverMode: ReadableProperty[Boolean] =
-    gameModeProperty.transform(_.exists(_.isEndGame))
+//  val inPlacingShipsMode: ReadableProperty[Boolean] =
+//    gameModeProperty.transform(_.exists(_.isPlacingShips))
+//
+//  val inPlayingMode: ReadableProperty[Boolean] =
+//    gameModeProperty.transform(_.exists(_.isPlaying))
+//
+//  val inGameOverMode: ReadableProperty[Boolean] =
+//    gameModeProperty.transform(_.exists(_.isEndGame))
 
   val isMyTurnProperty: ReadableProperty[Boolean] =
     playingModeProperty.transform(_.exists(_.isMyTurn))
@@ -379,6 +379,16 @@ class GamePresenter(
     ).transform { case (totalSize, lastSeenMessageCount, selectedTab) =>
       Some(totalSize - lastSeenMessageCount)
         .filter(_ > 0 && selectedTab != ScreenModel.enemyMovesTab)
+    }
+
+  def resetLastSeenMessages(): Unit =
+    selectedTabProperty.get match {
+      case ScreenModel.chatTab =>
+        screenModel.subProp(_.lastSeenMessagesChat).set(chatMessagesSizeProperty.get)
+      case ScreenModel.myMovesTab =>
+        screenModel.subProp(_.lastSeenMessagesMyMoves).set(myMovesHistorySizeProperty.get)
+      case ScreenModel.enemyMovesTab =>
+        screenModel.subProp(_.lastSeenMessagesEnemyMoves).set(enemyMovesHistorySizeProperty.get)
     }
 
   val shipCounter: Map[ShipId, Property[Int]] =

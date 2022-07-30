@@ -609,6 +609,7 @@ class PlayerVsUtils(
               div(
                 `class` := "d-flex align-items-center",
                 span(
+                  cursorPointer,
                   `class` := "my-2 mr-2",
                   FontAwesome.Modifiers.Sizing.x2,
                   FontAwesome.Solid.infoCircle
@@ -637,6 +638,7 @@ class PlayerVsUtils(
               createAttackTypesDiv(nested)
 
             div(
+              unselectableText,
               `class` := "row m-1",
               div(`class` := "col-12 p-0 mb-2", turnNumberDiv),
               div(`class` := "col-12 p-0", extraTurnDiv),
@@ -722,6 +724,7 @@ class PlayerVsUtils(
   ): Div =
     div(
       `class` := "row m-0",
+      unselectableText,
       div(
         `class` := "col-12 d-flex justify-content-center my-1",
         nested(produce(playerUsername) {
@@ -735,12 +738,12 @@ class PlayerVsUtils(
           nested(translatedDynamic(playerProgressKey0)(_.apply())),
           nested(
             produce(playerProgressProperty) {
-              case Some((shipsDestoyed, shipsAmount)) =>
+              case Some((shipsDestroyed, shipsAmount)) =>
                 div(
                   `class` := "row m-1",
                   div(
                     `class` := "col-12 d-flex justify-content-center",
-                    span(shipsDestoyed, " / ", b(shipsAmount))
+                    span(shipsDestroyed, " / ", b(shipsAmount))
                   )
                 ).render
               case _ =>

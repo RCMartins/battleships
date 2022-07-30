@@ -13,6 +13,7 @@ import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.frontend.views.model.NamedRules
+import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game.RuleTimeLimit._
 import pt.rmartins.battleships.shared.model.game._
@@ -142,7 +143,7 @@ class PreGameView(
           `class` := "mx-2 py-2 g-3 btn-group rounded-start",
           span(
             `class` := "rounded-start bg-primary text-white py-1 px-2",
-            style := "user-select: none",
+            GameStyles.unselectableText,
             bind(shipCountProperty)
           ),
           plusButton,
@@ -358,7 +359,7 @@ class PreGameView(
             `class` := "input-group-prepend",
             span(
               `class` := "input-group-text",
-              style := "user-select: none",
+              GameStyles.unselectableText,
               nested(translatedDynamic(Translations.PreGame.fleet)(_.apply()))
             )
           ),
@@ -920,7 +921,7 @@ class PreGameView(
       val deleteSpan: Span =
         span(
           `class` := "rounded p-2 d-flex justify-content-center bg-danger text-white",
-          style := "cursor: pointer",
+          GameStyles.cursorPointer,
           width := "32px",
           FontAwesome.Solid.trash
         ).render
@@ -946,7 +947,7 @@ class PreGameView(
       val deleteBonusSpan: Span =
         span(
           `class` := "rounded p-2 d-flex justify-content-center bg-danger text-white",
-          style := "cursor: pointer",
+          GameStyles.cursorPointer,
           width := "32px",
           FontAwesome.Solid.times
         ).render
@@ -964,7 +965,7 @@ class PreGameView(
       val editSpan: Span =
         span(
           `class` := "rounded p-2 bg-primary text-white",
-          style := "cursor: pointer",
+          GameStyles.cursorPointer,
           FontAwesome.Solid.pencilAlt
         ).render
 

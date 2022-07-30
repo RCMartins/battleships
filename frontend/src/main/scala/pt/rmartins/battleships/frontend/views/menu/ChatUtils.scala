@@ -11,13 +11,10 @@ import io.udash.component.ComponentId
 import io.udash.css.CssView
 import io.udash.i18n._
 import org.scalajs.dom
-import org.scalajs.dom.document
-import org.scalajs.dom.html.{Canvas, Div, Input, LI}
+import org.scalajs.dom.html.{Canvas, Div, Input, LI, Span}
 import pt.rmartins.battleships.frontend.services.TranslationsService
-import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.frontend.views.game._
-import pt.rmartins.battleships.frontend.views.model.ModeType.{GameOverModeType, PlayingModeType}
-import pt.rmartins.battleships.shared.css.ChatStyles
+import pt.rmartins.battleships.shared.css.{ChatStyles, GameStyles}
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game._
 import pt.rmartins.battleships.shared.model.utils.BoardUtils._
@@ -40,77 +37,38 @@ class ChatUtils(
 
   import translationsService._
 
-  private val chatTabButton: UdashButton =
-    UdashButton()(nested =>
-      Seq[Modifier](
-        `class` := "nav-link btn-outline-primary" +
-          (if (presenter.selectedTabProperty.get == ScreenModel.chatTab) " active"
-           else ""),
-        nested(translatedDynamic(Translations.Game.chatTab)(_.apply())),
-        nested(produce(presenter.chatMessagesShowNotification) {
-          case None         => span.render
-          case Some(number) => span(`class` := "badge badge-light ml-1", number).render
-        })
-      )
-    )
-
-  private val myMovesTabDisabledProperty: ReadableProperty[Boolean] =
-    combine(presenter.modeTypeProperty, presenter.gamePuzzleStateProperty.transform(_.nonEmpty))
-      .transform {
-        case (_, true)                                     => false
-        case (Some(PlayingModeType | GameOverModeType), _) => false
-        case _                                             => true
-      }
-
-  private val enemyMovesTabDisabledProperty: ReadableProperty[Boolean] =
-    presenter.modeTypeProperty.transform {
-      case Some(PlayingModeType | GameOverModeType) => false
-      case _                                        => true
+  private def createNotification(numberOpt: Option[Int]): Span =
+    numberOpt match {
+      case None         => span.render
+      case Some(number) => span(`class` := "badge badge-light ml-1", number).render
     }
 
-  private val myMovesTabButton: UdashButton =
-    UdashButton(
-      disabled = myMovesTabDisabledProperty
-    )(nested =>
-      Seq[Modifier](
-        `class` := "nav-link btn-outline-primary" +
-          (if (presenter.selectedTabProperty.get == ScreenModel.myMovesTab) " active"
-           else ""),
-        nested(translatedDynamic(Translations.Game.myMovesTab)(_.apply())),
-        nested(produce(presenter.myMovesHistoryShowNotification) {
-          case None         => span.render
-          case Some(number) => span(`class` := "badge badge-light ml-1", number).render
-        })
-      )
-    )
+  private def createChatTabButton(nested: NestedInterceptor): Div =
+    div(
+      `class` := "nav-link btn-outline-primary",
+      GameStyles.cursorPointer,
+      GameStyles.unselectableText,
+      nested(translatedDynamic(Translations.Game.chatTab)(_.apply())),
+      nested(produce(presenter.chatMessagesShowNotification)(createNotification))
+    ).render
 
-  private val enemyMovesTabButton: UdashButton =
-    UdashButton(
-      disabled = enemyMovesTabDisabledProperty
-    )(nested =>
-      Seq[Modifier](
-        `class` := "nav-link btn-outline-primary" +
-          (if (presenter.selectedTabProperty.get == ScreenModel.enemyMovesTab) " active"
-           else ""),
-        nested(translatedDynamic(Translations.Game.enemyMovesTab)(_.apply())),
-        nested(produce(presenter.enemyMovesHistoryShowNotification) {
-          case None         => span.render
-          case Some(number) => span(`class` := "badge badge-light ml-1", number).render
-        })
-      )
-    )
+  private def createMyMovesTabButton(nested: NestedInterceptor): Div =
+    div(
+      `class` := "nav-link btn-outline-primary",
+      GameStyles.cursorPointer,
+      GameStyles.unselectableText,
+      nested(translatedDynamic(Translations.Game.myMovesTab)(_.apply())),
+      nested(produce(presenter.myMovesHistoryShowNotification)(createNotification))
+    ).render
 
-  chatTabButton.listen { _ =>
-    presenter.setSelectedTab(ScreenModel.chatTab)
-  }
-
-  myMovesTabButton.listen { _ =>
-    presenter.setSelectedTab(ScreenModel.myMovesTab)
-  }
-
-  enemyMovesTabButton.listen { _ =>
-    presenter.setSelectedTab(ScreenModel.enemyMovesTab)
-  }
+  private def createEnemyMovesTabButton(nested: NestedInterceptor): Div =
+    div(
+      `class` := "nav-link btn-outline-primary",
+      GameStyles.cursorPointer,
+      GameStyles.unselectableText,
+      nested(translatedDynamic(Translations.Game.enemyMovesTab)(_.apply())),
+      nested(produce(presenter.enemyMovesHistoryShowNotification)(createNotification))
+    ).render
 
   private val msgInput = TextInput(chatModel.subProp(_.msgInput))(
     translatedAttrDynamic(Translations.Chat.inputPlaceholder, "placeholder")(_.apply())
@@ -142,13 +100,9 @@ class ChatUtils(
     presenter.sendMsg()
   }
 
-  private def messagesTabItem(nested: NestedInterceptor): Div =
+  private def createMessagesTabItem(nested: NestedInterceptor): Div =
     div(
-      `class` := "tab-pane fade" +
-        (if (presenter.selectedTabProperty.get == ScreenModel.chatTab)
-           " show active"
-         else ""),
-      id := ScreenModel.chatTab,
+      `class` := "tab-pane fade",
       role := "tabpanel",
       div(
         ChatStyles.messagesWindow,
@@ -165,7 +119,7 @@ class ChatUtils(
       msgForm
     ).render
 
-  private def myMovesTabItem(nested: NestedInterceptor): Div = {
+  private def createMyMovesTabItem(nested: NestedInterceptor): Div = {
     val showAllMovesCheckbox: Input =
       input(
         `class` := "form-control px-1",
@@ -234,7 +188,7 @@ class ChatUtils(
             label(
               `class` := "input-group-text",
               `for` := "allMoves-checkbox",
-              style := "user-select: none",
+              GameStyles.unselectableText,
               span(
                 `class` := "pl-1",
                 nested(translatedDynamic(Translations.Game.allMoves)(_.apply()))
@@ -247,7 +201,7 @@ class ChatUtils(
             label(
               `class` := "input-group-text",
               `for` := "missesMoves-checkbox",
-              style := "user-select: none",
+              GameStyles.unselectableText,
               span(
                 `class` := "pl-1",
                 nested(translatedDynamic(Translations.Game.missesMoves)(_.apply()))
@@ -260,7 +214,7 @@ class ChatUtils(
             label(
               `class` := "input-group-text",
               `for` := "disabledMoves-checkbox",
-              style := "user-select: none",
+              GameStyles.unselectableText,
               span(
                 `class` := "pl-1",
                 nested(translatedDynamic(Translations.Game.disabledMoves)(_.apply()))
@@ -283,11 +237,7 @@ class ChatUtils(
       )
 
     div(
-      `class` := "position-relative tab-pane fade" +
-        (if (presenter.selectedTabProperty.get == ScreenModel.myMovesTab)
-           " show active"
-         else ""),
-      id := ScreenModel.myMovesTab,
+      `class` := "position-relative tab-pane fade",
       role := "tabpanel",
       div(
         ChatStyles.myMovesWindow,
@@ -307,7 +257,7 @@ class ChatUtils(
         `class` := "p-1 position-absolute",
         style := "left: 0; bottom: 0",
         span(
-          style := "cursor: pointer",
+          GameStyles.cursorPointer,
           FontAwesome.fas("gear"),
           FontAwesome.Modifiers.Sizing.x2,
         ),
@@ -322,13 +272,9 @@ class ChatUtils(
     ).render
   }
 
-  private def enemyMovesTabItem(nested: NestedInterceptor): Div =
+  private def createEnemyMovesTabItem(nested: NestedInterceptor): Div =
     div(
-      `class` := "tab-pane fade" +
-        (if (presenter.selectedTabProperty.get == ScreenModel.enemyMovesTab)
-           " show active"
-         else ""),
-      id := ScreenModel.enemyMovesTab,
+      `class` := "tab-pane fade",
       role := "tabpanel",
       ChatStyles.enemyMovesWindow,
       nested(repeat(presenter.enemyMovesHistoryProperty) { turnPlayProperty =>
@@ -454,7 +400,7 @@ class ChatUtils(
               inputCheckBox,
               strong(
                 `class` := "col-6 pl-3 py-2",
-                style := "user-select: none",
+                GameStyles.unselectableText,
                 toTurnString,
                 ": "
               )
@@ -484,41 +430,57 @@ class ChatUtils(
     turnDiv
   }
 
-  private def selectedTabToButtonId(id: String): String =
-    id match {
-      case ScreenModel.chatTab       => chatTabButton.componentId.value
-      case ScreenModel.myMovesTab    => myMovesTabButton.componentId.value
-      case ScreenModel.enemyMovesTab => enemyMovesTabButton.componentId.value
-    }
-
-  presenter.selectedTabProperty.listen { selectedTab =>
-    def updateClass(id: String): Unit =
-      if (selectedTab == id) {
-        Option(document.getElementById(selectedTabToButtonId(id)))
-          .foreach(_.classList.add("active"))
-        Option(document.getElementById(id)).foreach { elem =>
-          elem.classList.add("show")
-          elem.classList.add("active")
-        }
-      } else {
-        Option(document.getElementById(selectedTabToButtonId(id)))
-          .foreach(_.classList.remove("active"))
-        Option(document.getElementById(id)).foreach { elem =>
-          elem.classList.remove("show")
-          elem.classList.remove("active")
-        }
-      }
-
-    List(ScreenModel.chatTab, ScreenModel.myMovesTab, ScreenModel.enemyMovesTab)
-      .foreach(updateClass)
-  }
-
   def chatAndMovesDiv(nested: NestedInterceptor): Modifier = {
-    def makeNavItem(button: UdashButton): JsDom.TypedTag[LI] =
+    def makeNavItem(div: Div): JsDom.TypedTag[LI] =
       li(
         `class` := "nav-item",
         role := "presentation",
-        nested(button)
+        div
+      )
+
+    def setupButtonDiv(div: Div, newSelectedTab: String): Unit =
+      div.onclick = _ => {
+        presenter.resetLastSeenMessages()
+        screenModel.subProp(_.selectedTab).set(newSelectedTab)
+        presenter.resetLastSeenMessages()
+      }
+
+    val chatTabButton: Div =
+      createChatTabButton(nested).tap(setupButtonDiv(_, ScreenModel.chatTab))
+    val myMovesTabButton: Div =
+      createMyMovesTabButton(nested).tap(setupButtonDiv(_, ScreenModel.myMovesTab))
+    val enemyMovesTabButton: Div =
+      createEnemyMovesTabButton(nested).tap(setupButtonDiv(_, ScreenModel.enemyMovesTab))
+
+    val messagesTabItem: Div = createMessagesTabItem(nested)
+    val myMovesTabItem: Div = createMyMovesTabItem(nested)
+    val enemyMovesTabItem: Div = createEnemyMovesTabItem(nested)
+
+    val allTabButtons: List[(String, Div, Div)] =
+      List(
+        (ScreenModel.chatTab, chatTabButton, messagesTabItem),
+        (ScreenModel.myMovesTab, myMovesTabButton, myMovesTabItem),
+        (ScreenModel.enemyMovesTab, enemyMovesTabButton, enemyMovesTabItem),
+      )
+
+    screenModel
+      .subProp(_.selectedTab)
+      .listen(
+        { newSelectedTab =>
+          allTabButtons.foreach {
+            case (tabStr, divButton, divContent) if tabStr == newSelectedTab =>
+              divButton.classList.remove("btn-outline-primary")
+              divButton.classList.add("btn-primary")
+              divContent.classList.add("show")
+              divContent.classList.add("active")
+            case (_, div, divContent) =>
+              div.classList.remove("btn-primary")
+              div.classList.add("btn-outline-primary")
+              divContent.classList.remove("show")
+              divContent.classList.remove("active")
+          }
+        },
+        initUpdate = true
       )
 
     div(
@@ -533,9 +495,9 @@ class ChatUtils(
         ),
         div(
           `class` := "tab-content",
-          messagesTabItem(nested),
-          myMovesTabItem(nested),
-          enemyMovesTabItem(nested)
+          messagesTabItem,
+          myMovesTabItem,
+          enemyMovesTabItem
         )
       )
     )

@@ -1,6 +1,6 @@
 package pt.rmartins.battleships.frontend.views.game
 
-import io.udash.HasModelPropertyCreator
+import io.udash.{HasModelPropertyCreator, ModelProperty}
 import pt.rmartins.battleships.frontend.views.model.ErrorModalType
 import pt.rmartins.battleships.shared.model.game.{Coordinate, Turn}
 

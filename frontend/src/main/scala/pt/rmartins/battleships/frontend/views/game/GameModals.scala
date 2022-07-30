@@ -14,6 +14,7 @@ import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.Utils._
 import pt.rmartins.battleships.frontend.views.model.ErrorModalType._
 import pt.rmartins.battleships.frontend.views.model.NamedRules
+import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game._
 import scalatags.JsDom.all._
@@ -51,7 +52,7 @@ class GameModals(
                 ).render
             },
             span(
-              style := "cursor: pointer",
+              GameStyles.cursorPointer,
               FontAwesome.Solid.times,
               FontAwesome.Modifiers.Sizing.x2,
               attr("data-bs-dismiss") := "modal"
@@ -123,7 +124,7 @@ class GameModals(
                 h5.render
             },
             span(
-              style := "cursor: pointer",
+              GameStyles.cursorPointer,
               FontAwesome.Solid.times,
               FontAwesome.Modifiers.Sizing.x2,
               attr("data-bs-dismiss") := "modal"
@@ -277,7 +278,7 @@ class GameModals(
             `class` := "modal-header",
             h5(translatedDynamic(Translations.PreGame.chooseFleetNameTitle)(_.apply())),
             span(
-              style := "cursor: pointer",
+              GameStyles.cursorPointer,
               FontAwesome.Solid.times,
               FontAwesome.Modifiers.Sizing.x2,
               attr("data-bs-dismiss") := "modal"
@@ -380,7 +381,7 @@ class GameModals(
               }
             ),
             span(
-              style := "cursor: pointer",
+              GameStyles.cursorPointer,
               FontAwesome.Solid.times,
               FontAwesome.Modifiers.Sizing.x2,
               attr("data-bs-dismiss") := "modal"
@@ -437,7 +438,7 @@ class GameModals(
             `class` := "modal-header",
             h5(translatedDynamic(Translations.Game.confirmQuitGameTitle)(_.apply())),
             span(
-              style := "cursor: pointer",
+              GameStyles.cursorPointer,
               FontAwesome.Solid.times,
               FontAwesome.Modifiers.Sizing.x2,
               attr("data-bs-dismiss") := "modal"
