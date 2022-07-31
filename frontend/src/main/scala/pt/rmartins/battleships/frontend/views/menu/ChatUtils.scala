@@ -387,14 +387,28 @@ class ChatUtils(
     } else
       inputCheckBox.style.visibility = "hidden"
 
-    val turnDiv =
+    val divMargins: String =
+      if (fleetMaxSize.y > 1)
+        "my-1"
+      else
+        "my-2"
+
+    val itemMargins: String =
+      if (fleetMaxSize.y > 1)
+        "mt-0 mb-1 mx-0"
+      else
+        "m-0"
+
+    val turnDiv: Div =
       div(
+        `class` := divMargins,
         ChatStyles.turnContainer,
         div(
           `class` := "form-group my-0",
           div(
             `class` := "checkbox",
             label(
+              `class` := itemMargins,
               minWidth := "75px",
               `for` := checkId,
               inputCheckBox,

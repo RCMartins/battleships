@@ -23,6 +23,7 @@ import pt.rmartins.battleships.frontend.views.model.ModeType._
 import pt.rmartins.battleships.shared.css.GameStyles._
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game.GameMode._
+import pt.rmartins.battleships.shared.model.game.RuleTimeLimit.WithRuleTimeLimit
 import pt.rmartins.battleships.shared.model.game._
 import scalatags.JsDom
 import scalatags.JsDom.all.{span, _}
@@ -700,6 +701,7 @@ class PlayerVsUtils(
           chatModel.subProp(_.username).transform(Some(_)),
           Translations.Game.myProgress,
           myProgressProperty,
+          presenter.rulesProperty.transform(_.map(_.timeLimit)),
           gameModel.subProp(_.timeRemaining).transform(_.map(_._1)),
         )
       ),
@@ -710,6 +712,7 @@ class PlayerVsUtils(
           presenter.enemyUsernameProperty,
           Translations.Game.enemyProgress,
           enemyProgressProperty,
+          presenter.rulesProperty.transform(_.map(_.timeLimit)),
           gameModel.subProp(_.timeRemaining).transform(_.map(_._2)),
         )
       ),
@@ -720,7 +723,8 @@ class PlayerVsUtils(
       playerUsername: ReadableProperty[Option[Username]],
       playerProgressKey0: TranslationKey0,
       playerProgressProperty: ReadableProperty[Option[(Int, Int)]],
-      timeRemainingProperty: ReadableProperty[Option[TimeRemaining]]
+      ruleTimeLimitProperty: ReadableProperty[Option[RuleTimeLimit]],
+      timeRemainingProperty: ReadableProperty[Option[TimeRemaining]],
   ): Div =
     div(
       `class` := "row m-0",
@@ -733,7 +737,7 @@ class PlayerVsUtils(
         })
       ),
       playerStatsSummaryDestroyedDiv(nested, playerProgressKey0, playerProgressProperty),
-      playerStatsSummaryTimeDiv(nested, timeRemainingProperty)
+      playerStatsSummaryTimeDiv(nested, ruleTimeLimitProperty, timeRemainingProperty)
     ).render
 
   private def playerStatsSummaryDestroyedDiv(
@@ -748,10 +752,29 @@ class PlayerVsUtils(
         nested(
           produce(playerProgressProperty) {
             case Some((shipsDestroyed, shipsAmount)) =>
+              val perc: Double =
+                (shipsDestroyed.toDouble / shipsAmount) * 100.0
+
+              println(perc)
+
+              val progress: JsDom.TypedTag[Div] =
+                div(
+                  `class` := "progress d-flex align-items-end mr-2 border border-dark",
+                  width := "25px",
+                  height := "25px",
+                  div(
+                    `class` := s"progress-bar",
+                    role := "progressbar",
+                    style := s"width: 100%; height: $perc%",
+                    backgroundColor := "rgb(160, 94, 39)",
+                  )
+                )
+
               div(
                 `class` := "row m-1",
                 div(
-                  `class` := "col-12 d-flex justify-content-center",
+                  `class` := "col-12 d-flex align-items-center",
+                  progress,
                   span(shipsDestroyed, " / ", b(shipsAmount))
                 )
               ).render
@@ -764,6 +787,7 @@ class PlayerVsUtils(
 
   private def playerStatsSummaryTimeDiv(
       nested: NestedInterceptor,
+      ruleTimeLimitProperty: ReadableProperty[Option[RuleTimeLimit]],
       timeRemainingProperty: ReadableProperty[Option[TimeRemaining]]
   ): JsDom.TypedTag[Div] =
     div(
@@ -771,34 +795,66 @@ class PlayerVsUtils(
       div(
         nested(translatedDynamic(Translations.Game.remainingTime)(_.apply())),
         nested(
-          produce(timeRemainingProperty) {
-            case Some(timeRemaining) =>
-              def toTimeStr(seconds: Int): JsDom.TypedTag[Span] =
-                span("%02d:%02d".format(seconds / 60, seconds % 60))
+          produce(combine(ruleTimeLimitProperty, timeRemainingProperty)) {
+            case (Some(WithRuleTimeLimit(initialTime, _)), Some(timeRemaining)) =>
+              def toTimeStr(millis: Int): JsDom.TypedTag[Span] = {
+                val seconds: Int = millis / 1000
+                span(
+                  blackTextStyle,
+                  if (seconds / 60 > 0)
+                    "%02d:%02d".format(seconds / 60, seconds % 60)
+                  else
+                    "%d.%d".format(seconds % 60, (millis % 1000) / 100)
+                )
+              }
 
               def toShortTimeStr(secondsOpt: Option[Int]): JsDom.TypedTag[Span] =
                 secondsOpt
                   .map {
                     case 0 =>
-                      span(" + ", b(redTextStyle, "00"))
+                      span(blackTextStyle, " + ", b(redTextStyle, "00"))
                     case seconds if seconds >= 60 =>
-                      span(" + %02d:%02d".format(seconds / 60, seconds % 60))
+                      span(blackTextStyle, " + %02d:%02d".format(seconds / 60, seconds % 60))
                     case seconds =>
-                      span(" + %02d".format(seconds))
+                      span(blackTextStyle, " + %02d".format(seconds))
                   }
                   .getOrElse(span())
 
-              val textSpan: Span =
-                span(
-                  toTimeStr(timeRemaining.totalTimeRemainingMillis / 1000),
-                  toShortTimeStr(timeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000))
-                ).render
+              val perc: Double =
+                if (initialTime == 0)
+                  0.0
+                else
+                  (timeRemaining.totalTimeRemainingMillis / 1000.0 / initialTime) * 100.0
+
+              val colorStr: String =
+                if (perc < PlayerVsUtils.TimeLimitRedPerc) "bg-danger"
+                else if (perc < PlayerVsUtils.TimeLimitYellowPerc) "bg-warning"
+                else "bg-success"
+
+              val textDiv: JsDom.TypedTag[Div] =
+                div(
+                  `class` := "position-absolute d-flex justify-content-center",
+                  style := "width: 100%",
+                  span(
+                    toTimeStr(timeRemaining.totalTimeRemainingMillis),
+                    toShortTimeStr(timeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000))
+                  )
+                )
+
+              val progress: JsDom.TypedTag[Div] =
+                div(
+                  `class` := s"progress-bar $colorStr",
+                  role := "progressbar",
+                  style := s"width: $perc%",
+                )
 
               div(
-                `class` := "row m-1",
+                `class` := "row my-1",
                 div(
-                  `class` := "col-12 d-flex justify-content-center",
-                  textSpan
+                  `class` := "col-12 d-flex justify-content-start p-0 progress position-relative border border-dark",
+                  height := "20px",
+                  progress,
+                  textDiv,
                 )
               ).render
             case _ =>
@@ -831,5 +887,7 @@ object PlayerVsUtils {
 
   private val DefaultSelectorSize = 36
   private val DefaultSelectorCoor = Coordinate.square(DefaultSelectorSize)
+  private val TimeLimitRedPerc: Double = 15.0
+  private val TimeLimitYellowPerc: Double = 50.0
 
 }

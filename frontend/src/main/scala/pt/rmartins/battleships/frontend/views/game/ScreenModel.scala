@@ -59,6 +59,8 @@ object ScreenModel extends HasModelPropertyCreator[ScreenModel] {
 
   def resetScreenModel(model: ScreenModel): ScreenModel = {
     model.copy(
+      mainBoardCanvasSize = Coordinate.square(300),
+      smallBoardCanvasSize = Coordinate.square(100),
       selectedTab = chatTab,
       lastSeenMessagesChat = 0,
       lastSeenMessagesMyMoves = 0,
