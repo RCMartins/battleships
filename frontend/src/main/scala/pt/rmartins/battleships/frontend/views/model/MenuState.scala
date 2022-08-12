@@ -4,6 +4,8 @@ sealed trait MenuState
 
 object MenuState {
 
+  // TODO Nothing selected ???
+
   case object PlayingVsBots extends MenuState
 
   case object PlayingVsPlayer extends MenuState

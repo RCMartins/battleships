@@ -378,13 +378,13 @@ class GameView(
       BootstrapStyles.containerFluid,
       div(
         `class` := "navbar col-12",
-//        button(
-//          `class` := "navbar-toggler",
-//          `type` := "button",
+        button(
+          `class` := "navbar-toggler",
+          `type` := "button",
 //          attr("data-toggle") := "collapse",
 //          attr("data-target") := "#navbarToggleExternalContent",
-//          span(FontAwesome.Solid.bars, FontAwesome.Modifiers.Sizing.x2)
-//        ),
+          span(FontAwesome.Solid.bars, FontAwesome.Modifiers.Sizing.x2)
+        ),
         quitGameButton,
         h2(
           `class` := "text-center",
@@ -463,24 +463,6 @@ class GameView(
 //                      )(_.apply())
 //                    )
 //                  span(color := "#FF0000", b(placeShipsBinding)).render
-//                case (Some(PlayingMode(isMyTurn, turn, _, _, _)), nested) =>
-//                  val turnStrBinding: Binding =
-//                    nested(
-//                      translatedDynamic(
-//                        if (isMyTurn)
-//                          Translations.Game.yourTurn
-//                        else
-//                          Translations.Game.enemyTurn
-//                      )(_.apply())
-//                    )
-//
-//                  span(
-//                    nested(translatedDynamic(Translations.Game.turn)(_.apply())),
-//                    " ",
-//                    turn.toTurnString,
-//                    ": ",
-//                    span(color := "#FF0000", b(turnStrBinding))
-//                  ).render
 //                case (Some(GameOverMode(turn, youWon, _, _, _)), nested) =>
 //                  val turnStrBinding: Binding =
 //                    nested(
@@ -502,85 +484,7 @@ class GameView(
 //                case _ =>
 //                  span.render
 //              })
-//            ), {
-//              def toTimeStr(seconds: Int): String =
-//                "%02d:%02d".format(seconds / 60, seconds % 60)
-//
-//              def toShortTimeStr(secondsOpt: Option[Int]): String =
-//                secondsOpt
-//                  .map { seconds =>
-//                    if (seconds >= 60)
-//                      " + %02d:%02d".format(seconds / 60, seconds % 60)
-//                    else
-//                      " + %02d".format(seconds)
-//                  }
-//                  .getOrElse("")
-//
-//              def showTimeStr(nested: NestedInterceptor, key: TranslationKey0): Binding =
-//                nested(
-//                  produceWithNested(presenter.modeTypeProperty) {
-//                    case (Some(PlayingModeType | GameOverModeType), nested) =>
-//                      span(nested(translatedDynamic(key)(_.apply()))).render
-//                    case _ =>
-//                      div.render
-//                  }
-//                )
-//
-//              def showTime(timeRemaining: TimeRemaining): Span =
-//                span(
-//                  `class` := "px-0",
-//                  span(b(toTimeStr(timeRemaining.totalTimeRemainingMillis / 1000))),
-//                  span(b(toShortTimeStr(timeRemaining.turnTimeRemainingMillisOpt.map(_ / 1000))))
-//                ).render
-//
-//              div(
-//                `class` := "col-4 row p-0 m-0",
-//                div(
-//                  `class` := "col px-0",
-//                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.nonEmpty)) {
-//                    case true =>
-//                      span(showTimeStr(nested, Translations.Game.myTime)).render
-//                    case false =>
-//                      span.render
-//                  }),
-//                  br,
-//                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.map(_._1))) {
-//                    case Some(myTimeRemaining) =>
-//                      showTime(myTimeRemaining)
-//                    case None =>
-//                      span.render
-//                  })
-//                ),
-//                div(
-//                  `class` := "col px-0",
-//                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.nonEmpty)) {
-//                    case true =>
-//                      span(showTimeStr(nested, Translations.Game.enemyTime)).render
-//                    case false =>
-//                      span.render
-//                  }),
-//                  br,
-//                  nested(produce(gameModel.subProp(_.timeRemaining).transform(_.nonEmpty)) {
-//                    case true =>
-//                      div(
-//                        `class` := "row m-0",
-//                        nested(produce(gameModel.subProp(_.timeRemaining).transform(_.map(_._2))) {
-//                          case Some(enemyTimeRemaining) =>
-//                            div(
-//                              `class` := "m-0",
-//                              showTime(enemyTimeRemaining)
-//                            ).render
-//                          case None =>
-//                            span.render
-//                        }),
-//                        addEnemyTimeButton
-//                      ).render
-//                    case false =>
-//                      span.render
-//                  })
-//                )
-//              )
-//            },
+//            ),
 //            div(
 //              `class` := "col-2 container",
 //              div(
