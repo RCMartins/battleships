@@ -372,20 +372,17 @@ class GameView(
   override def getTemplate: Modifier =
     div(
       `class` := "row m-0 p-0 vh-100",
-      // loads Bootstrap and FontAwesome styles from CDN
-//      UdashBootstrap.loadBootstrapStyles(),
-//      UdashBootstrap.loadFontAwesome(),
       BootstrapStyles.containerFluid,
       div(
         `class` := "navbar col-12",
-        button(
-          `class` := "navbar-toggler",
-          `type` := "button",
-//          attr("data-toggle") := "collapse",
-//          attr("data-target") := "#navbarToggleExternalContent",
-          span(FontAwesome.Solid.bars, FontAwesome.Modifiers.Sizing.x2)
+        div(
+          `class` := "d-flex align-items-center",
+          button(
+            `class` := "navbar-toggler mr-3",
+            span(FontAwesome.Solid.bars, FontAwesome.Modifiers.Sizing.x2)
+          ).render.tap(_.onclick = _ => { Globals.showCollapse("navbarToggle") }),
+          quitGameButton,
         ),
-        quitGameButton,
         h2(
           `class` := "text-center",
           style := "font-family: 'Holtwood One SC', serif;",
@@ -398,12 +395,34 @@ class GameView(
         )
       ),
       div(
-        `class` := "col-12",
+        `class` := "d-flex align-items-center",
         div(
-          //      GameStyles.flexContainer,
-          //      GameStyles.mainCardHeight,
-          gameModals.initialize(),
-          mainDiv(),
+          id := "navbarToggle",
+          `class` := "collapse",
+          div(
+            `class` := "d-flex flex-column ml-2",
+            div(
+              `class` := "card card-body my-2",
+              "Player vs Bot"
+            ),
+            div(
+              `class` := "card card-body my-2",
+              "Player vs Player"
+            ),
+            div(
+              `class` := "card card-body my-2",
+              "Puzzles"
+            ),
+          )
+        ),
+        div(
+          `class` := "col-12",
+          div(
+            //      GameStyles.flexContainer,
+            //      GameStyles.mainCardHeight,
+            gameModals.initialize(),
+            mainDiv(),
+          )
         )
       )
     )

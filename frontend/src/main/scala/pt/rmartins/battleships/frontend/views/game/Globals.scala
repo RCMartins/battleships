@@ -16,4 +16,6 @@ object Globals extends js.Object {
 
   def modalToggleWithoutDismiss(@unused id: String): Unit = js.native
 
+  def showCollapse(@unused id: String): Unit = js.native
+
 }
