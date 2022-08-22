@@ -10,4 +10,6 @@ object MenuState {
 
   case object PlayingVsPlayer extends MenuState
 
+  case object PlayingPuzzles extends MenuState
+
 }

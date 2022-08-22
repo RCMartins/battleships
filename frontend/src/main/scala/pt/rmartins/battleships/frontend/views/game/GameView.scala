@@ -22,7 +22,7 @@ import pt.rmartins.battleships.frontend.views.menu._
 import pt.rmartins.battleships.frontend.views.model.JoinedPreGame.PlayingAgainstPlayer
 import pt.rmartins.battleships.frontend.views.model.ModeType._
 import pt.rmartins.battleships.frontend.views.model.{AttacksQueuedStatus, MenuState}
-import pt.rmartins.battleships.shared.css.{ChatStyles, GlobalStyles}
+import pt.rmartins.battleships.shared.css.{ChatStyles, GameStyles, GlobalStyles}
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game._
@@ -349,6 +349,8 @@ class GameView(
                   playerVsBotsView.mainEditorDiv(nested)
                 case (MenuState.PlayingVsPlayer, nested) =>
                   playerVsPlayerView.mainEditorDiv(nested)
+                case (MenuState.PlayingPuzzles, nested) =>
+                  puzzlesView.createMainDiv(nested)
               }
             )
           ).render
@@ -367,6 +369,11 @@ class GameView(
     }
 
     btn.render
+  }
+
+  private def setMenuState(newMenuState: MenuState): Unit = {
+    preGameModel.subProp(_.menuState).set(newMenuState)
+    Globals.showCollapse("navbarToggle")
   }
 
   override def getTemplate: Modifier =
@@ -403,16 +410,25 @@ class GameView(
             `class` := "d-flex flex-column ml-2",
             div(
               `class` := "card card-body my-2",
+              GameStyles.cursorPointer,
               "Player vs Bot"
-            ),
+            ).render.tap {
+              _.onclick = _ => { setMenuState(MenuState.PlayingVsBots) }
+            },
             div(
               `class` := "card card-body my-2",
+              GameStyles.cursorPointer,
               "Player vs Player"
-            ),
+            ).render.tap {
+              _.onclick = _ => { setMenuState(MenuState.PlayingVsPlayer) }
+            },
             div(
               `class` := "card card-body my-2",
+              GameStyles.cursorPointer,
               "Puzzles"
-            ),
+            ).render.tap {
+              _.onclick = _ => { setMenuState(MenuState.PlayingPuzzles) }
+            },
           )
         ),
         div(
