@@ -48,9 +48,32 @@ body {
     });
   }
 
-  function showCollapse(id) {
+  function toggleCollapse(id) {
     $('#' + id).toggle()
   }
+
+  function hideCollapse(id) {
+    $('#' + id).collapse('hide')
+  }
+
+<!--  $(document).click(function(e) {-->
+<!--	  if (!$(e.target).is('.battle-navbar')) {-->
+<!--      $('.collapse').collapse('hide');-->
+<!--    }-->
+<!--  });-->
+
+    $(document).ready(function () {
+        console.log('test1');
+        $(document).click(function (event) {
+            console.log('test2');
+            var clickover = $(event.target);
+            var $navbar = $("#navbarToggle");
+            var _opened = $navbar.hasClass("in");
+            if (_opened === true && !clickover.hasClass("navbar-toggle")) {
+                $navbar.collapse('hide');
+            }
+        });
+    });
 
 </script>
 

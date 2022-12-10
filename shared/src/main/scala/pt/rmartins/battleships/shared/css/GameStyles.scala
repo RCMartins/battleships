@@ -76,4 +76,40 @@ object GameStyles extends CssBase {
     animationDuration(2 seconds),
   )
 
+  val myCollapsible: CssStyle = style(
+    position.relative,
+    zIndex(1),
+  )
+
+  /*
+
+
+.collapsible {
+  /* The div that will be collapsed/expanded */
+  position: relative;
+  /* Position the div above other elements on the page */
+  z-index: 1;
+  /* Set the initial height of the div to 0, so it will be hidden */
+  width: 0;
+  /* Set the overflow property to "hidden" to hide the content of the div */
+  overflow: hidden;
+  /* Add a transition to smoothly animate the height of the div */
+  transition: left 0.3s ease;
+}
+
+.my-collapsible {
+  /* The div that will be collapsed/expanded */
+  position: relative;
+  /* Position the div above other elements on the page */
+  z-index: 1;
+  /* Add a transition to smoothly animate the height of the div */
+  transition: left 0.3s ease;
+}
+
+.collapsible.expanded {
+  /* When the div is expanded, set the height to auto to show the content */
+  width: auto;
+}
+   */
+
 }

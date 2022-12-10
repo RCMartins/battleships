@@ -1369,6 +1369,10 @@ class GamePresenter(
     }
   }
 
+  def setPlayerName(newUsername: Username): Unit = {
+    chatModel.subProp(_.username).set(newUsername)
+  }
+
 }
 
 object GamePresenter {

@@ -2,32 +2,27 @@ package pt.rmartins.battleships.frontend.views.game
 
 import com.avsystem.commons.universalOps
 import io.udash._
-import io.udash.bindings.modifiers.Binding
-import io.udash.bootstrap.{BootstrapStyles, UdashBootstrap}
+import io.udash.bootstrap.BootstrapStyles
 import io.udash.bootstrap.button.UdashButton
-import io.udash.bootstrap.form.UdashForm.FormEvent
-import io.udash.bootstrap.form.{FormElementsFactory, UdashForm, UdashInputGroup}
+import io.udash.bootstrap.form.{FormElementsFactory, UdashForm}
 import io.udash.bootstrap.utils.BootstrapStyles.Color
 import io.udash.bootstrap.utils.UdashIcons.FontAwesome
 import io.udash.component.ComponentId
 import io.udash.css._
 import io.udash.i18n._
-import org.scalajs.dom
-import org.scalajs.dom.html.{Canvas, Div, Input, LI}
+import org.scalajs.dom.html.Input
 import org.scalajs.dom.{html, _}
 import pt.rmartins.battleships.BuildInfo
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.frontend.views.menu._
 import pt.rmartins.battleships.frontend.views.model.JoinedPreGame.PlayingAgainstPlayer
+import pt.rmartins.battleships.frontend.views.model.MenuState
 import pt.rmartins.battleships.frontend.views.model.ModeType._
-import pt.rmartins.battleships.frontend.views.model.{AttacksQueuedStatus, MenuState}
-import pt.rmartins.battleships.shared.css.{ChatStyles, GameStyles, GlobalStyles}
+import pt.rmartins.battleships.shared.css.{GameStyles, GlobalStyles}
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game.GameMode._
 import pt.rmartins.battleships.shared.model.game._
-import pt.rmartins.battleships.shared.model.utils.BoardUtils._
-import scalatags.JsDom
 import scalatags.JsDom.all._
 
 import scala.util.chaining.scalaUtilChainingOps
@@ -348,7 +343,7 @@ class GameView(
                 case (MenuState.PlayingVsBots, nested) =>
                   playerVsBotsView.mainEditorDiv(nested)
                 case (MenuState.PlayingVsPlayer, nested) =>
-                  playerVsPlayerView.mainEditorDiv(nested)
+                  playerVsPlayerView.mainPlayerDiv(nested)
                 case (MenuState.PlayingPuzzles, nested) =>
                   puzzlesView.createMainDiv(nested)
               }
@@ -371,10 +366,21 @@ class GameView(
     btn.render
   }
 
+  private val navbarToggleId: String = "navbarToggle"
+
   private def setMenuState(newMenuState: MenuState): Unit = {
     preGameModel.subProp(_.menuState).set(newMenuState)
-    Globals.showCollapse("navbarToggle")
+//    Option(document.getElementById(navbarToggleId)).foreach(_.classList.remove("expanded"))
+    Globals.toggleCollapse(navbarToggleId)
   }
+
+//  private def toggleCollapseNavbar(): Unit =
+//    Option(document.getElementById(navbarToggleId)).foreach { elem =>
+//      if (elem.classList.contains("expanded"))
+//        elem.classList.remove("expanded")
+//      else
+//        elem.classList.add("expanded")
+//    }
 
   override def getTemplate: Modifier =
     div(
@@ -387,7 +393,7 @@ class GameView(
           button(
             `class` := "navbar-toggler mr-3",
             span(FontAwesome.Solid.bars, FontAwesome.Modifiers.Sizing.x2)
-          ).render.tap(_.onclick = _ => { Globals.showCollapse("navbarToggle") }),
+          ).render.tap(_.onclick = _ => { Globals.toggleCollapse(navbarToggleId) }),
           quitGameButton,
         ),
         h2(
@@ -404,8 +410,9 @@ class GameView(
       div(
         `class` := "d-flex align-items-center",
         div(
-          id := "navbarToggle",
+          id := navbarToggleId,
           `class` := "collapse",
+          GameStyles.myCollapsible,
           div(
             `class` := "d-flex flex-column ml-2",
             div(
@@ -442,6 +449,12 @@ class GameView(
         )
       )
     )
+//      .render.tap { mainDivParent =>
+//      mainDivParent.onclick = event => {
+//        if (event.target.is)
+//          Globals.hideCollapse("navbarToggle")
+//      }
+//    }
 
 //    div(
 //      UdashCard(componentId = ComponentId("game-panel"))(factory =>
