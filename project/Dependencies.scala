@@ -3,7 +3,7 @@ import org.scalajs.jsdependencies.sbtplugin.JSDependenciesPlugin.autoImport._
 import sbt._
 
 object Dependencies {
-  val versionOfScala = "2.13.8"
+  val versionOfScala = "2.13.10"
 
   // Udash
   val udashVersion = "0.9.0-M24"
@@ -19,7 +19,7 @@ object Dependencies {
   val macwireVersion = "2.5.7"
 
   // JS dependencies
-  val bootstrapVersion = "5.1.3"
+  val bootstrapVersion = "5.2.3"
 
   // Testing
   val scalatestVersion = "3.2.3"
