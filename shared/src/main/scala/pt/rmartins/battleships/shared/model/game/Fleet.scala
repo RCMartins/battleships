@@ -5,7 +5,7 @@ import zio.json.{DeriveJsonDecoder, DeriveJsonEncoder, JsonDecoder, JsonEncoder}
 
 case class Fleet(shipCounterList: List[(ShipId, (Int, Rotation))]) {
 
-  lazy val shipAmount: Int = shipCounterList.map(_._2._1).sum
+  lazy val shipsAmount: Int = shipCounterList.map(_._2._1).sum
 
   lazy val shipCounterMap: Map[ShipId, (Int, Rotation)] = shipCounterList.toMap
 

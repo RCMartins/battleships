@@ -37,10 +37,9 @@ class PreGameView(
 
   private val MaxCustomNamedRules = 5
 
-  private val defaultHeight = 300
   private val fleetMaxSize: Coordinate = Ship.allShipsFleetMaxX.maxSize
   private val sqSize: Int = Math.min(100 / fleetMaxSize.x, 50 / fleetMaxSize.y)
-  private val canvasSize: Coordinate = fleetMaxSize * sqSize + Coordinate.square(4)
+  private val shipCanvasSize: Coordinate = fleetMaxSize * sqSize + Coordinate.square(4)
 
   private val MinBoardSize = 4
   private val MaxBoardSize = 20
@@ -60,70 +59,48 @@ class PreGameView(
       gamePresenter.preGameRulesProperty.get.copy(timeLimit = timeLimit)
     )
 
-  def createComponents(divElement: Element, nested: NestedInterceptor): Div = {
+  def createComponents(nested: NestedInterceptor): Div = {
     div(
-      `class` := "d-flex justify-content-start",
+      `class` := "d-flex row",
       div(
-        `class` := "nav flex-column nav-pills me-3",
-        role := "tablist",
-        button(
-          `class` := "nav-link active btn",
-          attr("data-bs-toggle") := "pill",
-          attr("data-bs-target") := "#nav-pregame-fleet",
-          `type` := "button",
-          role := "tab",
-          nested(translatedDynamic(Translations.PreGame.fleet)(_.apply()))
-        ),
-        button(
-          `class` := "nav-link btn",
-          attr("data-bs-toggle") := "pill",
-          attr("data-bs-target") := "#nav-pregame-options",
-          `type` := "button",
-          role := "tab",
-          nested(translatedDynamic(Translations.PreGame.options)(_.apply()))
-        )
-      ),
-      div(
-        `class` := "tab-content",
+        `class` := "col-12",
         div(
-          `class` := "tab-pane fade show active",
-          id := "nav-pregame-fleet",
-          role := "tabpanel",
+          `class` := "card col-12 p-0 mt-3",
+          div(
+            `class` := "card-header",
+            createFleetSaveLoadDiv(nested)
+          ),
           div(
             `class` := "row m-2 justify-content-between",
-            height := "100%",
             div(
-              `class` := "col-7 px-0 overflow-auto",
+              `class` := "col-lg-7 col-md-12 px-0", // col-lg-6 col-md-12
               div(
-                createFleetSaveLoadDiv(nested)
-              ),
-              hr(`class` := "my-2"),
-              div(
-                GameStyles.flexContainer,
-                height := defaultHeight,
+//                GameStyles.flexContainer,
+//                height := defaultHeight,
                 div(
                   `class` := "row my-0 mx-1",
-                  GameStyles.hideScrollX,
+//                  GameStyles.hideScrollX,
                   createAllShipElems
                 )
               )
             ),
             div(
-              `class` := "col-5",
-              createCanvasPreview(divElement, nested)
+              `class` := "col-lg-5 col-md-12",
+              div(
+                `class` := "d-flex justify-content-start",
+                createCanvasPreview(nested),
+                createFleetPreview(nested),
+              )
             )
           )
-        ),
+        )
+      ),
+      div(
+        `class` := "col-12",
         div(
-          `class` := "tab-pane fade",
-          id := "nav-pregame-options",
-          role := "tabpanel",
-          div(
-            `class` := "row m-2",
-            height := defaultHeight,
-            createFirstColumnOptions(nested),
-            createSecondColumnOptions(nested)
-          )
+          `class` := "row mx-0 my-3",
+          createFirstColumnOptions(nested),
+          createSecondColumnOptions(nested)
         )
       )
     ).render
@@ -132,7 +109,7 @@ class PreGameView(
   private def createAllShipElems: Modifier = {
     def createShipCanvas(ship: Ship): Canvas =
       viewUtils.createShipCanvas(
-        canvasSize,
+        shipCanvasSize,
         sqSize,
         ship,
         destroyed = false,
@@ -166,7 +143,7 @@ class PreGameView(
           `class` := "mx-2 py-2 g-3 btn-group rounded-start",
           span(
             `class` := "rounded-start bg-primary text-white py-1 px-2",
-            style := "user-select: none",
+            GameStyles.unselectableText,
             bind(shipCountProperty)
           ),
           plusButton,
@@ -327,7 +304,7 @@ class PreGameView(
 
         val clearButton =
           button(
-            `class` := "btn btn-danger p-1",
+            `class` := "btn btn-danger px-2 py-1",
             span(FontAwesome.Solid.trash),
             span(" "),
             span(nested(translatedDynamic(Translations.PreGame.clearAllShips)(_.apply())))
@@ -377,69 +354,81 @@ class PreGameView(
           }
 
         div(
-          `class` := "row",
+          `class` := "input-group d-flex justify-content-start",
           div(
-            `class` := "input-group d-flex justify-content-center",
-            div(
-              `class` := "input-group-prepend",
-              span(
-                `class` := "input-group-text",
-                style := "user-select: none",
-                nested(translatedDynamic(Translations.PreGame.fleet)(_.apply()))
-              )
-            ),
-            div(
-              fleetSelector
-            ),
-            editAndSaveButtons,
-            div(
-              `class` := "ml-4",
-              clearButton
+            `class` := "input-group-prepend",
+            span(
+              `class` := "input-group-text",
+              GameStyles.unselectableText,
+              nested(translatedDynamic(Translations.PreGame.fleet)(_.apply()))
             )
+          ),
+          div(
+            fleetSelector
+          ),
+          editAndSaveButtons,
+          div(
+            `class` := "ml-4",
+            clearButton
           )
         ).render
       }
     )
 
-  private def createCanvasPreview(divElement: Element, nested: NestedInterceptor): Binding =
+  private def createCanvasPreview(nested: NestedInterceptor): Binding = {
+    val plusButton =
+      button(
+        `class` := "btn btn-primary p-2 btn-block",
+        b(nested(translatedDynamic(Translations.PreGame.size)(_.apply()))),
+        " ",
+        span(
+          style := "width: 1rem; height: 1rem;",
+          FontAwesome.Solid.plus
+        )
+      ).render
+
+    val minusButton =
+      button(
+        `class` := "btn btn-primary p-2 btn-block",
+        b(nested(translatedDynamic(Translations.PreGame.size)(_.apply()))),
+        " ",
+        span(
+          style := "width: 1rem; height: 1rem;",
+          FontAwesome.Solid.minus
+        )
+      ).render
+
     nested(
       produce(
         combine(
           preGameModel.subProp(_.rules).transform(_.boardSize),
           preGameModel.subProp(_.previewBoardOpt),
-          translationsModel.subProp(_.previewBoardTitle),
-          screenModel.subProp(_.screenResized)
+          screenModel.subProp(_.mainBoardCanvasSize)
         )
       ) {
-        case (boardSize, previewBoardOpt, previewBoardTitle, _) =>
-          val usableWidth = Math.max(50, Math.min(290, divElement.clientWidth / 2 - 130))
-
-          val boardPos = Coordinate(0, 20)
-          val maxWidthPixels = usableWidth
+        case (boardSize, previewBoardOpt, defaultCanvasSize) =>
+          val boardMargin = Coordinate(1, 1)
+          val maxWidthPixels = defaultCanvasSize.x
           val sqSize = maxWidthPixels / boardSize.max
-          val canvasSize = Coordinate.square(maxWidthPixels) + boardPos
+          val canvasSize = Coordinate.square(maxWidthPixels) + boardMargin * 2
           val previewCanvas: Canvas = canvas.render
           previewCanvas.setAttribute("width", canvasSize.x.toString)
           previewCanvas.setAttribute("height", canvasSize.y.toString)
           val renderingCtx = previewCanvas.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
 
-          val backgroundColor =
+          val backgroundColor: Option[CanvasColor] =
             if (previewBoardOpt.isEmpty)
               Some(CanvasColor.Red())
             else
               Some(CanvasColor.Water())
 
-          val boardSizeText: String =
-            "%02dx%02d".format(boardSize.x, boardSize.y)
-
-          val boardTitle: String =
-            previewBoardTitle.innerText + " - " + boardSizeText
+//          val boardSizeText: String =
+//            "%02d x %02d".format(boardSize.x, boardSize.y)
 
           canvasUtils.drawBoardLimits(
             renderingCtx,
-            boardTitle,
             boardSize,
-            boardPos,
+            boardMargin,
             sqSize,
             backgroundColor = backgroundColor,
             None
@@ -450,7 +439,7 @@ class PreGameView(
               ship.shipActualPieces.foreach { shipPiece =>
                 canvasUtils.drawBoardSquare(
                   renderingCtx,
-                  boardPos,
+                  boardMargin,
                   shipPiece,
                   sqSize,
                   CanvasColor.Ship()
@@ -473,7 +462,7 @@ class PreGameView(
             else if (percDouble < PreGameModel.WarningPreviewTriesPerc) "bg-warning"
             else "bg-success"
 
-          val progressBars: Node =
+          val progressBar: Div =
             div(
               `class` := s"progress-bar progress-bar-striped $color",
               role := "progressbar",
@@ -481,49 +470,105 @@ class PreGameView(
               s"$perc%"
             ).render
 
-          val plusButton =
-            button(
-              `class` := "btn btn-primary p-2 mx-1",
-              span(style := "width: 1rem; height: 1rem;", FontAwesome.Solid.plus)
-            ).render
-          if (boardSize.x == MaxBoardSize)
-            plusButton.disabled = true
+          plusButton.disabled = boardSize.x == MaxBoardSize
           plusButton.onclick = _ =>
             boardSizeProperty.set(
               Coordinate.square(Math.min(MaxBoardSize, boardSize.x + 1))
             )
 
-          val minusButton =
-            button(
-              `class` := "btn btn-primary p-2 mx-1",
-              span(style := "width: 1rem; height: 1rem;", FontAwesome.Solid.minus)
-            ).render
-          if (boardSize.x == MinBoardSize)
-            minusButton.disabled = true
+          minusButton.disabled = boardSize.x == MinBoardSize
           minusButton.onclick = _ =>
             boardSizeProperty.set(
               Coordinate.square(Math.max(MinBoardSize, boardSize.x - 1))
             )
 
-          Seq[Node](
+          div(
+            `class` := "row",
             div(
-              `class` := "row",
-              minusButton,
+              `class` := "col-12 p-0 mx-3",
+              maxWidth := maxWidthPixels,
+              previewCanvas,
               div(
-                maxWidth := maxWidthPixels,
-                previewCanvas,
-                div(
-                  `class` := "progress",
-                  progressBars
-                ).render
+                `class` := "col-12 p-0 progress",
+                progressBar
               ),
-              plusButton
-            ).render
-          )
+              div(
+                `class` := "col-12 p-0",
+                div(
+                  `class` := "row m-0",
+                  div(
+                    `class` := "col-6 p-1",
+                    minusButton,
+                  ),
+                  div(
+                    `class` := "col-6 p-1",
+                    plusButton,
+                  )
+                )
+              )
+            ),
+          ).render
         case _ =>
           Seq.empty
       }
     )
+  }
+
+  def createFleetPreview(nested: NestedInterceptor): Binding = {
+    nested(
+      produce(
+        combine(
+          preGameModel.subProp(_.rules).transform(_.gameFleet),
+          screenModel.subProp(_.mainBoardCanvasSize)
+        )
+      ) { case (gameFleet, canvasSize) =>
+        val fleetSorted: List[(Ship, Int)] =
+          gameFleet.shipCounterList
+            .filter(_._2._1 > 0)
+            .map { case (shipId, (amount, rotation)) => (Ship.getShip(shipId, rotation), amount) }
+            .sortBy { case (ship, _) => (ship.piecesSize, ship.shipId.id) }
+
+        val maxTotalHeight1column = 40
+        val totalFleetYSize = Math.max(10, fleetSorted.map(_._1.size.y).sum + fleetSorted.size)
+        val (previewSqSize, twoColumns) =
+          if (totalFleetYSize <= maxTotalHeight1column)
+            (Math.max(7, canvasSize.y / totalFleetYSize - 2), false)
+          else
+            (Math.max(7, canvasSize.y / (totalFleetYSize / 2) - 2), true)
+
+        def createShipCanvas(ship: Ship): Canvas = {
+          val canvasSize: Coordinate = ship.size * previewSqSize + Coordinate.square(4)
+          viewUtils.createShipCanvas(
+            canvasSize,
+            previewSqSize,
+            ship,
+            destroyed = false,
+            centerXCanvas = true,
+            centerYCanvas = true,
+            drawRadar = false
+          )
+        }
+
+        val fleetDivs: List[JsDom.TypedTag[Div]] =
+          fleetSorted.map { case (ship, amount) =>
+            div(
+              `class` := (if (twoColumns) "col-6" else "col-12"),
+              div(
+                (1 to amount).map(_ => createShipCanvas(ship))
+              )
+            )
+          }
+
+        div(
+          `class` := "d-flex align-items-start",
+          div(
+            `class` := "row mx-0 my-3",
+            fleetDivs
+          )
+        ).render
+      }
+    )
+  }
 
   private def createFirstColumnOptions(nested: NestedInterceptor): Modifier =
     div(
@@ -660,24 +705,34 @@ class PreGameView(
 
     Seq[Modifier](
       div(
-        `class` := "col-12 btn-group my-3",
-        totalTimeLimitCheckBox,
-        label(
-          `class` := "input-group-text",
-          `for` := totalTimeLimit.id,
+        `class` := "card col-12 p-0",
+        h5(
+          `class` := "card-header",
           nested(translatedDynamic(Translations.PreGame.timeLimit)(_.apply()))
         ),
-        totalTimeLimit
-      ),
-      div(
-        `class` := "col-12 btn-group my-3",
-        turnTimeLimitCheckBox,
-        label(
-          `class` := "input-group-text",
-          `for` := turnTimeLimit.id,
-          nested(translatedDynamic(Translations.PreGame.turnTimeLimit)(_.apply()))
-        ),
-        turnTimeLimit
+        div(
+          `class` := "row m-0",
+          div(
+            `class` := "col-lg-6 col-md-12 btn-group my-3",
+            totalTimeLimitCheckBox,
+            label(
+              `class` := "input-group-text",
+              `for` := totalTimeLimit.id,
+              nested(translatedDynamic(Translations.PreGame.timeLimit)(_.apply()))
+            ),
+            totalTimeLimit
+          ),
+          div(
+            `class` := "col-lg-6 col-md-12 btn-group my-3",
+            turnTimeLimitCheckBox,
+            label(
+              `class` := "input-group-text",
+              `for` := turnTimeLimit.id,
+              nested(translatedDynamic(Translations.PreGame.turnTimeLimit)(_.apply()))
+            ),
+            turnTimeLimit
+          )
+        )
       )
     )
   }
@@ -763,12 +818,18 @@ class PreGameView(
     )
 
     div(
-      `class` := "col-12 btn-group justify-content-between my-3",
-      label(
-        `class` := "input-group-text",
+      `class` := "card col-12 p-0 mt-3",
+      h5(
+        `class` := "card-header",
         nested(translatedDynamic(Translations.PreGame.amountOfShots)(_.apply()))
       ),
-      editTurnDivs
+      div(
+        `class` := "row m-0",
+        div(
+          `class` := "col-12 btn-group my-3",
+          editTurnDivs
+        )
+      )
     )
   }
 
@@ -858,7 +919,7 @@ class PreGameView(
       val deleteSpan: Span =
         span(
           `class` := "rounded p-2 d-flex justify-content-center bg-danger text-white",
-          style := "cursor: pointer",
+          GameStyles.cursorPointer,
           width := "32px",
           FontAwesome.Solid.trash
         ).render
@@ -884,7 +945,7 @@ class PreGameView(
       val deleteBonusSpan: Span =
         span(
           `class` := "rounded p-2 d-flex justify-content-center bg-danger text-white",
-          style := "cursor: pointer",
+          GameStyles.cursorPointer,
           width := "32px",
           FontAwesome.Solid.times
         ).render
@@ -902,7 +963,7 @@ class PreGameView(
       val editSpan: Span =
         span(
           `class` := "rounded p-2 bg-primary text-white",
-          style := "cursor: pointer",
+          GameStyles.cursorPointer,
           FontAwesome.Solid.pencilAlt
         ).render
 
@@ -1004,27 +1065,36 @@ class PreGameView(
     }
 
     div(
-      `class` := "col-12",
+      `class` := "col-12 pr-0",
       div(
         `class` := "card",
         h5(
           `class` := "card-header",
-          "Game Bonuses"
+          nested(translatedDynamic(Translations.PreGame.gameBonusTitle)(_.apply()))
         ),
+//        div(
+//          height := "100%",
         div(
-          height := "100%",
+          `class` := "px-0",
           div(
-            `class` := "px-0 overflow-auto",
+            `class` := "list-group",
+//              GameStyles.flexContainer,
+//              height := BonusEditorCardHeight,
+//            div(
+//              BonusType.AllBonusType.map(createTurnBonusDiv)
+//            )
             div(
-              `class` := "list-group",
-              GameStyles.flexContainer,
-              height := 250,
-              div(
-                BonusType.AllBonusType.map(createTurnBonusDiv)
-              )
+              `class` := "row m-0",
+              BonusType.AllBonusType.map { bonusType =>
+                div(
+                  `class` := "col-lg-6 col-md-12 p-0",
+                  createTurnBonusDiv(bonusType)
+                )
+              }
             )
           )
         )
+//      )
       )
     )
   }

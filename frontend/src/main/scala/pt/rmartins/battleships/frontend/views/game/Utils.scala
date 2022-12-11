@@ -1,8 +1,12 @@
 package pt.rmartins.battleships.frontend.views.game
 
 import io.udash.ReadableProperty
+import scalatags.JsDom
+import scalatags.JsDom.all.raw
 
 object Utils {
+
+  val nbsp: JsDom.RawFrag = raw("&nbsp;")
 
   def combine[A, B](
       propertyA: ReadableProperty[A],

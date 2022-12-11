@@ -3,7 +3,7 @@ import org.scalajs.jsdependencies.sbtplugin.JSDependenciesPlugin.autoImport._
 import sbt._
 
 object Dependencies {
-  val versionOfScala = "2.13.8"
+  val versionOfScala = "2.13.10"
 
   // Udash
   val udashVersion = "0.9.0-M24"
@@ -16,10 +16,10 @@ object Dependencies {
   val quicklensVersion = "1.7.4"
   val betterFilesVersion = "3.9.1"
   val zioJsonVersion = "0.1.5"
+  val macwireVersion = "2.5.7"
 
   // JS dependencies
-  val bootstrapVersion = "5.1.3"
-  val highchartsVersion = "9.2.2"
+  val bootstrapVersion = "5.2.3"
 
   // Testing
   val scalatestVersion = "3.2.3"
@@ -52,7 +52,10 @@ object Dependencies {
       // type-safe wrapper for Twitter Bootstrap
       "io.udash" %%% "udash-bootstrap4" % udashVersion,
       // type-safe wrapper for jQuery
-      "io.udash" %%% "udash-jquery" % udashJQueryVersion
+      "io.udash" %%% "udash-jquery" % udashJQueryVersion,
+
+      // other dependencies
+      "com.softwaremill.macwire" %%% "macros" % macwireVersion % "provided"
     )
   )
 
@@ -62,21 +65,7 @@ object Dependencies {
     Seq(
       // "jquery.js" is provided by "udash-jquery" dependency
       "org.webjars" % "bootstrap" % bootstrapVersion / "js/bootstrap.bundle.js"
-        minified "js/bootstrap.bundle.min.js" dependsOn "jquery.js",
-
-      // Highcharts JS files
-      "org.webjars" % "highcharts" % highchartsVersion /
-        s"$highchartsVersion/highcharts.src.js" minified s"$highchartsVersion/highcharts.js" dependsOn "jquery.js",
-      "org.webjars" % "highcharts" % highchartsVersion /
-        s"$highchartsVersion/highcharts-3d.src.js" minified s"$highchartsVersion/highcharts-3d.js" dependsOn s"$highchartsVersion/highcharts.src.js",
-      "org.webjars" % "highcharts" % highchartsVersion /
-        s"$highchartsVersion/highcharts-more.src.js" minified s"$highchartsVersion/highcharts-more.js" dependsOn s"$highchartsVersion/highcharts.src.js",
-      "org.webjars" % "highcharts" % highchartsVersion /
-        s"$highchartsVersion/modules/exporting.src.js" minified s"$highchartsVersion/modules/exporting.js" dependsOn s"$highchartsVersion/highcharts.src.js",
-      "org.webjars" % "highcharts" % highchartsVersion /
-        s"$highchartsVersion/modules/drilldown.src.js" minified s"$highchartsVersion/modules/drilldown.js" dependsOn s"$highchartsVersion/highcharts.src.js",
-      "org.webjars" % "highcharts" % highchartsVersion /
-        s"$highchartsVersion/modules/heatmap.src.js" minified s"$highchartsVersion/modules/heatmap.js" dependsOn s"$highchartsVersion/highcharts.src.js"
+        minified "js/bootstrap.bundle.min.js" dependsOn "jquery.js"
     )
   )
 
@@ -104,4 +93,5 @@ object Dependencies {
       "org.scalamock" %%% "scalamock" % scalamockVersion
     ).map(_ % Test)
   )
+
 }

@@ -25,7 +25,8 @@ class ViewUtils(canvasUtils: CanvasUtils) {
       centerXCanvas: Boolean,
       centerYCanvas: Boolean,
       drawRadar: Boolean,
-      margin: Coordinate = defaultMargin
+      margin: Coordinate = defaultMargin,
+      canvasColor: CanvasColor = CanvasColor.Ship()
   ): Canvas = {
     val shipCanvas = canvas.render
     val sizeWithMargin = canvasSize + margin
@@ -48,17 +49,19 @@ class ViewUtils(canvasUtils: CanvasUtils) {
         initialPositionShip,
         shipPiece,
         sqSize,
-        CanvasColor.Ship()
+        canvasColor
       )
-      if (destroyed)
+      if (destroyed) {
+        val lineWidth = Math.max(1.0, sqSize / 15.0)
         CanvasUtils.drawCrosshair(
           renderingCtx,
           initialPositionShip,
           shipPiece,
           sqSize,
-          lineWidth = 1.5,
+          lineWidth = lineWidth,
           alpha = 1.0
         )
+      }
     }
     if (drawRadar) {
       val initialPositionRadar: Coordinate =

@@ -1,10 +1,9 @@
 package pt.rmartins.battleships.frontend.views.game
 
 import org.scalajs.dom
-import org.scalajs.dom.{CanvasRenderingContext2D, Event}
 import org.scalajs.dom.html.{Canvas, Image}
 import org.scalajs.dom.raw.HTMLImageElement
-import pt.rmartins.battleships.frontend.views.game.BoardView.MinTextSize
+import org.scalajs.dom.{CanvasRenderingContext2D, Event}
 import pt.rmartins.battleships.frontend.views.game.CanvasUtils.CanvasColor
 import pt.rmartins.battleships.shared.model.game.{AttackType, Coordinate, Turn}
 import scalatags.JsDom.all.canvas
@@ -36,7 +35,6 @@ class CanvasUtils(gamePresenter: GamePresenter) {
 
   def drawBoardLimits(
       renderingCtx: CanvasRenderingContext2D,
-      boardTitle: String,
       boardSize: Coordinate,
       boardPosition: Coordinate,
       squareSize: Int,
@@ -95,13 +93,6 @@ class CanvasUtils(gamePresenter: GamePresenter) {
       )
       renderingCtx.stroke()
     }
-
-    val fontSize = MinTextSize
-    renderingCtx.fillStyle = s"rgb(0, 0, 0)"
-    renderingCtx.font = s"${fontSize}px serif"
-    renderingCtx.textBaseline = "bottom"
-    renderingCtx.textAlign = "left"
-    renderingCtx.fillText(boardTitle, boardPosition.x, boardPosition.y - 2)
   }
 
 }
@@ -142,6 +133,11 @@ object CanvasUtils {
     case class RedBold(alpha: Double = 1.0) extends CanvasBorder {
       val lineColor: String = "255, 0, 0"
       val lineWidth: Double = 3.0
+    }
+
+    case class DashBlack(alpha: Double = 1.0, lineWidth: Double = 5.0) extends CanvasBorder {
+      val lineColor: String = "0, 0, 0"
+      override val lineDash: Option[Seq[Double]] = Some(Seq(10, 5))
     }
 
     case class DashRed(alpha: Double = 1.0, lineWidth: Double = 3.0) extends CanvasBorder {
@@ -286,6 +282,7 @@ object CanvasUtils {
   class CanvasImage(src: String) {
     val element: HTMLImageElement =
       dom.document.createElement("img").asInstanceOf[HTMLImageElement]
+
     element.src = src
   }
 
@@ -315,10 +312,15 @@ object CanvasUtils {
       y: Int,
       width: Int,
       height: Int,
-      useAntiAliasing: Boolean
+      useAntiAliasing: Boolean,
+      alpha: Double = 1.0
   ): Unit = {
+    if (alpha != 1.0)
+      renderingCtx.globalAlpha = alpha
     renderingCtx.imageSmoothingEnabled = useAntiAliasing
     renderingCtx.drawImage(image, 0, 0, 500, 500, x, y, width, height)
+    if (alpha != 1.0)
+      renderingCtx.globalAlpha = 1.0
   }
 
   def createEmptyCanvas(size: Coordinate): Canvas = {
@@ -337,7 +339,8 @@ object CanvasUtils {
       canvas: Canvas,
       position: Coordinate,
       canvasImage: CanvasImage,
-      size: Coordinate
+      size: Coordinate,
+      alpha: Double = 1.0
   ): Canvas = {
     def draw(): Unit =
       if (!canvasImage.element.complete) {
@@ -355,7 +358,8 @@ object CanvasUtils {
           y = position.y,
           size.x,
           size.y,
-          useAntiAliasing = true
+          useAntiAliasing = true,
+          alpha = alpha
         )
       }
 
@@ -363,7 +367,13 @@ object CanvasUtils {
     canvas
   }
 
-  def createCanvasImage(canvasImage: CanvasImage, size: Coordinate): Canvas =
-    drawCanvasImage(createEmptyCanvas(size), Coordinate(1, 1), canvasImage, size - Coordinate(2, 2))
+  def createCanvasImage(canvasImage: CanvasImage, size: Coordinate, alpha: Double = 1.0): Canvas =
+    drawCanvasImage(
+      createEmptyCanvas(size),
+      Coordinate(1, 1),
+      canvasImage,
+      size - Coordinate(2, 2),
+      alpha = alpha
+    )
 
 }
