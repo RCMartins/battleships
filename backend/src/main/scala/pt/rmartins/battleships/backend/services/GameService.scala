@@ -603,7 +603,7 @@ class GameService(rpcClientsService: RpcClientsService) {
       player2DataOpt: Option[(ClientId, Username)],
       rules: Rules
   ): Option[Game] =
-    if (rules.gameFleet.shipAmount == 0)
+    if (rules.gameFleet.shipsAmount == 0)
       None
     else {
       val simplifiedRules: Rules =
@@ -617,8 +617,8 @@ class GameService(rpcClientsService: RpcClientsService) {
         ServerEnemyBoard(
           boardSize,
           BoardUtils.createEmptyBoardMarks(boardSize),
-          simplifiedRules.gameFleet.shipAmount,
-          simplifiedRules.gameFleet.shipAmount
+          simplifiedRules.gameFleet.shipsAmount,
+          simplifiedRules.gameFleet.shipsAmount
         )
 
       val player1First: Boolean = Random.nextBoolean()

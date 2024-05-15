@@ -48,6 +48,7 @@ val compileCss = taskKey[Unit]("Compiles CSS files.")
 val compileStatics = taskKey[File](
   "Compiles JavaScript files and copies all assets to the target directory."
 )
+
 val compileAndOptimizeStatics = taskKey[File](
   "Compiles and optimizes JavaScript files and copies all assets to the target directory."
 )
@@ -269,5 +270,6 @@ Global / excludeLintKeys ++= Set(
   frontend / Compile / packageJSDependencies / artifactPath,
   frontend / Compile / packageMinifiedJSDependencies / artifactPath
 )
+
 Global / cancelable := true
 Global / onChangedBuildSource := ReloadOnSourceChanges

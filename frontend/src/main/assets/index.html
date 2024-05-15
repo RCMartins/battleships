@@ -8,6 +8,21 @@
     <script src="/scripts/frontend.js"></script>
 
     <link rel="stylesheet" type="text/css" href="/styles/main.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Holtwood+One+SC&display=swap" rel="stylesheet">
+
+    <style>
+html {
+    height: 100%;
+    overflow: hidden;
+}
+body {
+    min-height: 100%;
+    overflow: hidden;
+}
+    </style>
 </head>
 <body>
     <div id="application"></div>
@@ -32,6 +47,33 @@
       keyboard: false
     });
   }
+
+  function toggleCollapse(id) {
+    $('#' + id).toggle()
+  }
+
+  function hideCollapse(id) {
+    $('#' + id).collapse('hide')
+  }
+
+<!--  $(document).click(function(e) {-->
+<!--	  if (!$(e.target).is('.battle-navbar')) {-->
+<!--      $('.collapse').collapse('hide');-->
+<!--    }-->
+<!--  });-->
+
+    $(document).ready(function () {
+        console.log('test1');
+        $(document).click(function (event) {
+            console.log('test2');
+            var clickover = $(event.target);
+            var $navbar = $("#navbarToggle");
+            var _opened = $navbar.hasClass("in");
+            if (_opened === true && !clickover.hasClass("navbar-toggle")) {
+                $navbar.collapse('hide');
+            }
+        });
+    });
 
 </script>
 

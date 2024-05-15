@@ -37,8 +37,10 @@ object Translations {
     val clearAllShips = key("game.pregame.clear_all_ships")
     val chooseFleetNameTitle = key("game.modal.choose_fleet_name_title")
     val editGameBonusTitle = key("game.modal.edit_game_bonus_title")
+    val gameBonusTitle = key("game.pregame.game_bonus")
     val newBonusButton = key("game.pregame.new_bonus_button")
     val saveChangesButton = key("game.pregame.save_changes")
+    val size = key("game.pregame.size")
 
     val fleet = key("game.pregame.fleet")
     val options = key("game.pregame.options")
@@ -73,8 +75,12 @@ object Translations {
     val loggedInAs = key("game.header.logged_in_as")
     val playingAgainst = key("game.header.playing_against")
     val turn = key("game.header.turn")
-    val myTime = key("game.header.my_time")
-    val enemyTime = key("game.header.enemy_time")
+//    val myTime = key("game.header.my_time")
+//    val enemyTime = key("game.header.enemy_time")
+    val remainingTime = key("game.header.remaining_time")
+    val myProgress = key("game.header.my_progress")
+    val enemyProgress = key("game.header.enemy_progress")
+    val extraTurn = key("game.header.extra_turn")
 
     val startGameVsBot = key("game.buttons.start_game_bot")
     val invitePlayerButton = key("game.buttons.invite_player")
@@ -101,8 +107,6 @@ object Translations {
     val showEnemyBoardButton = key("game.buttons.show_enemy_board")
     val closeButton = key("game.buttons.close")
 
-    val extraTurnPopup = key("game.popup.extra_turn")
-
     val myBoardTitle = key("game.board.my_board_title")
     val enemyBoardTitle = key("game.board.enemy_board_title")
     val realEnemyBoardTitle = key("game.board.real_enemy_board_title")
@@ -110,6 +114,7 @@ object Translations {
     val chatTab = key("game.tab.chat")
     val myMovesTab = key("game.tab.my_moves")
     val enemyMovesTab = key("game.tab.enemy_moves")
+    val allMoves = key("game.tab.all_moves")
     val missesMoves = key("game.tab.missed_moves")
     val disabledMoves = key("game.tab.disabled_moves")
 
@@ -139,4 +144,5 @@ object Translations {
     val puzzleCorrect = key("game.puzzles.correct")
     val puzzleIncorrect = key("game.puzzles.incorrect")
   }
+
 }

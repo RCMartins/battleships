@@ -32,7 +32,7 @@ case class TranslationsModel(
 
 object TranslationsModel extends HasModelPropertyCreator[TranslationsModel] {
 
-  val default: TranslationsModel =
+  val Default: TranslationsModel =
     TranslationsModel(
       extraTurnText = span.render,
       myBoardTitle = span.render,

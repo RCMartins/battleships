@@ -2,7 +2,7 @@ package pt.rmartins.battleships.frontend.views.game
 
 import io.udash.HasModelPropertyCreator
 import org.scalajs.dom.html.Div
-import pt.rmartins.battleships.frontend.views.model.{JoinedPreGame, NamedRules}
+import pt.rmartins.battleships.frontend.views.model.{JoinedPreGame, MenuState, NamedRules}
 import pt.rmartins.battleships.shared.model.game.BonusReward.ExtraTurn
 import pt.rmartins.battleships.shared.model.game.Fleet.fromShips
 import pt.rmartins.battleships.shared.model.game.RuleTimeLimit.WithRuleTimeLimit
@@ -12,6 +12,7 @@ import scalatags.JsDom.all.div
 import scala.collection.immutable.SortedMap
 
 case class PreGameModel(
+    menuState: MenuState,
     enemyUsernameText: Username,
     invitedUsername: Option[Username],
     inviter: Option[(Username, PlayerInviteType)],
@@ -109,8 +110,9 @@ object PreGameModel extends HasModelPropertyCreator[PreGameModel] {
       )
     }
 
-  val default: PreGameModel =
+  val Default: PreGameModel =
     PreGameModel(
+      menuState = MenuState.PlayingVsBots,
       enemyUsernameText = Username(""),
       invitedUsername = None,
       inviter = None,

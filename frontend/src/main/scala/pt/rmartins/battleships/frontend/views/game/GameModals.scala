@@ -2,18 +2,19 @@ package pt.rmartins.battleships.frontend.views.game
 
 import com.softwaremill.quicklens.ModifyPimp
 import io.udash._
-import io.udash.bindings.modifiers.Binding.NestedInterceptor
 import io.udash.bootstrap.button.UdashButton
 import io.udash.bootstrap.utils.BootstrapStyles.Color
 import io.udash.bootstrap.utils.UdashIcons.FontAwesome
 import io.udash.component.ComponentId
 import io.udash.css.CssView
 import io.udash.i18n._
+import org.scalajs.dom.Event
 import org.scalajs.dom.html.{Div, Input}
 import pt.rmartins.battleships.frontend.services.TranslationsService
 import pt.rmartins.battleships.frontend.views.game.Utils._
 import pt.rmartins.battleships.frontend.views.model.ErrorModalType._
 import pt.rmartins.battleships.frontend.views.model.NamedRules
+import pt.rmartins.battleships.shared.css.GameStyles
 import pt.rmartins.battleships.shared.i18n.Translations
 import pt.rmartins.battleships.shared.model.game._
 import scalatags.JsDom.all._
@@ -30,7 +31,7 @@ class GameModals(
   import translationsService._
 
   val errorModalId: String = "error-modal"
-  def generalGameErrorModal(nested: NestedInterceptor): Div =
+  def generalGameErrorModal(): Div =
     div(
       `class` := "modal fade",
       id := errorModalId,
@@ -40,18 +41,18 @@ class GameModals(
           `class` := "modal-content",
           div(
             `class` := "modal-header",
-            nested(produceWithNested(screenModel.subProp(_.errorModalType)) {
+            produceWithNested(screenModel.subProp(_.errorModalType)) {
               case (Some(SmallBoardError | EmptyFleetError), nested) =>
                 h5(
                   nested(translatedDynamic(Translations.Game.cannotStartGameTitle)(_.apply()))
                 ).render
-              case _ =>
+              case (_, nested) =>
                 h5(
                   nested(translatedDynamic(Translations.Game.generalErrorTitle)(_.apply()))
                 ).render
-            }),
+            },
             span(
-              style := "cursor: pointer",
+              GameStyles.cursorPointer,
               FontAwesome.Solid.times,
               FontAwesome.Modifiers.Sizing.x2,
               attr("data-bs-dismiss") := "modal"
@@ -59,7 +60,7 @@ class GameModals(
           ),
           div(
             `class` := "modal-body",
-            nested(produceWithNested(screenModel.subProp(_.errorModalType)) {
+            produceWithNested(screenModel.subProp(_.errorModalType)) {
               case (Some(SmallBoardError), nested) =>
                 span(
                   nested(translatedDynamic(Translations.Game.startGameBoardSizeError)(_.apply()))
@@ -79,7 +80,7 @@ class GameModals(
                 ).render
               case (None, _) =>
                 span.render
-            })
+            }
           ),
           div(
             `class` := "modal-footer",
@@ -87,7 +88,7 @@ class GameModals(
               `class` := "btn btn-primary",
               `type` := "button",
               attr("data-bs-dismiss") := "modal",
-              nested(translatedDynamic(Translations.Game.closeButton)(_.apply()))
+              translatedDynamic(Translations.Game.closeButton)(_.apply())
             )
           )
         )
@@ -95,7 +96,7 @@ class GameModals(
     ).render
 
   val acceptPlayerInviteModalId: String = "accept-player-invite-modal"
-  def acceptPlayerInviteModal(nested: NestedInterceptor): Div =
+  def acceptPlayerInviteModal(): Div =
     div(
       `class` := "modal fade",
       id := acceptPlayerInviteModalId,
@@ -106,7 +107,7 @@ class GameModals(
           `class` := "modal-content",
           div(
             `class` := "modal-header",
-            nested(produceWithNested(preGameModel.subProp(_.inviter)) {
+            produceWithNested(preGameModel.subProp(_.inviter)) {
               case (Some((_, PlayerInviteType.Play)), nested) =>
                 h5(
                   nested(
@@ -121,9 +122,9 @@ class GameModals(
                 ).render
               case _ =>
                 h5.render
-            }),
+            },
             span(
-              style := "cursor: pointer",
+              GameStyles.cursorPointer,
               FontAwesome.Solid.times,
               FontAwesome.Modifiers.Sizing.x2,
               attr("data-bs-dismiss") := "modal"
@@ -131,7 +132,7 @@ class GameModals(
           ),
           div(
             `class` := "modal-body",
-            nested(produceWithNested(presenter.enemyUsernameProperty) {
+            produceWithNested(presenter.enemyUsernameProperty) {
               case (Some(enemyUsername), nested) =>
                 span(
                   nested(
@@ -161,7 +162,7 @@ class GameModals(
                 ).render
               case _ =>
                 span.render
-            })
+            }
           ),
           div(
             `class` := "modal-footer",
@@ -169,13 +170,13 @@ class GameModals(
               `class` := "btn btn-danger",
               `type` := "button",
               attr("data-bs-dismiss") := "modal",
-              nested(translatedDynamic(Translations.Game.modalDecline)(_.apply()))
+              translatedDynamic(Translations.Game.modalDecline)(_.apply())
             ).render,
             button(
               `class` := "btn btn-success",
               `type` := "button",
               attr("data-bs-dismiss") := "modal",
-              nested(translatedDynamic(Translations.Game.modalAccept)(_.apply()))
+              translatedDynamic(Translations.Game.modalAccept)(_.apply())
             ).render.tap {
               _.onclick = _ => {
                 presenter.answerInvitePlayerRequest(true)
@@ -187,7 +188,7 @@ class GameModals(
     ).render
 
   val editRulesModalId: String = "edit-rules-modal"
-  def acceptEditRulesModal(nested: NestedInterceptor): Div =
+  def acceptEditRulesModal(): Div =
     div(
       `class` := "modal fade",
       id := editRulesModalId,
@@ -197,11 +198,11 @@ class GameModals(
           `class` := "modal-content",
           div(
             `class` := "modal-header",
-            h5(nested(translatedDynamic(Translations.Game.editRulesModalTitle)(_.apply())))
+            h5(translatedDynamic(Translations.Game.editRulesModalTitle)(_.apply()))
           ),
           div(
             `class` := "modal-body",
-            nested(produceWithNested(presenter.enemyUsernameProperty) {
+            produceWithNested(presenter.enemyUsernameProperty) {
               case (Some(enemyUsername), nested) =>
                 span(
                   nested(translatedDynamic(Translations.Game.editRulesModalBodyStart)(_.apply())),
@@ -212,7 +213,7 @@ class GameModals(
                 ).render
               case _ =>
                 span.render
-            })
+            }
           ),
           div(
             `class` := "modal-footer",
@@ -220,13 +221,13 @@ class GameModals(
               `class` := "btn btn-danger",
               `type` := "button",
               attr("data-bs-dismiss") := "modal",
-              nested(translatedDynamic(Translations.Game.modalDecline)(_.apply()))
+              translatedDynamic(Translations.Game.modalDecline)(_.apply())
             ).render,
             button(
               `class` := "btn btn-success",
               `type` := "button",
               attr("data-bs-dismiss") := "modal",
-              nested(translatedDynamic(Translations.Game.modalAccept)(_.apply()))
+              translatedDynamic(Translations.Game.modalAccept)(_.apply())
             ).render.tap {
               _.onclick = _ => {
                 presenter.answerEditRulesRequest(true)
@@ -265,7 +266,7 @@ class GameModals(
   }
 
   val fleetNameModalId: String = "fleet-name-modal"
-  def fleetNameModal(nested: NestedInterceptor): Div =
+  def fleetNameModal(): Div =
     div(
       `class` := "modal fade",
       id := fleetNameModalId,
@@ -275,9 +276,9 @@ class GameModals(
           `class` := "modal-content",
           div(
             `class` := "modal-header",
-            h5(nested(translatedDynamic(Translations.PreGame.chooseFleetNameTitle)(_.apply()))),
+            h5(translatedDynamic(Translations.PreGame.chooseFleetNameTitle)(_.apply())),
             span(
-              style := "cursor: pointer",
+              GameStyles.cursorPointer,
               FontAwesome.Solid.times,
               FontAwesome.Modifiers.Sizing.x2,
               attr("data-bs-dismiss") := "modal"
@@ -300,7 +301,7 @@ class GameModals(
               `class` := "btn btn-secondary",
               `type` := "button",
               attr("data-bs-dismiss") := "modal",
-              nested(translatedDynamic(Translations.Game.closeButton)(_.apply()))
+              translatedDynamic(Translations.Game.closeButton)(_.apply())
             ).render.tap {
               _.onclick = _ => {
                 screenModel.subProp(_.namedRuleName).set("")
@@ -309,7 +310,7 @@ class GameModals(
             button(
               `class` := "btn btn-primary",
               `type` := "button",
-              nested(translatedDynamic(Translations.PreGame.saveFleet)(_.apply()))
+              translatedDynamic(Translations.PreGame.saveFleet)(_.apply())
             ).render.tap {
               _.onclick = _ => {
                 if (
@@ -362,7 +363,7 @@ class GameModals(
   }
 
   val editGameBonusModalId: String = "game-bonus-modal"
-  def editGameBonusModal(nested: NestedInterceptor): Div =
+  def editGameBonusModal(): Div =
     div(
       `class` := "modal fade",
       id := editGameBonusModalId,
@@ -373,16 +374,14 @@ class GameModals(
           div(
             `class` := "modal-header",
             h5(
-              nested(translatedDynamic(Translations.PreGame.editGameBonusTitle)(_.apply())),
-              nested(
-                produceWithNested(preGameModel.subProp(_.editGameBonusType)) {
-                  case (bonusType, nested) =>
-                    span(" ", b(nested(TranslationUtils.bonusTypeToText(bonusType)))).render
-                }
-              )
+              translatedDynamic(Translations.PreGame.editGameBonusTitle)(_.apply()),
+              produceWithNested(preGameModel.subProp(_.editGameBonusType)) {
+                case (bonusType, nested) =>
+                  span(" ", b(nested(TranslationUtils.bonusTypeToText(bonusType)))).render
+              }
             ),
             span(
-              style := "cursor: pointer",
+              GameStyles.cursorPointer,
               FontAwesome.Solid.times,
               FontAwesome.Modifiers.Sizing.x2,
               attr("data-bs-dismiss") := "modal"
@@ -394,7 +393,7 @@ class GameModals(
               button(
                 `class` := "btn btn-primary",
                 `type` := "button",
-                nested(translatedDynamic(Translations.PreGame.newBonusButton)(_.apply()))
+                translatedDynamic(Translations.PreGame.newBonusButton)(_.apply())
               ).render.tap { button =>
                 preGameModel.subProp(_.editGameBonusRewards).listen {
                   case Nil => button.disabled = false
@@ -409,9 +408,7 @@ class GameModals(
               }
             ),
             div(
-              nested(
-                produce(preGameModel.subProp(_.editGameBonusDiv)) { div => div }
-              )
+              produce(preGameModel.subProp(_.editGameBonusDiv)) { div => div }
             )
           ),
           div(
@@ -420,7 +417,7 @@ class GameModals(
               `class` := "btn btn-secondary",
               `type` := "button",
               attr("data-bs-dismiss") := "modal",
-              nested(translatedDynamic(Translations.Game.closeButton)(_.apply()))
+              translatedDynamic(Translations.Game.closeButton)(_.apply())
             ),
             acceptGameBonusChangesButton
           )
@@ -429,7 +426,7 @@ class GameModals(
     ).render
 
   val quitGameModalId: String = "quit-game-modal"
-  def quitGameModal(nested: NestedInterceptor): Div =
+  def quitGameModal(): Div =
     div(
       `class` := "modal fade",
       id := quitGameModalId,
@@ -439,9 +436,9 @@ class GameModals(
           `class` := "modal-content",
           div(
             `class` := "modal-header",
-            h5(nested(translatedDynamic(Translations.Game.confirmQuitGameTitle)(_.apply()))),
+            h5(translatedDynamic(Translations.Game.confirmQuitGameTitle)(_.apply())),
             span(
-              style := "cursor: pointer",
+              GameStyles.cursorPointer,
               FontAwesome.Solid.times,
               FontAwesome.Modifiers.Sizing.x2,
               attr("data-bs-dismiss") := "modal"
@@ -453,13 +450,13 @@ class GameModals(
               `class` := "btn btn-secondary",
               `type` := "button",
               attr("data-bs-dismiss") := "modal",
-              nested(translatedDynamic(Translations.Game.closeButton)(_.apply()))
+              translatedDynamic(Translations.Game.closeButton)(_.apply())
             ),
             button(
               `class` := "btn btn-primary",
               `type` := "button",
               attr("data-bs-dismiss") := "modal",
-              nested(translatedDynamic(Translations.Game.confirmButton)(_.apply()))
+              translatedDynamic(Translations.Game.confirmButton)(_.apply())
             ).render.tap {
               _.onclick = _ => {
                 presenter.quitCurrentGame()
@@ -469,5 +466,54 @@ class GameModals(
         )
       )
     ).render
+
+  def initialize(): Modifier = {
+    Seq[Modifier](
+      generalGameErrorModal().tap {
+        _.addEventListener(
+          "hidden.bs.modal",
+          (_: Event) => {
+            screenModel.subProp(_.errorModalType).set(None)
+          }
+        )
+      },
+      fleetNameModal()
+        .tap {
+          _.addEventListener(
+            "shown.bs.modal",
+            (_: Event) => {
+              fleetNameInput.focus()
+            }
+          )
+        }
+        .tap {
+          _.addEventListener(
+            "hidden.bs.modal",
+            (_: Event) => {
+              presenter.saveNewNamedRules()
+            }
+          )
+        },
+      quitGameModal(),
+      acceptPlayerInviteModal().tap {
+        _.addEventListener(
+          "hidden.bs.modal",
+          (_: Event) => {
+            presenter.answerInvitePlayerRequest(false)
+          }
+        )
+      },
+      acceptEditRulesModal().tap {
+        _.addEventListener(
+          "hidden.bs.modal",
+          (_: Event) => {
+            screenModel.subProp(_.receiveEditRequest).set(None)
+            presenter.answerEditRulesRequest(false)
+          }
+        )
+      },
+      editGameBonusModal()
+    )
+  }
 
 }

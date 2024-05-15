@@ -4,12 +4,14 @@ import com.softwaremill.quicklens.ModifyPimp
 import io.udash._
 import io.udash.auth.AuthRequires
 import io.udash.i18n.translatedDynamic
+import org.scalajs.dom.html.Div
 import org.scalajs.dom.window
 import pt.rmartins.battleships.frontend.ApplicationContext.application
 import pt.rmartins.battleships.frontend.routing.{RoutingInGameState, RoutingLoginPageState}
 import pt.rmartins.battleships.frontend.services.rpc.NotificationsCenter
 import pt.rmartins.battleships.frontend.services.{TranslationsService, UserContextService}
 import pt.rmartins.battleships.frontend.views.game.BoardView.GameAction
+import pt.rmartins.battleships.frontend.views.game.GamePresenter._
 import pt.rmartins.battleships.frontend.views.game.Utils.combine
 import pt.rmartins.battleships.frontend.views.model.JoinedPreGame.PlayingAgainstPlayer
 import pt.rmartins.battleships.frontend.views.model.ModeType._
@@ -69,7 +71,7 @@ class GamePresenter(
     combine(
       preGameModel.subProp(_.inviter),
       preGameModel.subProp(_.inJoinedPreGame).transform(_.flatMap(_.enemyUsernameOpt)),
-      gameStateModel.transform(_.gameState.map(_.enemy.username))
+      gameStateProperty.transform(_.map(_.enemy.username))
     ).transform { case (inviter, preGameEnemy, inGameEnemy) =>
       inviter.map(_._1).orElse(preGameEnemy.orElse(inGameEnemy))
     }
@@ -77,9 +79,9 @@ class GamePresenter(
   val gameModeProperty: Property[Option[GameMode]] =
     gameStateProperty.bitransform[Option[GameMode]](_.map(_.gameMode)) {
       case None =>
-        gameStateModel.get.gameState
+        gameStateProperty.get
       case Some(gameMode) =>
-        gameStateModel.get.gameState.map(_.copy(gameMode = gameMode))
+        gameStateProperty.get.map(_.copy(gameMode = gameMode))
     }
 
   val modeTypeProperty: ReadableProperty[Option[ModeType]] =
@@ -95,9 +97,12 @@ class GamePresenter(
       gamePuzzleStateProperty.transform(_.nonEmpty)
     )
 
+  val myBoardSizeProperty: ReadableProperty[Option[Coordinate]] =
+    gameStateProperty.transform(_.map(_.me.myBoard.boardSize))
+
   val mainBoardSizeProperty: ReadableProperty[Option[Coordinate]] =
     combine(
-      enemyProperty.transform(_.map(_.boardSize)),
+      gameStateProperty.transform(_.map(_.enemy.boardSize)),
       gamePuzzleStateProperty.transform(_.map(_.playerPuzzle.boardSize))
     ).transform { case (boardSizeOpt1, boardSizeOpt2) =>
       boardSizeOpt1.orElse(boardSizeOpt2)
@@ -118,9 +123,12 @@ class GamePresenter(
   val rulesProperty: ReadableProperty[Option[Rules]] =
     gameStateProperty.transform(_.map(_.rules))
 
+  val fleetProperty: ReadableProperty[Option[Fleet]] =
+    rulesProperty.transform(_.map(_.gameFleet))
+
   val gameFleetMaxSize: ReadableProperty[Coordinate] =
     combine(
-      rulesProperty.transform(_.map(_.gameFleet)),
+      fleetProperty,
       gamePuzzleStateProperty.transform(_.map(_.playerPuzzle.gameFleet.shipsList))
     ).transform { case (gameFleetOpt, shipsListOpt) =>
       gameFleetOpt
@@ -129,14 +137,14 @@ class GamePresenter(
         .getOrElse(Coordinate.origin)
     }
 
-  val inPlacingShipsMode: ReadableProperty[Boolean] =
-    gameModeProperty.transform(_.exists(_.isPlacingShips))
-
-  val inPlayingMode: ReadableProperty[Boolean] =
-    gameModeProperty.transform(_.exists(_.isPlaying))
-
-  val inGameOverMode: ReadableProperty[Boolean] =
-    gameModeProperty.transform(_.exists(_.isEndGame))
+//  val inPlacingShipsMode: ReadableProperty[Boolean] =
+//    gameModeProperty.transform(_.exists(_.isPlacingShips))
+//
+//  val inPlayingMode: ReadableProperty[Boolean] =
+//    gameModeProperty.transform(_.exists(_.isPlaying))
+//
+//  val inGameOverMode: ReadableProperty[Boolean] =
+//    gameModeProperty.transform(_.exists(_.isEndGame))
 
   val isMyTurnProperty: ReadableProperty[Boolean] =
     playingModeProperty.transform(_.exists(_.isMyTurn))
@@ -287,7 +295,7 @@ class GamePresenter(
     else {
       val updatedGameState = None
       updateGameState(gameStateProperty.get.map(_.gameMode), updatedGameState)
-      gameModel.set(GameModel.default)
+      gameModel.set(GameModel.Default)
       gameStateProperty.set(updatedGameState)
       screenModel.set(ScreenModel.resetScreenModel(screenModel.get))
     }
@@ -302,8 +310,10 @@ class GamePresenter(
 
   val chatMessagesProperty: ReadableSeqProperty[ChatMessage] =
     chatModel.subSeq(_.msgs)
+
   val chatMessagesSizeProperty: ReadableProperty[Int] =
     chatMessagesProperty.transform(_.size)
+
   val chatMessagesShowNotification: ReadableProperty[Option[Int]] =
     combine(
       chatMessagesSizeProperty,
@@ -318,22 +328,33 @@ class GamePresenter(
     combine(
       gameStateProperty,
       gamePuzzleStateProperty,
+      screenModel.subProp(_.showAllMoves),
       screenModel.subProp(_.showMissesMoves),
       screenModel.subProp(_.showDisabledMoves),
       screenModel.subProp(_.disabledMovesSet)
     ).transformToSeq {
-      case (gameStateOpt, gamePuzzleState, showMissesMoves, showDisabledMoves, disabledMovesSet) =>
+      case (
+            gameStateOpt,
+            gamePuzzleState,
+            showAllMoves,
+            showMissesMoves,
+            showDisabledMoves,
+            disabledMovesSet
+          ) =>
         gameStateOpt
           .map(_.me.turnPlayHistory)
           .orElse(gamePuzzleState.map(_.playerPuzzle.turnPlayHistory))
           .map(_.filter { turnPlay =>
+            showAllMoves ||
             (showMissesMoves || turnPlay.hitHints.exists(_.isShip)) &&
             (showDisabledMoves || !disabledMovesSet(turnPlay.turn))
           })
           .getOrElse(Seq.empty)
     }
+
   val myMovesHistorySizeProperty: ReadableProperty[Int] =
     myMovesHistoryProperty.transform(_.size)
+
   val myMovesHistoryShowNotification: ReadableProperty[Option[Int]] =
     combine(
       myMovesHistorySizeProperty,
@@ -346,8 +367,10 @@ class GamePresenter(
 
   val enemyMovesHistoryProperty: ReadableSeqProperty[TurnPlay] =
     gameStateProperty.transformToSeq(_.map(_.enemy.turnPlayHistory).getOrElse(Seq.empty))
+
   val enemyMovesHistorySizeProperty: ReadableProperty[Int] =
     enemyMovesHistoryProperty.transform(_.size)
+
   val enemyMovesHistoryShowNotification: ReadableProperty[Option[Int]] =
     combine(
       enemyMovesHistorySizeProperty,
@@ -356,6 +379,16 @@ class GamePresenter(
     ).transform { case (totalSize, lastSeenMessageCount, selectedTab) =>
       Some(totalSize - lastSeenMessageCount)
         .filter(_ > 0 && selectedTab != ScreenModel.enemyMovesTab)
+    }
+
+  def resetLastSeenMessages(): Unit =
+    selectedTabProperty.get match {
+      case ScreenModel.chatTab =>
+        screenModel.subProp(_.lastSeenMessagesChat).set(chatMessagesSizeProperty.get)
+      case ScreenModel.myMovesTab =>
+        screenModel.subProp(_.lastSeenMessagesMyMoves).set(myMovesHistorySizeProperty.get)
+      case ScreenModel.enemyMovesTab =>
+        screenModel.subProp(_.lastSeenMessagesEnemyMoves).set(enemyMovesHistorySizeProperty.get)
     }
 
   val shipCounter: Map[ShipId, Property[Int]] =
@@ -385,7 +418,7 @@ class GamePresenter(
       lineDashOffsetIntervalHandle = Some(
         window.setInterval(
           () => {
-            lineDashOffset.set((lineDashOffset.get + 1) % 17)
+            lineDashOffset.set(lineDashOffset.get + 1)
           },
           timeout = lineDashOffsetIntervalMillis
         )
@@ -437,7 +470,6 @@ class GamePresenter(
 
         selectedTabProperty.set(ScreenModel.chatTab)
         screenModel.subProp(_.lastSeenMessagesChat).set(chatMessagesSizeProperty.get)
-        screenModel.subProp(_.screenResized).set((), force = true)
       case (
             None | Some(_: PlacingShipsMode),
             Some(GameState(_, _, me, enemy, PlayingMode(_, _, turnAttackTypes, _, _)))
@@ -540,20 +572,12 @@ class GamePresenter(
     }
   }
 
-  private var newTurnAnimationHandle: Option[Int] = None
-  private val newTurnAnimationMillis: Int = 50
-
-  private def stopNewTurnAnimation(): Unit = {
-    newTurnAnimationHandle.foreach(window.clearTimeout)
-    newTurnAnimationHandle = None
-  }
-
   playingModeProperty
     .transform(
       _.map(inGameMode => (inGameMode.isMyTurn, inGameMode.turn, inGameMode.turnAttackTypes))
     )
     .listen {
-      case Some((isMyTurn, Turn(_, extraTurn), turnAttackTypes)) =>
+      case Some((isMyTurn, Turn(_, _), turnAttackTypes)) =>
         gameModel.get.turnAttacksQueuedStatus match {
           case AttacksQueuedStatus.NotSet =>
           case AttacksQueuedStatus.Queued if isMyTurn =>
@@ -561,38 +585,6 @@ class GamePresenter(
           case AttacksQueuedStatus.Sent =>
             gameModel.subProp(_.turnAttacksQueuedStatus).set(AttacksQueuedStatus.NotSet)
             gameModel.subProp(_.turnAttacks).set(turnAttackTypes.map(Attack(_, None)))
-            screenModel
-              .subProp(_.missilesPopupMillisOpt)
-              .set(Some(BoardView.MissilesInitialPopupTime))
-            screenModel
-              .subProp(_.extraTurnPopup)
-              .set(extraTurn.map(_ => BoardView.ExtraTurnPopupTime))
-
-            newTurnAnimationHandle.foreach(window.clearInterval)
-            newTurnAnimationHandle = Some(
-              window.setInterval(
-                () => {
-                  val screen = screenModel.get
-
-                  screen.missilesPopupMillisOpt.foreach { missilesPopupMillis =>
-                    val updatedTime = missilesPopupMillis - newTurnAnimationMillis
-                    screenModel
-                      .subProp(_.missilesPopupMillisOpt)
-                      .set(Some(updatedTime).filter(_ > 0))
-                  }
-                  screen.extraTurnPopup.foreach { timeRemaining =>
-                    val updatedTime = timeRemaining - newTurnAnimationMillis
-                    screenModel
-                      .subProp(_.extraTurnPopup)
-                      .set(Some(updatedTime).filter(_ > 0))
-                  }
-
-                  if (screen.missilesPopupMillisOpt.isEmpty && screen.extraTurnPopup.isEmpty)
-                    stopNewTurnAnimation()
-                },
-                newTurnAnimationMillis
-              )
-            )
         }
       case _ =>
     }
@@ -608,7 +600,7 @@ class GamePresenter(
 
     translationsModel
       .subProp(_.extraTurnText)
-      .set(span(translatedDynamic(Translations.Game.extraTurnPopup)(_.apply())).render)
+      .set(span(translatedDynamic(Translations.Game.extraTurn)(_.apply())).render)
     translationsModel
       .subProp(_.myBoardTitle)
       .set(span(translatedDynamic(Translations.Game.myBoardTitle)(_.apply())).render)
@@ -675,6 +667,9 @@ class GamePresenter(
     translationsModel
       .subProp(_.puzzleIncorrect)
       .set(span(translatedDynamic(Translations.Puzzles.puzzleIncorrect)(_.apply())).render)
+
+//     TODO force puzzle state:
+//    startNewPuzzle()
 
     initializePreGameModel()
   }
@@ -868,18 +863,14 @@ class GamePresenter(
     )
   }
 
-  def onCanvasResize(boardView: BoardView): Boolean = {
-    screenModel.subProp(_.screenResized).set((), force = true)
+  def onCanvasResize(div: Div): Unit = {
+    val newSizeInt = div.clientHeight - MainBoardHeightMargin
+    val newSize = Coordinate.square(newSizeInt)
+    screenModel.subProp(_.mainBoardCanvasSize).set(newSize)
 
-    val width = Math.max(500, boardView.canvasDiv.clientWidth)
-    val height = BoardView.CanvasSize.y
-    screenModel.subProp(_.canvasSize).set(Coordinate(width, height))
-    if (width != boardView.myBoardCanvas.width || height != boardView.myBoardCanvas.height) {
-      boardView.myBoardCanvas.setAttribute("width", width.toString)
-      boardView.myBoardCanvas.setAttribute("height", height.toString)
-      true
-    } else
-      false
+    val smallBoardNewSize: Coordinate =
+      Coordinate.square((newSizeInt * SmallBoardSizeMultiplier).toInt)
+    screenModel.subProp(_.smallBoardCanvasSize).set(smallBoardNewSize)
   }
 
   override def onClose(): Unit = {
@@ -918,7 +909,7 @@ class GamePresenter(
     val preGame = preGameModel.get
     if (preGame.previewBoardOpt.forall(_._2 < PreGameModel.MinPreviewTries))
       Left(ErrorModalType.SmallBoardError)
-    else if (preGame.rules.gameFleet.shipAmount == 0)
+    else if (preGame.rules.gameFleet.shipsAmount == 0)
       Left(ErrorModalType.EmptyFleetError)
     else {
       Right(preGame.rules)
@@ -1185,7 +1176,6 @@ class GamePresenter(
         if (isMyTurn) {
           gameModel.subProp(_.turnAttacksQueuedStatus).set(AttacksQueuedStatus.Sent)
           gameRpc.sendTurnAttacks(gameId, turn, turnAttacks)
-          stopNewTurnAnimation()
         } else {
           gameModel.subProp(_.turnAttacksQueuedStatus).set(AttacksQueuedStatus.Queued)
         }
@@ -1378,5 +1368,16 @@ class GamePresenter(
       preGameModel.subProp(_.selectedNamedRule).set(Some(updatedNamedRules))
     }
   }
+
+  def setPlayerName(newUsername: Username): Unit = {
+    chatModel.subProp(_.username).set(newUsername)
+  }
+
+}
+
+object GamePresenter {
+
+  val MainBoardHeightMargin: Int = 32
+  val SmallBoardSizeMultiplier: Double = 0.35
 
 }

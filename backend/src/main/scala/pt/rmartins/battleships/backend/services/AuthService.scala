@@ -51,6 +51,8 @@ class AuthService() {
         usersLogged += usernameLower
       }
 
+      println(s"New connection: $username")
+
       Right(ctx)
     }
   }

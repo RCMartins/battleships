@@ -12,7 +12,7 @@ case class ChatModel(
 
 object ChatModel extends HasModelPropertyCreator[ChatModel] {
 
-  val default: ChatModel =
+  val Default: ChatModel =
     ChatModel(Username(""), Seq.empty, "")
 
 }
